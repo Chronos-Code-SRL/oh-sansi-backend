@@ -39,6 +39,7 @@ class OlympiadController extends Controller
      */
     public function store(Request $request)
     {
+        // Data validation
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'edition' => 'required|string|max:20|unique:olympiads,edition',
@@ -46,7 +47,6 @@ class OlympiadController extends Controller
             'end_date' => 'required|date|after:start_date',
         ]);
 
-        // Data validation
         if ($validator->fails()) {
             $data = [
                 'message' => 'Error in data validation',
@@ -109,7 +109,46 @@ class OlympiadController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        //
+        $olympiad = Olympiad::find($id);
+
+        if (!$olympiad) {
+            $data = [
+                'message' => 'Olympiad not found',
+                'status' => 404
+            ];
+            return response()->json($data, 404);
+        };
+
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'edition' => 'required|string|max:20|unique:olympiads,edition',
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after:start_date',
+        ]);
+
+        if ($validator->fails()) {
+            $data = [
+                'message' => 'Error in data validation',
+                'error' => $validator->errors(),
+                'status' => 400
+            ];
+            return response()->json($data, 400);
+        }
+
+        $olympiad->name = $request->name;
+        $olympiad->edition = $request->edition;
+        $olympiad->start_date = $request->start_date;
+        $olympiad->end_date = $request->end_date;
+
+        $olympiad->save();
+
+        $data = [
+            'message' => 'Olympiad updated',
+            'olympiad' => $olympiad,
+            'status' => 200
+        ];
+
+        return response()->json($data, 200);
     }
 
     /**
