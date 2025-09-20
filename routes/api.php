@@ -18,11 +18,7 @@ Route::get('/olympiads/{id}', [OlympiadController::class, 'show']);
 // POST /olympiads/
 Route::post('/olympiads', [OlympiadController::class, 'store']);
 // PUT /olympiads/{id}
-Route::put('/olympiads', function (){
-    return 'Placeholder PUT olympiad';
-});
+Route::put('/olympiads/{id}', [OlympiadController::class, 'update']);
 // TO DO: PATCH/olympiads/{id}
 // DELETE /olympiads/{id}
-Route::delete('/olympiads', function (){
-    return 'Placeholder DELETE olympiad';
-});
+Route::delete('/olympiads/{id}', [OlympiadController::class, 'destroy']);

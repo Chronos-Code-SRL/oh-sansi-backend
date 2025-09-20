@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 use App\Models\Olympiad;
 
@@ -119,9 +120,15 @@ class OlympiadController extends Controller
             return response()->json($data, 404);
         };
 
+        // Rule set to ignore the edition if it is the same as the one sent
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
-            'edition' => 'required|string|max:20|unique:olympiads,edition',
+            'edition' => [
+                'required',
+                'string',
+                'max:20',
+                Rule::unique('olympiads', 'edition')->ignore($olympiad->id),
+            ],
             'start_date' => 'required|date',
             'end_date' => 'required|date|after:start_date',
         ]);
@@ -156,6 +163,23 @@ class OlympiadController extends Controller
      */
     public function destroy(string $id)
     {
-        //
+        $olympiad = Olympiad::find($id);
+
+        if (!$olympiad) {
+            $data = [
+                'message' => 'Olympiad not found',
+                'status' => 404
+            ];
+            return response()->json($data, 404);
+        };
+
+        $olympiad->delete();
+
+        $data = [
+            'message' => 'Olympiad deleted',
+            'status' => 200
+        ];
+
+        return response()->json($data, 200);
     }
 }
