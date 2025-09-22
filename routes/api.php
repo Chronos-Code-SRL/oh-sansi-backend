@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 
 // Controllers here:
 use App\Http\Controllers\Api\OlympiadController;
+use App\Http\Controllers\Api\UserController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -22,3 +23,15 @@ Route::put('/olympiads/{id}', [OlympiadController::class, 'update']);
 // TO DO: PATCH/olympiads/{id}
 // DELETE /olympiads/{id}
 Route::delete('/olympiads/{id}', [OlympiadController::class, 'destroy']);
+
+// <--- CRUD Users --->
+// GET /users
+Route::get('/users', [UserController::class, 'index']);
+// GET /users/{id}
+Route::get('/users/{id}', [UserController::class, 'show']);
+// POST /users/
+Route::post('/users', [UserController::class, 'store']);
+// PUT /users/{id}
+Route::put('/users/{id}', [UserController::class, 'update']);
+// DELETE /users/{id}
+Route::delete('/users/{id}', [UserController::class, 'destroy']);
