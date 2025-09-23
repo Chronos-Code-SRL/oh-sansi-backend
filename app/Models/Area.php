@@ -11,9 +11,8 @@ class Area extends Model
 
     protected $fillable = ['name', 'description'];
 
-    public function olympiads()
+    public function olympiadAreas()
     {
-        return $this->belongsToMany(Olympiad::class, 'olympiad_area')
-            ->withTimestamps();
+        return $this->hasMany(OlympiadArea::class);
     }
 }

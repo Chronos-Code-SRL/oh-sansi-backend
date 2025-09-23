@@ -13,8 +13,8 @@ return new class extends Migration
     {
         Schema::create('olympiad_area', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('olympiad_id')->constrained()->onDelete('cascade');
-            $table->foreignId('area_id')->constrained()->onDelete('cascade');
+            $table->foreignId('olympiad_id')->constrained('olympiads')->onDelete('cascade');
+            $table->foreignId('area_id')->constrained('areas')->onDelete('cascade');
             $table->timestamps();
         });
     }
