@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 
 // Controllers here:
 use App\Http\Controllers\Api\OlympiadController;
+use App\Http\Controllers\Api\CompetitorUploadController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -22,3 +23,6 @@ Route::put('/olympiads/{id}', [OlympiadController::class, 'update']);
 // TO DO: PATCH/olympiads/{id}
 // DELETE /olympiads/{id}
 Route::delete('/olympiads/{id}', [OlympiadController::class, 'destroy']);
+
+// CSV upload for competitors
+Route::post('/competitors/upload-csv', [CompetitorUploadController::class, 'upload']);
