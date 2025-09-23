@@ -6,6 +6,8 @@ use Illuminate\Support\Facades\Route;
 // Controllers here:
 use App\Http\Controllers\Api\OlympiadController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\Api\AdminController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -24,14 +26,15 @@ Route::put('/olympiads/{id}', [OlympiadController::class, 'update']);
 // DELETE /olympiads/{id}
 Route::delete('/olympiads/{id}', [OlympiadController::class, 'destroy']);
 
-// <--- CRUD Users --->
-// GET /users
-Route::get('/users', [UserController::class, 'index']);
-// GET /users/{id}
-Route::get('/users/{id}', [UserController::class, 'show']);
-// POST /users/
-Route::post('/users', [UserController::class, 'store']);
-// PUT /users/{id}
-Route::put('/users/{id}', [UserController::class, 'update']);
-// DELETE /users/{id}
-Route::delete('/users/{id}', [UserController::class, 'destroy']);
+// login 
+Route::post('/login', [AuthController::class, 'login']);
+
+//login admin
+Route::middleware(['auth:sanctum', 'admin'])->group(function(){
+    //POST register evaluator or responsible academic
+    Route::post('/register', [AuthController::class, 'register']);
+    //GET all users
+    Route::get('/users', [AdminController::class, 'index']);
+    //POST logout    
+    Route::post('/logout', [AuthController::class, 'logout']);
+});
