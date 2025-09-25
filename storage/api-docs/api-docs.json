@@ -1,0 +1,261 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "OH Sansi API",
+        "description": "Documentación de la API para OH Sansi.",
+        "version": "1.0.0"
+    },
+    "servers": [
+        {
+            "url": "{APP_URL}",
+            "description": "Servidor local",
+            "variables": {
+                "APP_URL": {
+                    "default": "http://localhost:8000",
+                    "description": "URL base de la aplicación"
+                }
+            }
+        }
+    ],
+    "paths": {
+        "/api/competitors/upload-csv": {
+            "post": {
+                "tags": [
+                    "Competitors"
+                ],
+                "summary": "Subir CSV de competidores",
+                "description": "Sube uno o varios archivos CSV y procesa participantes, tutores, colegios y sus inscripciones. Cabeceras esperadas: N. (opcional), DOC., NOMBRE, GEN, DEP., COLEGIO, CELULAR, E-MAIL, AREA, NIVEL, GRADO. AREA admite múltiples valores separados por coma, punto y coma o barra vertical. Si se envían file y files a la vez, se prioriza files.",
+                "operationId": "uploadCompetitorsCsv",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CompetitorUploadForm"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Procesamiento de archivos CSV finalizado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CompetitorUploadResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Error de validación o archivo faltante",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "oneOf": [
+                                        {
+                                            "$ref": "#/components/schemas/MissingFileError"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/ValidationError"
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "CompetitorRowError": {
+                "required": [
+                    "message"
+                ],
+                "properties": {
+                    "row": {
+                        "description": "Número de fila en el CSV (1-index).",
+                        "type": "integer",
+                        "example": 5,
+                        "nullable": true
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "Faltan campos obligatorios en la fila."
+                    }
+                },
+                "type": "object"
+            },
+            "CompetitorStats": {
+                "required": [
+                    "processed",
+                    "created_contestants",
+                    "updated_contestants",
+                    "created_inscriptions",
+                    "skipped_duplicate_area",
+                    "errors"
+                ],
+                "properties": {
+                    "processed": {
+                        "type": "integer",
+                        "example": 12
+                    },
+                    "created_contestants": {
+                        "type": "integer",
+                        "example": 8
+                    },
+                    "updated_contestants": {
+                        "type": "integer",
+                        "example": 4
+                    },
+                    "created_inscriptions": {
+                        "type": "integer",
+                        "example": 10
+                    },
+                    "skipped_duplicate_area": {
+                        "type": "integer",
+                        "example": 2
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/CompetitorRowError"
+                        }
+                    }
+                },
+                "type": "object"
+            },
+            "CompetitorFileResult": {
+                "required": [
+                    "mensaje"
+                ],
+                "properties": {
+                    "archivo": {
+                        "type": "string",
+                        "example": "competitors.csv",
+                        "nullable": true
+                    },
+                    "mensaje": {
+                        "type": "string",
+                        "example": "Archivo procesado correctamente."
+                    },
+                    "estadisticas": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/CompetitorStats"
+                            }
+                        ],
+                        "nullable": true
+                    },
+                    "errores": {
+                        "type": "array",
+                        "items": {
+                            "properties": {
+                                "message": {
+                                    "type": "string",
+                                    "example": "Faltan columnas obligatorias."
+                                },
+                                "missing_headers": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    },
+                                    "nullable": true
+                                }
+                            },
+                            "type": "object"
+                        },
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "CompetitorUploadResponse": {
+                "required": [
+                    "message",
+                    "resultados"
+                ],
+                "properties": {
+                    "message": {
+                        "type": "string",
+                        "example": "Procesamiento de archivos CSV finalizado."
+                    },
+                    "resultados": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/CompetitorFileResult"
+                        }
+                    }
+                },
+                "type": "object"
+            },
+            "MissingFileError": {
+                "required": [
+                    "message"
+                ],
+                "properties": {
+                    "message": {
+                        "type": "string",
+                        "example": "No se recibió ningún archivo. Envíe uno o más archivos CSV."
+                    }
+                },
+                "type": "object"
+            },
+            "ValidationError": {
+                "required": [
+                    "message",
+                    "errors"
+                ],
+                "properties": {
+                    "message": {
+                        "type": "string",
+                        "example": "Archivo(s) inválido(s). Solo se permiten archivos .csv."
+                    },
+                    "errors": {
+                        "type": "object"
+                    }
+                },
+                "type": "object"
+            },
+            "CompetitorUploadForm": {
+                "description": "Formulario para subir uno o varios archivos CSV.",
+                "properties": {
+                    "file": {
+                        "description": "Archivo CSV (alternativa a 'files').",
+                        "type": "string",
+                        "format": "binary"
+                    },
+                    "files": {
+                        "description": "Varios archivos CSV.",
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "format": "binary"
+                        }
+                    }
+                },
+                "type": "object"
+            }
+        },
+        "requestBodies": {
+            "uploadCsv": {
+                "required": true,
+                "content": {
+                    "multipart/form-data": {
+                        "schema": {
+                            "$ref": "#/components/schemas/CompetitorUploadForm"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "tags": [
+        {
+            "name": "Competitors",
+            "description": "Operaciones relacionadas con competidores"
+        }
+    ]
+}
