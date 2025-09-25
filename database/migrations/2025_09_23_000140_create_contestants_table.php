@@ -15,9 +15,7 @@ return new class extends Migration {
             $table->date('born_date')->nullable();
             $table->foreignId('tutor_id')->nullable()->constrained('tutors')->nullOnDelete();
             $table->foreignId('school_id')->nullable()->constrained('schools')->nullOnDelete();
-            $table->enum('city', [
-                'Beni','Chuquisaca','Cochabamba','La_Paz','Oruro','Pando','Potosí','Santa_Cruz','Tarija'
-            ])->nullable();
+            $table->string('department')->nullable();
             $table->foreignId('education_level_id')->nullable()->constrained('levels')->nullOnDelete();
             $table->timestamps();
         });

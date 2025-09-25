@@ -12,7 +12,7 @@ class Contestant extends Model
     use HasFactory;
 
     protected $fillable = [
-        'name','lastname','ci_document','born_date','tutor_id','school_id','city','education_level_id'
+        'name','lastname','gender','ci_document','tutor_id','school_id','department','grade_id'
     ];
 
     public function tutor(): BelongsTo
@@ -25,9 +25,9 @@ class Contestant extends Model
         return $this->belongsTo(School::class);
     }
 
-    public function educationLevel(): BelongsTo
+    public function grade(): BelongsTo
     {
-        return $this->belongsTo(Level::class, 'education_level_id');
+        return $this->belongsTo(Grade::class);
     }
 
     public function inscriptions(): HasMany
