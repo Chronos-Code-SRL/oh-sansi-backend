@@ -62,13 +62,7 @@ class OlympiadController extends Controller
             return response()->json($data, 400);
         }
 
-        $olympiad = Olympiad::create([
-            'name' => $request->name,
-            'edition' => $request->edition,
-            'start_date' => $request->start_date,
-            'end_date' => $request->end_date,
-            'number_of_phases' => $request->number_of_phases
-        ]);
+        $olympiad = Olympiad::createWithDefaults($request->all());
 
         // If the Olympiad creation fails
         if (!$olympiad) {
@@ -77,43 +71,6 @@ class OlympiadController extends Controller
                 'status' => 500
             ];
             return response()->json($data, 500);
-        }
-
-        // Default Areas
-        $defaultAreas = ['Matemáticas', 'Física', 'Química', 'Informática'];
-        $areaIds = [];
-
-        foreach ($defaultAreas as $areaName) {
-            $area = Area::firstOrCreate(['name' => $areaName]);
-            $areaIds[] = $area->id;
-        }
-
-        // Relate Olympiad with Areas
-        $olympiad->areas()->sync($areaIds);
-
-        // Default Phases (number_of_phases)
-        $phaseIds = [];
-        for ($i = 1; $i <= $olympiad->number_of_phases; $i++) {
-            $phase = Phase::firstOrCreate([
-                'name' => 'Fase ' . $i,
-                'order' => $i,
-            ]);
-            $phaseIds[] = $phase->id;
-        }
-
-        // Relate each OlympiadArea with all Phases
-        foreach ($areaIds as $areaId) {
-            // Get the pivot relationship between Olympiad and Area
-            $olympiadArea = OlympiadArea::where('olympiad_id', $olympiad->id)
-                ->where('area_id', $areaId)
-                ->first();
-
-            foreach ($phaseIds as $phaseId) {
-                OlympiadAreaPhase::firstOrCreate([
-                    'olympiad_area_id' => $olympiadArea->id,
-                    'phase_id' => $phaseId,
-                ]);
-            }
         }
 
         return response()->json([
