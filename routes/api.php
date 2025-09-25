@@ -5,6 +5,9 @@ use Illuminate\Support\Facades\Route;
 
 // Controllers here:
 use App\Http\Controllers\Api\OlympiadController;
+use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\AdminController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -22,3 +25,29 @@ Route::put('/olympiads/{id}', [OlympiadController::class, 'update']);
 // TO DO: PATCH/olympiads/{id}
 // DELETE /olympiads/{id}
 Route::delete('/olympiads/{id}', [OlympiadController::class, 'destroy']);
+
+// login 
+Route::post('/login', [AuthController::class, 'login']);
+
+//admin routes
+Route::middleware(['auth:sanctum', 'admin'])->group(function(){
+    //POST register evaluator or responsible academic
+    Route::post('/register', [AuthController::class, 'register']);
+    //GET all users
+    Route::get('/users', [AdminController::class, 'index']);
+});
+
+// evaluator routes
+Route::middleware(['auth:sanctum', 'evaluator'])->group(function(){
+
+});
+
+// academic responsible routes
+Route::middleware(['auth:sanctum', 'academic_responsible'])->group(function(){
+
+});
+
+//POST logout    
+Route::middleware(['auth:sanctum'])->group(function () {
+    Route::post('/logout', [AuthController::class, 'logout']);
+});
