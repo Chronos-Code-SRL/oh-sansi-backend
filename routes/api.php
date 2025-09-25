@@ -42,6 +42,11 @@ Route::middleware(['auth:sanctum', 'evaluator'])->group(function(){
 
 });
 
+// academic responsible routes
+Route::middleware(['auth:sanctum', 'academic_responsible'])->group(function(){
+
+});
+
 //POST logout    
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);

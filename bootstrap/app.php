@@ -16,6 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'admin' => \App\Http\Middleware\AdminMiddleware::class,
             'evaluator' => \App\Http\Middleware\EvaluatorMiddleware::class,
+            'academic_responsible' => \App\Http\Middleware\EvaluatorMiddleware::class,
         ]);
     
     })
