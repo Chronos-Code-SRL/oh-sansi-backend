@@ -19,6 +19,36 @@ class CompetitorUploadController extends Controller
     /**
      * Handle CSV upload, validate headers and rows, upsert contestants and inscriptions.
      */
+    /**
+     * @OA\Post(
+     *   path="/api/competitors/upload-csv",
+     *   summary="Subir CSV de competidores",
+     *   description="Sube uno o varios archivos CSV y procesa participantes, tutores, colegios y sus inscripciones. Cabeceras esperadas: N. (opcional), DOC., NOMBRE, GEN, DEP., COLEGIO, CELULAR, E-MAIL, AREA, NIVEL, GRADO. AREA admite múltiples valores separados por coma, punto y coma o barra vertical. Si se envían file y files a la vez, se prioriza files.",
+     *   tags={"Competitors"},
+     *   operationId="uploadCompetitorsCsv",
+     *   requestBody=@OA\RequestBody(
+     *     request="uploadCsv",
+     *     required=true,
+     *     @OA\MediaType(
+     *       mediaType="multipart/form-data",
+     *       @OA\Schema(ref="#/components/schemas/CompetitorUploadForm")
+     *     )
+     *   ),
+     *   @OA\Response(
+     *     response=200,
+     *     description="Procesamiento de archivos CSV finalizado",
+     *     @OA\JsonContent(ref="#/components/schemas/CompetitorUploadResponse")
+     *   ),
+     *   @OA\Response(
+     *     response=422,
+     *     description="Error de validación o archivo faltante",
+     *     @OA\JsonContent(oneOf={
+     *       @OA\Schema(ref="#/components/schemas/MissingFileError"),
+     *       @OA\Schema(ref="#/components/schemas/ValidationError")
+     *     })
+     *   )
+     * )
+     */
     public function upload(Request $request)
     {
         // Normalize input: allow 'file' (single) or 'files' (multiple)
