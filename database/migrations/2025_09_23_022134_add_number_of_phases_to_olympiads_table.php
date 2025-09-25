@@ -11,11 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('olympiad_areas', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('olympiad_id')->constrained('olympiads')->onDelete('cascade');
-            $table->foreignId('area_id')->constrained('areas')->onDelete('cascade');
-            $table->timestamps();
+        Schema::table('olympiads', function (Blueprint $table) {
+            $table->unsignedInteger('number_of_phases')->default(2);
         });
     }
 
@@ -24,6 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('olympiad_area');
+        Schema::table('olympiads', function (Blueprint $table) {
+            $table->dropColumn('number_of_phases');
+        });
     }
 };

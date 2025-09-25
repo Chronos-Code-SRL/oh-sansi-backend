@@ -11,9 +11,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('olympiad_area_phase', function (Blueprint $table) {
+        Schema::create('olympiad_area_phases', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('olympiad_area_id')->constrained('olympiad_area')->onDelete('cascade');
+            $table->foreignId('olympiad_area_id')->constrained('olympiad_areas')->onDelete('cascade');
             $table->foreignId('phase_id')->constrained('phases')->onDelete('cascade');
             $table->integer('score_cut')->nullable();
             $table->timestamps();
