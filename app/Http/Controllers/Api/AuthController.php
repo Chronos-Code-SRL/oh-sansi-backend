@@ -37,7 +37,6 @@ class AuthController extends Controller
 
         $full_name = $request->first_name . ' ' . $request->last_name;
         $generate_password = $this->generate_password($full_name, $request->ci);
-        echo $generate_password;
 
         $user = User::create([
             'first_name' => $request->first_name,
