@@ -19,7 +19,7 @@ class AuthController extends Controller
             'first_name' => 'required|string|min:2|max:50',
             'last_name' => 'required|string|min:2|max:50',
             'email' => 'required|email|unique:users,email',
-            'password' => 'required|string|confirmed',
+            // 'password' => 'required|string|confirmed',
             'ci' => 'required|min:6|max:12|unique:users,ci',
             'phone_number' => 'required|min:7|max:15',
             'genre' => 'required|in:masculino,femenino',
@@ -35,11 +35,15 @@ class AuthController extends Controller
             return response()->json($data, 400);
         }
 
+        $full_name = $request->first_name . ' ' . $request->last_name;
+        $generate_password = $this->generate_password($full_name, $request->ci);
+        echo $generate_password;
+
         $user = User::create([
             'first_name' => $request->first_name,
             'last_name' => $request->last_name,
             'email' => $request->email,
-            'password' => Hash::make($request->password),
+            'password' => Hash::make($generate_password),
             'ci' => $request->ci,
             'phone_number' => $request->phone_number,
             'genre' => $request->genre,
@@ -57,7 +61,6 @@ class AuthController extends Controller
         $token = $user->createToken('auth_token')->plainTextToken;
 
         $data = [
-            // 'data' => $user,
             'message' => 'User registration successfully',
             'acces_token' => $token,
             'token_type' => 'Bearer'
@@ -84,5 +87,33 @@ class AuthController extends Controller
         $request->user()->tokens()->delete();
 
         return response()->json(['message' => 'Logged out successfully']);
+    }
+
+    public function generate_password($name, $ci){
+        $full_name = trim($name);
+        $array_names = [];
+        $name = "";
+        $password = "";
+
+        for ($i=0; $i < strlen($full_name); $i++) { 
+            if ($full_name[$i] != ' ') {
+                $name .= $full_name[$i];
+            }else{
+                if ($name != "") {
+                    array_push($array_names, $name);
+                    $name = "";
+                }
+            }
+        }
+
+        if (!$name == "") {
+            array_push($array_names, $name);
+        }
+
+        for ($i=0; $i < sizeof($array_names); $i++) { 
+            $password .= $array_names[$i][0];
+        }
+        
+        return strtoupper($password) . $ci;
     }
 }
