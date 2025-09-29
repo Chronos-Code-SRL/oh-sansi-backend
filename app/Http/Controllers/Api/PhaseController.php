@@ -7,33 +7,28 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
-use App\Models\Olympiad;
-use App\Models\Area;
 use App\Models\Phase;
-use App\Models\OlympiadArea;
-use App\Models\OlympiadAreaPhase;
 
-class OlympiadController extends Controller
+class PhaseController extends Controller
 {
     /**
      * Display a listing of the resource.
      */
     public function index()
     {
-        $olympiads = Olympiad::all();
+        $phases = Phase::all();
 
-        if ($olympiads->isEmpty()) {
+        if ($phases->isEmpty()) {
             $data = [
-                'message' => 'No olympiads found',
+                'message' => 'No phases found',
                 'status' => 404
             ];
             return response()->json($data, 404);
         }
 
         $data = [
-            'olympiads' => $olympiads,
-            'stauts' => 200
-
+            'phases' => $phases,
+            'status' => 200
         ];
 
         return response()->json($data, 200);
@@ -46,11 +41,8 @@ class OlympiadController extends Controller
     {
         // Data validation
         $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'edition' => 'required|string|max:20|unique:olympiads,edition',
-            'start_date' => 'required|date',
-            'end_date' => 'required|date|after:start_date',
-            'number_of_phases' => 'required|integer|min:1',
+            'name' => 'required|string|max:50|unique:phases,name',
+            'order' => 'required|integer|min:1|unique:phases,order'
         ]);
 
         if ($validator->fails()) {
@@ -62,21 +54,26 @@ class OlympiadController extends Controller
             return response()->json($data, 400);
         }
 
-        $olympiad = Olympiad::createWithDefaults($request->all());
+        $phase = Phase::create([
+            'name' => $request->name,
+            'order' => $request->order
+        ]);
 
-        // If the Olympiad creation fails
-        if (!$olympiad) {
+        if (!$phase) {
             $data = [
-                'message' => 'Error creating the Olympiad',
+                'message' => 'Error creating phase',
                 'status' => 500
             ];
             return response()->json($data, 500);
         }
 
-        return response()->json([
-            'message' => 'Olympiad created successfully with default areas and phases',
-            'data' => $olympiad->load('areas', 'phases'),
-        ], 201);
+        $data = [
+            'message' => 'Phase created successfully',
+            'phase' => $phase,
+            'status' => 201
+        ];
+
+        return response()->json($data, 201);
     }
 
     /**
@@ -84,18 +81,18 @@ class OlympiadController extends Controller
      */
     public function show(string $id)
     {
-        $olympiad = Olympiad::find($id);
+        $phase = Phase::find($id);
 
-        if (!$olympiad) {
+        if (!$phase) {
             $data = [
-                'message' => 'Olympiad not found',
+                'message' => 'Phase not found',
                 'status' => 404
             ];
             return response()->json($data, 404);
-        };
+        }
 
         $data = [
-            'olympiad' => $olympiad,
+            'phase' => $phase,
             'status' => 200
         ];
 
@@ -107,27 +104,30 @@ class OlympiadController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        $olympiad = Olympiad::find($id);
+        $phase = Phase::find($id);
 
-        if (!$olympiad) {
+        if (!$phase) {
             $data = [
-                'message' => 'Olympiad not found',
+                'message' => 'Phase not found',
                 'status' => 404
             ];
             return response()->json($data, 404);
-        };
+        }
 
-        // Rule set to ignore the edition if it is the same as the one sent
+        // Data validation
         $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'edition' => [
+            'name' => [
                 'required',
                 'string',
-                'max:20',
-                Rule::unique('olympiads', 'edition')->ignore($olympiad->id),
+                'max:50',
+                Rule::unique('phases', 'name')->ignore($phase->id)
             ],
-            'start_date' => 'required|date',
-            'end_date' => 'required|date|after:start_date',
+            'order' => [
+                'required',
+                'integer',
+                'min:1',
+                Rule::unique('phases', 'order')->ignore($phase->id)
+            ]
         ]);
 
         if ($validator->fails()) {
@@ -139,16 +139,20 @@ class OlympiadController extends Controller
             return response()->json($data, 400);
         }
 
-        $olympiad->name = $request->name;
-        $olympiad->edition = $request->edition;
-        $olympiad->start_date = $request->start_date;
-        $olympiad->end_date = $request->end_date;
+        $phase->name = $request->name;
+        $phase->order = $request->order;
 
-        $olympiad->save();
+        if (!$phase->save()) {
+            $data = [
+                'message' => 'Error updating phase',
+                'status' => 500
+            ];
+            return response()->json($data, 500);
+        }
 
         $data = [
-            'message' => 'Olympiad updated',
-            'olympiad' => $olympiad,
+            'message' => 'Phase updated successfully',
+            'phase' => $phase,
             'status' => 200
         ];
 
@@ -160,20 +164,20 @@ class OlympiadController extends Controller
      */
     public function destroy(string $id)
     {
-        $olympiad = Olympiad::find($id);
+        $phase = Phase::find($id);
 
-        if (!$olympiad) {
+        if (!$phase) {
             $data = [
-                'message' => 'Olympiad not found',
+                'message' => 'Phase not found',
                 'status' => 404
             ];
             return response()->json($data, 404);
-        };
+        }
 
-        $olympiad->delete();
+        $phase->delete();
 
         $data = [
-            'message' => 'Olympiad deleted',
+            'message' => 'Phase deleted successfully',
             'status' => 200
         ];
 
