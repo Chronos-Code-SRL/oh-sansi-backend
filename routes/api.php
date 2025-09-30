@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\AreaController;
 use App\Http\Controllers\Api\PhaseController;
+use App\Http\Controllers\CompetitorRegistrationController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -71,9 +72,12 @@ Route::middleware(['auth:sanctum', 'evaluator'])->group(function(){
 });
 
 // academic responsible routes
-Route::middleware(['auth:sanctum', 'academic_responsible'])->group(function(){
-
-});
+//Route::middleware(['auth:sanctum', 'academic_responsible'])->group(function(){
+    // Competitor registration routes
+    Route::post('/competitors/upload-csv', [CompetitorRegistrationController::class, 'uploadCsv']);
+    Route::post('/competitors/test-upload', [CompetitorRegistrationController::class, 'testUpload']);
+    Route::get('/competitors/download-error-csv/{filename}', [CompetitorRegistrationController::class, 'downloadErrorCsv']);
+//});
 
 //POST logout
 Route::middleware(['auth:sanctum'])->group(function () {
