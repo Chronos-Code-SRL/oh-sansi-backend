@@ -38,46 +38,38 @@ class Olympiad extends Model
             'id');                      // PK in olympiad_area
     }
 
-    public static function createWithDefaults(array $data) {
-        $olympiad = self::create($data);
-
-        // Default Areas
-        $defaultAreas = ['Matemáticas', 'Física', 'Química', 'Informática'];
+    public function assignAreas(array $areaNames) {
         $areaIds = [];
 
-        foreach ($defaultAreas as $areaName) {
+        // Create or get areas
+        foreach ($areaNames as $areaName) {
             $area = Area::firstOrCreate(['name' => $areaName]);
             $areaIds[] = $area->id;
         }
 
         // Relate Olympiad with Areas
-        $olympiad->areas()->sync($areaIds);
+        $this->areas()->sync($areaIds);
 
-        // Default Phases (number_of_phases)
-        $phaseIds = [];
-        for ($i = 1; $i <= $olympiad->number_of_phases; $i++) {
-            $phase = Phase::firstOrCreate([
-                'name' => 'Fase ' . $i,
-                'order' => $i,
-            ]);
-            $phaseIds[] = $phase->id;
-        }
-
-        // Relate each OlympiadArea with all Phases
+        // Create phases for each area
         foreach ($areaIds as $areaId) {
-            // Get the pivot relationship between Olympiad and Area
-            $olympiadArea = OlympiadArea::where('olympiad_id', $olympiad->id)
+            $olympiadArea = OlympiadArea::where('olympiad_id', $this->id)
                 ->where('area_id', $areaId)
                 ->first();
 
-            foreach ($phaseIds as $phaseId) {
+            // Create phases for this area
+            for ($i = 1; $i <= $this->number_of_phases; $i++) {
+                $phase = Phase::firstOrCreate([
+                    'name' => 'Fase ' . $i,
+                    'order' => $i,
+                ]);
+
                 OlympiadAreaPhase::firstOrCreate([
                     'olympiad_area_id' => $olympiadArea->id,
-                    'phase_id' => $phaseId,
+                    'phase_id' => $phase->id,
                 ]);
             }
         }
 
-        return $olympiad->load('areas', 'phases');
+        return $this->load('areas', 'phases');
     }
 }
