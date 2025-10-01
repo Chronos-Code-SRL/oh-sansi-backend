@@ -62,7 +62,13 @@ class OlympiadController extends Controller
             return response()->json($data, 400);
         }
 
-        $olympiad = Olympiad::createWithDefaults($request->all());
+        $olympiad = Olympiad::create([
+            'name' => $request->name,
+            'edition' => $request->edition,
+            'start_date' => $request->start_date,
+            'end_date' => $request->end_date,
+            'number_of_phases' => $request->number_of_phases,
+        ]);
 
         // If the Olympiad creation fails
         if (!$olympiad) {
@@ -178,5 +184,38 @@ class OlympiadController extends Controller
         ];
 
         return response()->json($data, 200);
+    }
+
+    public function assignAreas(Request $request, $id)
+    {
+        $olympiad = Olympiad::find($id);
+
+        if (!$olympiad) {
+            return response()->json([
+                'message' => 'Olympiad not found',
+                'status' => 404
+            ], 404);
+        }
+
+        // Data validation
+        $validator = Validator::make($request->all(), [
+            'areas' => 'required|array|min:1',
+            'areas.*' => 'required|string|max:25'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Error in data validation',
+                'error' => $validator->errors(),
+                'status' => 400
+            ], 400);
+        }
+
+        $olympiad = $olympiad->assignAreas($request->areas);
+
+        return response()->json([
+            'message' => 'Areas assigned successfully',
+            'data' => $olympiad,
+        ], 200);
     }
 }
