@@ -51,6 +51,8 @@ class OlympiadController extends Controller
             'start_date' => 'required|date',
             'end_date' => 'required|date|after:start_date',
             'number_of_phases' => 'required|integer|min:1',
+            'areas' => 'required|array|min:1',
+            'areas.*' => 'required|string|max:25'
         ]);
 
         if ($validator->fails()) {
@@ -79,8 +81,11 @@ class OlympiadController extends Controller
             return response()->json($data, 500);
         }
 
+        // Assign areas
+        $olympiad = $olympiad->assignAreas($request->areas);
+
         return response()->json([
-            'message' => 'Olympiad created successfully with default areas and phases',
+            'message' => 'Olympiad created successfully with specific areas and phases',
             'data' => $olympiad->load('areas', 'phases'),
         ], 201);
     }
