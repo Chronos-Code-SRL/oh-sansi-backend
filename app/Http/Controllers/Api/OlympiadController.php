@@ -30,8 +30,14 @@ class OlympiadController extends Controller
             return response()->json($data, 404);
         }
 
+        // Mapping olympiads and merging areas names
         $data = [
-            'olympiads' => $olympiads,
+            'olympiads' => $olympiads->map(function ($olympiad) {
+                return array_merge(
+                    $olympiad->toArray(),
+                    ['areas' => $olympiad->areas->pluck('name')->toArray()]
+                );
+            }),
             'stauts' => 200
 
         ];
@@ -46,13 +52,13 @@ class OlympiadController extends Controller
     {
         // Data validation
         $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'edition' => 'required|string|max:20|unique:olympiads,edition',
+            'name' => 'required|string|max:30',
+            'edition' => 'required|string|max:10|unique:olympiads,edition',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after:start_date',
             'number_of_phases' => 'required|integer|min:1',
             'areas' => 'required|array|min:1',
-            'areas.*' => 'required|string|max:25'
+            'areas.*' => 'required|string|max:25|exists:areas,name',
         ]);
 
         if ($validator->fails()) {
@@ -106,7 +112,10 @@ class OlympiadController extends Controller
         };
 
         $data = [
-            'olympiad' => $olympiad,
+            'olympiad' => array_merge(
+                $olympiad->toArray(),
+                ['areas' => $olympiad->areas->pluck('name')->toArray()]
+                ),
             'status' => 200
         ];
 
@@ -205,7 +214,7 @@ class OlympiadController extends Controller
         // Data validation
         $validator = Validator::make($request->all(), [
             'areas' => 'required|array|min:1',
-            'areas.*' => 'required|string|max:25'
+            'areas.*' => 'required|string|max:25|exists:areas,name'
         ]);
 
         if ($validator->fails()) {

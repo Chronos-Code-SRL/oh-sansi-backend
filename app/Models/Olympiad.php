@@ -35,20 +35,27 @@ class Olympiad extends Model
             'olympiad_id',              // FK in olympiad_area
             'olympiad_area_id',         // FK in olympiad_area_phase
             'id',                       // PK in olympiads
-            'id');                      // PK in olympiad_area
+            'id'                        // PK in olympiad_areas
+        );
     }
 
-    public function assignAreas(array $areaNames) {
-        $areaIds = [];
+    public function assignAreas(array $areaNames)
+    {
+        // Get areas by their names
+        $areas = Area::whereIn('name', $areaNames)->get();
+        $areaIds = $areas->pluck('id')->toArray();
 
-        // Create or get areas
-        foreach ($areaNames as $areaName) {
-            $area = Area::firstOrCreate(['name' => $areaName]);
-            $areaIds[] = $area->id;
+        // Check if any area is already related to this olympiad
+        $existingAreas = $this->areas()->whereIn('areas.id', $areaIds)->exists();
+        if ($existingAreas) {
+            return response()->json([
+                'message' => 'One or more areas are already assigned to this olympiad',
+                'status' => 400
+            ], 400);
         }
 
         // Relate Olympiad with Areas
-        $this->areas()->sync($areaIds);
+        $this->areas()->attach($areaIds);
 
         // Create phases for each area
         foreach ($areaIds as $areaId) {
