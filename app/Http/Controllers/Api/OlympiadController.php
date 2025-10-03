@@ -232,4 +232,30 @@ class OlympiadController extends Controller
             'data' => $olympiad,
         ], 200);
     }
+
+    public function getAreas(string $id)
+    {
+        $olympiad = Olympiad::find($id);
+
+        if (!$olympiad) {
+            return response()->json([
+                'message' => 'Olympiad not found',
+                'status' => 404
+            ], 404);
+        }
+
+        $areas = $olympiad->areas;
+
+        if ($areas->isEmpty()) {
+            return response()->json([
+                'message' => 'No areas found for this olympiad',
+                'status' => 404
+            ], 404);
+        }
+
+        return response()->json([
+            'areas' => $areas->pluck('name')->toArray(),
+            'status' => 200
+        ], 200);
+    }
 }
