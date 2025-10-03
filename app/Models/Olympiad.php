@@ -15,6 +15,7 @@ class Olympiad extends Model
         'start_date',
         'end_date',
         'number_of_phases',
+        'status',
     ];
 
     public function olympiadAreas()
@@ -35,49 +36,48 @@ class Olympiad extends Model
             'olympiad_id',              // FK in olympiad_area
             'olympiad_area_id',         // FK in olympiad_area_phase
             'id',                       // PK in olympiads
-            'id');                      // PK in olympiad_area
+            'id'                        // PK in olympiad_areas
+        );
     }
 
-    public static function createWithDefaults(array $data) {
-        $olympiad = self::create($data);
+    public function assignAreas(array $areaNames)
+    {
+        // Get areas by their names
+        $areas = Area::whereIn('name', $areaNames)->get();
+        $areaIds = $areas->pluck('id')->toArray();
 
-        // Default Areas
-        $defaultAreas = ['Matemáticas', 'Física', 'Química', 'Informática'];
-        $areaIds = [];
-
-        foreach ($defaultAreas as $areaName) {
-            $area = Area::firstOrCreate(['name' => $areaName]);
-            $areaIds[] = $area->id;
+        // Check if any area is already related to this olympiad
+        $existingAreas = $this->areas()->whereIn('areas.id', $areaIds)->exists();
+        if ($existingAreas) {
+            return response()->json([
+                'message' => 'One or more areas are already assigned to this olympiad',
+                'status' => 400
+            ], 400);
         }
 
         // Relate Olympiad with Areas
-        $olympiad->areas()->sync($areaIds);
+        $this->areas()->attach($areaIds);
 
-        // Default Phases (number_of_phases)
-        $phaseIds = [];
-        for ($i = 1; $i <= $olympiad->number_of_phases; $i++) {
-            $phase = Phase::firstOrCreate([
-                'name' => 'Fase ' . $i,
-                'order' => $i,
-            ]);
-            $phaseIds[] = $phase->id;
-        }
-
-        // Relate each OlympiadArea with all Phases
+        // Create phases for each area
         foreach ($areaIds as $areaId) {
-            // Get the pivot relationship between Olympiad and Area
-            $olympiadArea = OlympiadArea::where('olympiad_id', $olympiad->id)
+            $olympiadArea = OlympiadArea::where('olympiad_id', $this->id)
                 ->where('area_id', $areaId)
                 ->first();
 
-            foreach ($phaseIds as $phaseId) {
+            // Create phases for this area
+            for ($i = 1; $i <= $this->number_of_phases; $i++) {
+                $phase = Phase::firstOrCreate([
+                    'name' => 'Fase ' . $i,
+                    'order' => $i,
+                ]);
+
                 OlympiadAreaPhase::firstOrCreate([
                     'olympiad_area_id' => $olympiadArea->id,
-                    'phase_id' => $phaseId,
+                    'phase_id' => $phase->id,
                 ]);
             }
         }
 
-        return $olympiad->load('areas', 'phases');
+        return $this->load('areas', 'phases');
     }
 }

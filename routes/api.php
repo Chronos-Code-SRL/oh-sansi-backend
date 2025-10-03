@@ -15,31 +15,29 @@ Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
 
+// <--- CRUD Olympiad --->
+Route::get('/olympiads', [OlympiadController::class, 'index']);
+Route::get('/olympiads/{id}', [OlympiadController::class, 'show']);
+Route::post('/olympiads', [OlympiadController::class, 'store']);
+Route::put('/olympiads/{id}', [OlympiadController::class, 'update']);
+Route::delete('/olympiads/{id}', [OlympiadController::class, 'destroy']);
+
+// <--- CRUD Olympiad-Areas --->
+Route::post('/olympiads/{id}/areas', [OlympiadController::class, 'assignAreas']);
+Route::get('/olympiads/{id}/areas', [OlympiadController::class, 'getAreas']);
 
 // <--- CRUD Area --->
-// GET /areas
 Route::get('/areas', [AreaController::class, 'index']);
-// GET /areas/{id}
 Route::get('/areas/{id}', [AreaController::class, 'show']);
-// POST /areas/
 Route::post('/areas', [AreaController::class, 'store']);
-// PUT /areas/{id}
 Route::put('/areas/{id}', [AreaController::class, 'update']);
-// TO DO: PATCH/areas/{id}
-// DELETE /areas/{id}
 Route::delete('/areas/{id}', [AreaController::class, 'destroy']);
 
 // <--- CRUD Phase --->
-// GET /phases
 Route::get('/phases', [PhaseController::class, 'index']);
-// GET /phases/{id}
 Route::get('/phases/{id}', [PhaseController::class, 'show']);
-// POST /phases/
 Route::post('/phases', [PhaseController::class, 'store']);
-// PUT /phases/{id}
 Route::put('/phases/{id}', [PhaseController::class, 'update']);
-// TO DO: PATCH/phases/{id}
-// DELETE /phases/{id}
 Route::delete('/phases/{id}', [PhaseController::class, 'destroy']);
 
 // login
