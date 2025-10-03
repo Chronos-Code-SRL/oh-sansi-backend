@@ -23,6 +23,8 @@ Route::put('/olympiads/{id}', [OlympiadController::class, 'update']);
 Route::delete('/olympiads/{id}', [OlympiadController::class, 'destroy']);
 // Assign areas to olympiad
 Route::post('/olympiads/{id}/areas', [OlympiadController::class, 'assignAreas']);
+// Get areas of an olympiad
+Route::get('/olympiads/{id}/areas', [OlympiadController::class, 'getAreas']);
 
 // <--- CRUD Area --->
 Route::get('/areas', [AreaController::class, 'index']);
