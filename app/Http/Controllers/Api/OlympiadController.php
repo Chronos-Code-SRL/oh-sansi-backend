@@ -57,6 +57,7 @@ class OlympiadController extends Controller
             'start_date' => 'required|date',
             'end_date' => 'required|date|after:start_date',
             'number_of_phases' => 'required|integer|min:1',
+            'status' => 'in:En planificación,Activa,Terminada',
             'areas' => 'required|array|min:1',
             'areas.*' => 'required|string|max:25|exists:areas,name',
         ]);
@@ -76,6 +77,7 @@ class OlympiadController extends Controller
             'start_date' => $request->start_date,
             'end_date' => $request->end_date,
             'number_of_phases' => $request->number_of_phases,
+            'status' => $request->status ?? 'En planificación',
         ]);
 
         // If the Olympiad creation fails
@@ -148,6 +150,7 @@ class OlympiadController extends Controller
             ],
             'start_date' => 'required|date',
             'end_date' => 'required|date|after:start_date',
+            'status' => 'in:En planificación,Activa,Terminada',
         ]);
 
         if ($validator->fails()) {
@@ -163,6 +166,7 @@ class OlympiadController extends Controller
         $olympiad->edition = $request->edition;
         $olympiad->start_date = $request->start_date;
         $olympiad->end_date = $request->end_date;
+        $olympiad->status = $request->status ?? $olympiad->status;
 
         $olympiad->save();
 

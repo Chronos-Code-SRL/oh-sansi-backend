@@ -15,6 +15,7 @@ class Olympiad extends Model
         'start_date',
         'end_date',
         'number_of_phases',
+        'status',
     ];
 
     public function olympiadAreas()
