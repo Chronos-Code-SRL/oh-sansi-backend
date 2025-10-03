@@ -47,18 +47,12 @@ Route::post('/login', [AuthController::class, 'login']);
 
 //admin routes
 Route::middleware(['auth:sanctum', 'admin'])->group(function(){
-    // <--- CRUD Olympiad --->
-    // GET /olympiads
-    Route::get('/olympiads', [OlympiadController::class, 'index']);
-    // GET /olympiads/{id}
-    Route::get('/olympiads/{id}', [OlympiadController::class, 'show']);
-    // POST /olympiads/
-    Route::post('/olympiads', [OlympiadController::class, 'store']);
-    // PUT /olympiads/{id}
-    Route::put('/olympiads/{id}', [OlympiadController::class, 'update']);
-    // TO DO: PATCH/olympiads/{id}
-    // DELETE /olympiads/{id}
-    Route::delete('/olympiads/{id}', [OlympiadController::class, 'destroy']);
+    // // <--- CRUD Olympiad --->
+    // Route::get('/olympiads', [OlympiadController::class, 'index']);
+    // Route::get('/olympiads/{id}', [OlympiadController::class, 'show']);
+    // Route::post('/olympiads', [OlympiadController::class, 'store']);
+    // Route::put('/olympiads/{id}', [OlympiadController::class, 'update']);
+    // Route::delete('/olympiads/{id}', [OlympiadController::class, 'destroy']);
 
     //POST register evaluator or responsible academic
     Route::post('/register', [AuthController::class, 'register']);
