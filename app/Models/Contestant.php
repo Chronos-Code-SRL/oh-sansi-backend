@@ -2,38 +2,59 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Contestant extends Model
 {
     use HasFactory;
 
     protected $fillable = [
-        'name','lastname','gender','ci_document','tutor_id','school_id','department','grade_id'
+        'first_name',
+        'last_name',
+        'ci_document',
+        'gender',
+        'school_name',
+        'department',
+        'phone_number',
+        'email',
+        'tutor_name',
+        'tutor_number',
+        'grade'
     ];
 
-    public function tutor(): BelongsTo
+    protected $casts = [
+        'gender' => 'string',
+    ];
+
+    /**
+     * Get the registrations for the contestant
+     */
+    public function registrations()
     {
-        return $this->belongsTo(Tutor::class);
+        return $this->hasMany(Registration::class);
     }
 
-    public function school(): BelongsTo
+    /**
+     * Get the groups for the contestant
+     */
+    public function groups()
     {
-        return $this->belongsTo(School::class);
+        return $this->hasMany(Group::class);
     }
 
-    public function grade(): BelongsTo
+    /**
+     * Get the olympiad areas through registrations
+     */
+    public function olympiadAreas()
     {
-        return $this->belongsTo(Grade::class);
-    }
-
-    public function inscriptions(): HasMany
-    {
-        return $this->hasMany(Inscription::class);
+        return $this->hasManyThrough(
+            OlympiadArea::class,
+            Registration::class,
+            'contestant_id',
+            'id',
+            'id',
+            'olympiad_area_id'
+        );
     }
 }
-
-
