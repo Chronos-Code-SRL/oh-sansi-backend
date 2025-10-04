@@ -40,4 +40,9 @@ class Area extends Model
             'id'                        // PK in olympiad_areas
         );
     }
+
+    public function users()
+    {
+        return $this->belongsToMany(User::class, 'user_areas');
+    }
 }

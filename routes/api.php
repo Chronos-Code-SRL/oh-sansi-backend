@@ -35,6 +35,11 @@ Route::post('/areas', [AreaController::class, 'store']);
 Route::put('/areas/{id}', [AreaController::class, 'update']);
 Route::delete('/areas/{id}', [AreaController::class, 'destroy']);
 
+// <--- CRUD Area-Users --->
+Route::get('/areas/{id}/users', [AreaController::class, 'getUsers']);
+Route::post('/areas/{id}/users', [AreaController::class, 'assignUsers']);
+Route::delete('/areas/{id}/users', [AreaController::class, 'removeUsers']);
+
 // <--- CRUD Phase --->
 Route::get('/phases', [PhaseController::class, 'index']);
 Route::get('/phases/{id}', [PhaseController::class, 'show']);
