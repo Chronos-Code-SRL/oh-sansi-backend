@@ -9,12 +9,10 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
 use App\Models\Contestant;
 use App\Models\Registration;
-use App\Models\Group;
 use App\Models\Area;
 use App\Models\OlympiadArea;
 use App\Models\Grade;
 use App\Models\Level;
-use App\Models\GradeLevel;
 use Carbon\Carbon;
 
 class CompetitorRegistrationController extends Controller
@@ -141,6 +139,7 @@ class CompetitorRegistrationController extends Controller
         $data = [];
         $errors = [];
         $successful = 0;
+        $seenCis = [];
 
         // Process each row
         for ($i = 1; $i < count($lines); $i++) {
@@ -160,17 +159,36 @@ class CompetitorRegistrationController extends Controller
                     'row_number' => $i + 1,
                     'errors' => "Row has " . count($row) . " columns but header has " . count($header) . " columns. Please check for missing commas or extra commas in the data."
                 ];
-                continue;
             }
             
             $rowData = array_combine($header, $row);
+            // Normalize keys by trimming spaces (handles ' NIVEL' vs 'NIVEL')
+            $normalized = [];
+            foreach ($rowData as $k => $v) {
+                $normalized[is_string($k) ? trim($k) : $k] = $v;
+            }
+            $rowData = $normalized;
             $rowData['row_number'] = $i + 1;
             
+            // Normalize header keys that might include spaces or dots
+            if (isset($rowData['N.'])) { unset($rowData['N.']); }
+
+            // Duplicate CI within this CSV file
+            if (!empty($rowData['CI'])) {
+                $ci = $rowData['CI'];
+                if (isset($seenCis[$ci])) {
+                    $rowData['errors'] = 'CI Document duplicated within the same file';
+                    $errors[] = $rowData;
+                    continue;
+                }
+            }
+
             $validation = $this->validateContestantData($rowData, $olympiadId);
-            
+
             if ($validation['valid']) {
                 $this->createContestantAndRegistration($rowData, $olympiadId);
                 $successful++;
+                if (!empty($rowData['CI'])) { $seenCis[$rowData['CI']] = true; }
             } else {
                 $rowData['errors'] = implode('; ', $validation['errors']);
                 $errors[] = $rowData;
@@ -282,18 +300,25 @@ class CompetitorRegistrationController extends Controller
             }
         }
 
-        // Area validation (must exist and max 3 areas)
+        // Area validation (must exist under olympiad and max 3 areas)
         if (!empty($data['AREA'])) {
-            // Support comma separator for multiple areas
-            $areas = array_map('trim', explode(',', $data['AREA']));
+            // Support comma or semicolon separators for multiple areas
+            $areas = array_map('trim', preg_split('/[,;]+/', $data['AREA']));
             if (count($areas) > 3) {
                 $errors[] = 'Maximum 3 areas allowed';
             }
             
-            $validAreas = Area::pluck('name')->toArray();
-            foreach ($areas as $area) {
-                if (!in_array($area, $validAreas)) {
-                    $errors[] = "Area '$area' does not exist";
+            foreach ($areas as $areaName) {
+                $area = Area::where('name', $areaName)->first();
+                if (!$area) {
+                    $errors[] = "Area '$areaName' does not exist";
+                    continue;
+                }
+                $existsInOlympiad = OlympiadArea::where('olympiad_id', $olympiadId)
+                    ->where('area_id', $area->id)
+                    ->exists();
+                if (!$existsInOlympiad) {
+                    $errors[] = "Area '$areaName' is not configured for the selected Olympiad";
                 }
             }
         }
@@ -303,6 +328,17 @@ class CompetitorRegistrationController extends Controller
             if (!preg_match('/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/', $data['GRADO'])) {
                 $errors[] = 'Grade must contain only letters';
             }
+        }
+
+        // Level validation (required, only letters). Accept key with or without leading space
+        $levelValue = $data['NIVEL'] ?? ($data[' NIVEL'] ?? null);
+        if (!empty($levelValue)) {
+            if (!preg_match('/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]{2,50}$/', $levelValue)) {
+                $errors[] = 'Level must be 2-50 characters and contain only letters';
+            }
+        }
+        if (empty($levelValue)) {
+            $errors[] = 'Level is required';
         }
 
         // Tutor Name validation (2-50 characters, only letters)
@@ -330,10 +366,7 @@ class CompetitorRegistrationController extends Controller
      */
     private function createContestantAndRegistration(array $data, $olympiadId): void
     {
-        // Find or create grade
-        $grade = Grade::firstOrCreate(['name' => $data['GRADO']]);
-
-        // Create contestant
+        // Create contestant (no grade in table per new schema)
         $contestant = Contestant::create([
             'first_name' => $data['NOMBRE'],
             'last_name' => $data['APELLIDO'],
@@ -344,12 +377,19 @@ class CompetitorRegistrationController extends Controller
             'phone_number' => $data['CELULAR'] ?? null,
             'email' => $data['E-MAIL'] ?? null,
             'tutor_name' => $data['NOMBRE TUTOR'],
-            'tutor_number' => $data['NUMERO TUTOR'],
-            'grade_id' => $grade->id
+            'tutor_number' => $data['NUMERO TUTOR']
         ]);
 
-        // Get areas and create registrations
-        $areas = array_map('trim', explode(',', $data['AREA']));
+        // Resolve grade and level for registration
+        $grade = null;
+        if (!empty($data['GRADO'])) {
+            $grade = Grade::firstOrCreate(['name' => trim($data['GRADO'])]);
+        }
+        $levelName = $data['NIVEL'] ?? ($data[' NIVEL'] ?? null);
+        $level = $levelName ? Level::firstOrCreate(['name' => trim($levelName)]) : null;
+
+        // Get areas and create registrations (support comma or semicolon separators)
+        $areas = array_map('trim', preg_split('/[,;]+/', $data['AREA']));
         foreach ($areas as $areaName) {
             $area = Area::where('name', $areaName)->first();
             if ($area) {
@@ -359,9 +399,10 @@ class CompetitorRegistrationController extends Controller
                 
                 if ($olympiadArea) {
                     $registration = Registration::create([
-                        'is_group' => false, // Individual registration
                         'contestant_id' => $contestant->id,
-                        'olympiad_area_id' => $olympiadArea->id
+                        'olympiad_area_id' => $olympiadArea->id,
+                        'grade_id' => $grade?->id,
+                        'level_id' => $level?->id
                     ]);
                 }
             }
@@ -398,7 +439,8 @@ class CompetitorRegistrationController extends Controller
         
         Storage::disk('public')->put($errorPath, $csvContent);
         
-        return $errorPath;
+        // Return only the filename, not the storage path
+        return $errorFilename;
     }
 
     /**
