@@ -10,14 +10,13 @@ class Registration extends Model
     use HasFactory;
 
     protected $fillable = [
-        'is_group',
         'contestant_id',
-        'olympiad_area_id'
+        'olympiad_area_id',
+        'grade_id',
+        'level_id'
     ];
 
-    protected $casts = [
-        'is_group' => 'boolean',
-    ];
+    protected $casts = [];
 
     /**
      * Get the contestant that owns the registration
@@ -35,13 +34,7 @@ class Registration extends Model
         return $this->belongsTo(OlympiadArea::class);
     }
 
-    /**
-     * Get the groups for the registration
-     */
-    public function groups()
-    {
-        return $this->hasMany(Group::class);
-    }
+    // groups() relation removed; Group entity no longer used in the new schema
 
     /**
      * Get the evaluations for the registration
@@ -49,5 +42,21 @@ class Registration extends Model
     public function evaluations()
     {
         return $this->hasMany(Evaluation::class);
+    }
+
+    /**
+     * Get the grade for the registration
+     */
+    public function grade()
+    {
+        return $this->belongsTo(Grade::class);
+    }
+
+    /**
+     * Get the level for the registration
+     */
+    public function level()
+    {
+        return $this->belongsTo(Level::class);
     }
 }
