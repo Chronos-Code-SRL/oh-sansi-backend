@@ -20,7 +20,7 @@ class Contestant extends Model
         'email',
         'tutor_name',
         'tutor_number',
-        'grade'
+        'grade_id'
     ];
 
     protected $casts = [
@@ -41,6 +41,14 @@ class Contestant extends Model
     public function groups()
     {
         return $this->hasMany(Group::class);
+    }
+
+    /**
+     * Get the grade for the contestant
+     */
+    public function grade()
+    {
+        return $this->belongsTo(Grade::class);
     }
 
     /**
