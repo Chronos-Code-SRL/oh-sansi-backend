@@ -64,11 +64,16 @@ class CompetitorRegistrationController extends Controller
                 'message' => 'No valid files provided'
             ], 422);
         }
-        
         $results = [];
         $totalSuccessful = 0;
-        $totalErrors = 0;
+        $totalCompetitorErrors = 0;
+        $totalHeaderErrors = 0;
+        $totalRecords = 0;
         $errorFiles = [];
+        $filesWithErrorsCount = 0;
+        $filesWithHeaderErrorsCount = 0;
+        $filesWithCompetitorErrorsCount = 0;
+        $processingStartTime = microtime(true);
 
         DB::beginTransaction();
 
@@ -77,27 +82,58 @@ class CompetitorRegistrationController extends Controller
                 $result = $this->processCsvFile($file, $olympiadId);
                 $results[] = $result;
                 $totalSuccessful += $result['successful'];
-                $totalErrors += $result['errors'];
-                
-                if ($result['errors'] > 0) {
-                    $errorFiles[] = $result['error_file'];
+                $totalCompetitorErrors += $result['competitor_errors'];
+                $totalHeaderErrors += $result['header_errors'];
+                $totalRecords += $result['total_records'];
+
+                // Count files with different types of errors
+                if ($result['header_errors'] > 0) {
+                    $filesWithHeaderErrorsCount++;
+                }
+                if ($result['competitor_errors'] > 0) {
+                    $filesWithCompetitorErrorsCount++;
+                }
+                if ($result['header_errors'] > 0 || $result['competitor_errors'] > 0) {
+                    $filesWithErrorsCount++;
+                    if ($result['error_file']) {
+                        $errorFiles[] = $result['error_file'];
+                    }
                 }
             }
 
             DB::commit();
 
+            $processingTime = microtime(true) - $processingStartTime;
+
             return response()->json([
                 'success' => true,
                 'message' => 'CSV files processed successfully',
                 'data' => [
+                    'total_files_processed' => count($files),
+                    'total_records_processed' => $totalRecords,
                     'total_successful' => $totalSuccessful,
-                    'total_errors' => $totalErrors,
-                    'files_processed' => count($files),
+                    'total_competitor_errors' => $totalCompetitorErrors,
+                    'total_header_errors' => $totalHeaderErrors,
+                    'total_errors' => $totalCompetitorErrors + $totalHeaderErrors,
+                    'success_rate' => $totalRecords > 0 ? round(($totalSuccessful / $totalRecords) * 100, 2) : 0,
+                    'competitor_error_rate' => $totalRecords > 0 ? round(($totalCompetitorErrors / $totalRecords) * 100, 2) : 0,
+                    'header_error_rate' => $totalRecords > 0 ? round(($totalHeaderErrors / $totalRecords) * 100, 2) : 0,
+                    'files_with_errors' => $filesWithErrorsCount,
+                    'files_with_header_errors' => $filesWithHeaderErrorsCount,
+                    'files_with_competitor_errors' => $filesWithCompetitorErrorsCount,
                     'error_files' => $errorFiles,
+                    'processing_time_seconds' => round($processingTime, 2),
+                    'records_per_second' => $processingTime > 0 ? round($totalRecords / $processingTime, 2) : 0,
+                    'olympiad_id' => $olympiadId,
                     'summary' => [
                         'total_competitors_registered' => $totalSuccessful,
-                        'total_competitors_with_errors' => $totalErrors,
-                        'files_with_errors' => count($errorFiles)
+                        'total_competitors_with_errors' => $totalCompetitorErrors,
+                        'total_header_errors' => $totalHeaderErrors,
+                        'total_files_processed' => count($files),
+                        'total_files_with_errors' => $filesWithErrorsCount,
+                        'total_files_with_header_errors' => $filesWithHeaderErrorsCount,
+                        'total_files_with_competitor_errors' => $filesWithCompetitorErrorsCount,
+                        'processing_time_seconds' => round($processingTime, 2)
                     ],
                     'details' => $results
                 ]
@@ -105,7 +141,7 @@ class CompetitorRegistrationController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Error processing CSV files: ' . $e->getMessage()
@@ -121,16 +157,52 @@ class CompetitorRegistrationController extends Controller
         $filename = $file->getClientOriginalName();
         $content = file_get_contents($file->getPathname());
         $lines = str_getcsv($content, "\n");
-        
+
         // Remove BOM if present
         if (substr($lines[0], 0, 3) === "\xEF\xBB\xBF") {
             $lines[0] = substr($lines[0], 3);
         }
 
         $header = str_getcsv($lines[0]);
-        
-        // Remove 'Errores' column if it exists (from error CSV files)
+
+        // Expected headers for valid CSV format
+        $expectedHeaders = [
+            'N.', 'CI', 'NOMBRE', 'APELLIDO', 'GENERO', 'DEPARTAMENTO',
+            'COLEGIO', 'CELULAR', 'E-MAIL', 'AREA', 'GRADO', 'NIVEL',
+            'NUMERO TUTOR', 'NOMBRE TUTOR'
+        ];
+
+        // Check if this is an error CSV file (contains 'Errores' column)
         $errorColumnIndex = array_search('Errores', $header);
+
+        // For validation, work with headers without the 'Errores' column if present
+        $headersToValidate = $header;
+        if ($errorColumnIndex !== false) {
+            unset($headersToValidate[$errorColumnIndex]);
+            $headersToValidate = array_values($headersToValidate); // Re-index array
+        }
+
+        // Validate that headers match expected format (case-sensitive and order-sensitive)
+        if ($headersToValidate !== $expectedHeaders) {
+            $errors[] = [
+                'row_number' => 1,
+                'errors' => "Las cabeceras del CSV no coinciden con el formato requerido. Revise la primera fila de datos para ver las cabeceras correctas."
+            ];
+
+            // Generate error CSV with the validation error AND all original data
+            $errorFile = $this->generateErrorCsv($filename, $header, $errors, $lines);
+
+            return [
+                'filename' => $filename,
+                'successful' => 0,
+                'competitor_errors' => 0,
+                'header_errors' => 1,
+                'total_records' => count($lines) - 1, // Excluding header row
+                'error_file' => $errorFile
+            ];
+        }
+
+        // Remove 'Errores' column if it exists (from error CSV files)
         if ($errorColumnIndex !== false) {
             unset($header[$errorColumnIndex]);
             $header = array_values($header); // Re-index array
@@ -204,7 +276,9 @@ class CompetitorRegistrationController extends Controller
         return [
             'filename' => $filename,
             'successful' => $successful,
-            'errors' => count($errors),
+            'competitor_errors' => count($errors),
+            'header_errors' => 0,
+            'total_records' => count($lines) - 1, // Excluding header row
             'error_file' => $errorFile
         ];
     }
@@ -412,33 +486,83 @@ class CompetitorRegistrationController extends Controller
     /**
      * Generate error CSV file
      */
-    private function generateErrorCsv(string $originalFilename, array $header, array $errors): string
+    private function generateErrorCsv(string $originalFilename, array $header, array $errors, array $lines = null): string
     {
         $baseFilename = pathinfo($originalFilename, PATHINFO_FILENAME);
         $errorFilename = $baseFilename . '-errores.csv';
         $errorPath = 'error-csvs/' . $errorFilename;
-        
+
         // Add error column to header
         $errorHeader = array_merge($header, ['Errores']);
-        
+
         $csvContent = implode(',', array_map(function($field) {
             return '"' . str_replace('"', '""', $field) . '"';
         }, $errorHeader)) . "\n";
-        
-        foreach ($errors as $error) {
-            $row = [];
-            foreach ($header as $field) {
-                $row[] = $error[$field] ?? '';
+
+        // If we have original lines (for header validation errors), include all data
+        if ($lines !== null && !empty($lines)) {
+            // Skip the header row (index 0) and process data rows
+            for ($i = 1; $i < count($lines); $i++) {
+                if (empty(trim($lines[$i]))) continue;
+
+                $row = str_getcsv($lines[$i]);
+
+                // Remove 'Errores' column data if it exists (from error CSV files)
+                $errorColumnIndex = array_search('Errores', $header);
+                if ($errorColumnIndex !== false && isset($row[$errorColumnIndex])) {
+                    unset($row[$errorColumnIndex]);
+                    $row = array_values($row); // Re-index array
+                }
+
+                // For header validation errors, provide better guidance
+                $errorMessage = '';
+                if (!empty($errors)) {
+                    // Check if this is a header validation error
+                    $headerError = null;
+                    foreach ($errors as $error) {
+                        if (isset($error['row_number']) && $error['row_number'] === 1) {
+                            $headerError = $error;
+                            break;
+                        }
+                    }
+
+                    if ($headerError) {
+                        if ($i === 1) { // First data row - add detailed error info
+                            $errorMessage = "ERROR EN CABECERAS: " . $headerError['errors'] .
+                                          " | CORRECCIÓN: Cambie las cabeceras a: " . implode(', ', [
+                                              'N.', 'CI', 'NOMBRE', 'APELLIDO', 'GENERO', 'DEPARTAMENTO',
+                                              'COLEGIO', 'CELULAR', 'E-MAIL', 'AREA', 'GRADO', 'NIVEL',
+                                              'NUMERO TUTOR', 'NOMBRE TUTOR'
+                                          ]);
+                        } else {
+                            $errorMessage = "Ver fila anterior para detalles del error de cabeceras";
+                        }
+                    }
+                }
+
+                $row[] = $errorMessage;
+
+                $csvContent .= implode(',', array_map(function($value) {
+                    return '"' . str_replace('"', '""', $value) . '"';
+                }, $row)) . "\n";
             }
-            $row[] = $error['errors'] ?? '';
-            
-            $csvContent .= implode(',', array_map(function($value) {
-                return '"' . str_replace('"', '""', $value) . '"';
-            }, $row)) . "\n";
+        } else {
+            // Original logic for row validation errors
+            foreach ($errors as $error) {
+                $row = [];
+                foreach ($header as $field) {
+                    $row[] = $error[$field] ?? '';
+                }
+                $row[] = $error['errors'] ?? '';
+
+                $csvContent .= implode(',', array_map(function($value) {
+                    return '"' . str_replace('"', '""', $value) . '"';
+                }, $row)) . "\n";
+            }
         }
-        
+
         Storage::disk('public')->put($errorPath, $csvContent);
-        
+
         // Return only the filename, not the storage path
         return $errorFilename;
     }
