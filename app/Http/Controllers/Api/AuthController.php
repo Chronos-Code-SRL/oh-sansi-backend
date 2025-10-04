@@ -12,7 +12,38 @@ use App\Models\User;
 
 class AuthController extends Controller
 {
-    //
+    /**
+     * @OA\Post(
+     *     path="/api/register",
+     *     summary="Registro de usuario",
+     *     description="Crea un nuevo usuario en el sistema",
+     *     tags={"Autenticación"},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"first_name","last_name","email","password","password_confirmation","ci","phone_number","genre","roles_id"},
+     *             @OA\Property(property="first_name", type="string", example="Maria"),
+     *             @OA\Property(property="last_name", type="string", example="Perez"),
+     *             @OA\Property(property="email", type="string", format="email", example="maria@example.com"),
+     *             @OA\Property(property="ci", type="string", example="12345678"),
+     *             @OA\Property(property="phone_number", type="string", example="71717717"),
+     *             @OA\Property(property="genre", type="string", enum={"masculino","femenino"}, example="femenino"),
+     *             @OA\Property(property="roles_id", type="integer", example=2),
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=201,
+     *         description="Usuario registrado correctamente",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="User registration successfully"),
+     *             @OA\Property(property="acces_token", type="string", example="2|gfdsgsgfsgsgf..."),
+     *             @OA\Property(property="token_type", type="string", example="Bearer")
+     *         )
+     *     ),
+     *     @OA\Response(response=400, description="Error de validación"),
+     *     @OA\Response(response=500, description="Error al crear el usuario")
+     * )
+     */
     public function register(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -68,6 +99,31 @@ class AuthController extends Controller
         return response()->json($data, 201);
     }
 
+        /**
+     * @OA\Post(
+     *     path="/api/login",
+     *     summary="Iniciar sesión",
+     *     description="Autenticar usuario y devolver token",
+     *     tags={"Autenticación"},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"email","password"},
+     *             @OA\Property(property="email", type="string", format="email", example="maria@example.com"),
+     *             @OA\Property(property="password", type="string", format="password", example="MP12345678")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Login exitoso",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="token", type="string", example="2|gfdsgsgfsgsgf..."),
+     *             @OA\Property(property="token_type", type="string", example="Bearer")
+     *         )
+     *     ),
+     *     @OA\Response(response=401, description="No autorizado")
+     * )
+     */
     public function login(Request $request)
     {
         if (!Auth::attempt($request->only('email', 'password'))) {
@@ -80,7 +136,22 @@ class AuthController extends Controller
 
         return response()->json(['token' => $token, 'token_type' => 'Bearer'], 200);
     }
-
+    /**
+     * @OA\Post(
+     *     path="/api/logout",
+     *     summary="Cerrar sesión",
+     *     description="Elimina el token del usuario autenticado",
+     *     tags={"Autenticación"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Logout exitoso",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Logged out successfully")
+     *         )
+     *     )
+     * )
+     */
     public function logout(Request $request)
     {
         $request->user()->tokens()->delete();
