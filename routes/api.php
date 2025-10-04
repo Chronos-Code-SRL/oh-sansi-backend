@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\AreaController;
 use App\Http\Controllers\Api\PhaseController;
+use App\Http\Controllers\Api\CompetitorUploadController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -72,3 +73,6 @@ Route::middleware(['auth:sanctum', 'academic_responsible'])->group(function(){
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
 });
+
+// CSV upload for competitors
+Route::post('/competitors/upload-csv', [CompetitorUploadController::class, 'upload']);

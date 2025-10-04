@@ -4,6 +4,9 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class Area extends Model
 {
@@ -11,17 +14,22 @@ class Area extends Model
 
     protected $fillable = ['name'];
 
-    public function olympiads()
+    public function inscriptions(): HasMany
+    {
+        return $this->hasMany(Inscription::class);
+    }
+
+    public function olympiads(): BelongsToMany
     {
         return $this->belongsToMany(Olympiad::class, 'olympiad_areas');
     }
 
-    public function olympiadAreas()
+    public function olympiadAreas(): HasMany
     {
         return $this->hasMany(OlympiadArea::class);
     }
 
-    public function phases()
+    public function phases(): HasManyThrough
     {
         return $this->hasManyThrough(
             OlympiadAreaPhase::class,   // Destination model
