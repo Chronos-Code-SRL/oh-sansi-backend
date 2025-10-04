@@ -3,6 +3,10 @@
 namespace App\OpenApi;
 
 /**
+ * @OA\OpenApi(
+ *     openapi="3.0.0"
+ * )
+ *
  * @OA\Info(
  *   title="OH Sansi API",
  *   version="1.0.0",
