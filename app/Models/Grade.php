@@ -22,10 +22,7 @@ class Grade extends Model
     }
 
     /**
-     * Get the grade levels for the grade
+     * gradeLevels relation removed; grade_levels table not used in new schema
      */
-    public function gradeLevels()
-    {
-        return $this->hasMany(GradeLevel::class);
-    }
+    // public function gradeLevels() {}
 }
