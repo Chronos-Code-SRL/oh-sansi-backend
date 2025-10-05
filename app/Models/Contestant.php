@@ -19,8 +19,7 @@ class Contestant extends Model
         'phone_number',
         'email',
         'tutor_name',
-        'tutor_number',
-        'grade'
+        'tutor_number'
     ];
 
     protected $casts = [
@@ -35,13 +34,7 @@ class Contestant extends Model
         return $this->hasMany(Registration::class);
     }
 
-    /**
-     * Get the groups for the contestant
-     */
-    public function groups()
-    {
-        return $this->hasMany(Group::class);
-    }
+    // groups() relation removed; Group entity no longer used in the new schema
 
     /**
      * Get the olympiad areas through registrations

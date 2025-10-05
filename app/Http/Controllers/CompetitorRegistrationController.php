@@ -9,9 +9,10 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
 use App\Models\Contestant;
 use App\Models\Registration;
-use App\Models\Group;
 use App\Models\Area;
 use App\Models\OlympiadArea;
+use App\Models\Grade;
+use App\Models\Level;
 use Carbon\Carbon;
 
 class CompetitorRegistrationController extends Controller
@@ -63,11 +64,16 @@ class CompetitorRegistrationController extends Controller
                 'message' => 'No valid files provided'
             ], 422);
         }
-        
         $results = [];
         $totalSuccessful = 0;
-        $totalErrors = 0;
+        $totalCompetitorErrors = 0;
+        $totalHeaderErrors = 0;
+        $totalRecords = 0;
         $errorFiles = [];
+        $filesWithErrorsCount = 0;
+        $filesWithHeaderErrorsCount = 0;
+        $filesWithCompetitorErrorsCount = 0;
+        $processingStartTime = microtime(true);
 
         DB::beginTransaction();
 
@@ -76,30 +82,66 @@ class CompetitorRegistrationController extends Controller
                 $result = $this->processCsvFile($file, $olympiadId);
                 $results[] = $result;
                 $totalSuccessful += $result['successful'];
-                $totalErrors += $result['errors'];
-                
-                if ($result['errors'] > 0) {
-                    $errorFiles[] = $result['error_file'];
+                $totalCompetitorErrors += $result['competitor_errors'];
+                $totalHeaderErrors += $result['header_errors'];
+                $totalRecords += $result['total_records'];
+
+                // Count files with different types of errors
+                if ($result['header_errors'] > 0) {
+                    $filesWithHeaderErrorsCount++;
+                }
+                if ($result['competitor_errors'] > 0) {
+                    $filesWithCompetitorErrorsCount++;
+                }
+                if ($result['header_errors'] > 0 || $result['competitor_errors'] > 0) {
+                    $filesWithErrorsCount++;
+                    if ($result['error_file']) {
+                        $errorFiles[] = $result['error_file'];
+                    }
                 }
             }
 
             DB::commit();
 
+            $processingTime = microtime(true) - $processingStartTime;
+
             return response()->json([
                 'success' => true,
                 'message' => 'CSV files processed successfully',
                 'data' => [
+                    'total_files_processed' => count($files),
+                    'total_records_processed' => $totalRecords,
                     'total_successful' => $totalSuccessful,
-                    'total_errors' => $totalErrors,
-                    'files_processed' => count($files),
+                    'total_competitor_errors' => $totalCompetitorErrors,
+                    'total_header_errors' => $totalHeaderErrors,
+                    'total_errors' => $totalCompetitorErrors + $totalHeaderErrors,
+                    'success_rate' => $totalRecords > 0 ? round(($totalSuccessful / $totalRecords) * 100, 2) : 0,
+                    'competitor_error_rate' => $totalRecords > 0 ? round(($totalCompetitorErrors / $totalRecords) * 100, 2) : 0,
+                    'header_error_rate' => $totalRecords > 0 ? round(($totalHeaderErrors / $totalRecords) * 100, 2) : 0,
+                    'files_with_errors' => $filesWithErrorsCount,
+                    'files_with_header_errors' => $filesWithHeaderErrorsCount,
+                    'files_with_competitor_errors' => $filesWithCompetitorErrorsCount,
                     'error_files' => $errorFiles,
+                    'processing_time_seconds' => round($processingTime, 2),
+                    'records_per_second' => $processingTime > 0 ? round($totalRecords / $processingTime, 2) : 0,
+                    'olympiad_id' => $olympiadId,
+                    'summary' => [
+                        'total_competitors_registered' => $totalSuccessful,
+                        'total_competitors_with_errors' => $totalCompetitorErrors,
+                        'total_header_errors' => $totalHeaderErrors,
+                        'total_files_processed' => count($files),
+                        'total_files_with_errors' => $filesWithErrorsCount,
+                        'total_files_with_header_errors' => $filesWithHeaderErrorsCount,
+                        'total_files_with_competitor_errors' => $filesWithCompetitorErrorsCount,
+                        'processing_time_seconds' => round($processingTime, 2)
+                    ],
                     'details' => $results
                 ]
             ]);
 
         } catch (\Exception $e) {
             DB::rollBack();
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Error processing CSV files: ' . $e->getMessage()
@@ -115,16 +157,52 @@ class CompetitorRegistrationController extends Controller
         $filename = $file->getClientOriginalName();
         $content = file_get_contents($file->getPathname());
         $lines = str_getcsv($content, "\n");
-        
+
         // Remove BOM if present
         if (substr($lines[0], 0, 3) === "\xEF\xBB\xBF") {
             $lines[0] = substr($lines[0], 3);
         }
 
         $header = str_getcsv($lines[0]);
-        
-        // Remove 'Errores' column if it exists (from error CSV files)
+
+        // Expected headers for valid CSV format
+        $expectedHeaders = [
+            'N.', 'CI', 'NOMBRE', 'APELLIDO', 'GENERO', 'DEPARTAMENTO',
+            'COLEGIO', 'CELULAR', 'E-MAIL', 'AREA', 'GRADO', 'NIVEL',
+            'NUMERO TUTOR', 'NOMBRE TUTOR'
+        ];
+
+        // Check if this is an error CSV file (contains 'Errores' column)
         $errorColumnIndex = array_search('Errores', $header);
+
+        // For validation, work with headers without the 'Errores' column if present
+        $headersToValidate = $header;
+        if ($errorColumnIndex !== false) {
+            unset($headersToValidate[$errorColumnIndex]);
+            $headersToValidate = array_values($headersToValidate); // Re-index array
+        }
+
+        // Validate that headers match expected format (case-sensitive and order-sensitive)
+        if ($headersToValidate !== $expectedHeaders) {
+            $errors[] = [
+                'row_number' => 1,
+                'errors' => "Las cabeceras del CSV no coinciden con el formato requerido. Revise la primera fila de datos para ver las cabeceras correctas."
+            ];
+
+            // Generate error CSV with the validation error AND all original data
+            $errorFile = $this->generateErrorCsv($filename, $header, $errors, $lines);
+
+            return [
+                'filename' => $filename,
+                'successful' => 0,
+                'competitor_errors' => 0,
+                'header_errors' => 1,
+                'total_records' => count($lines) - 1, // Excluding header row
+                'error_file' => $errorFile
+            ];
+        }
+
+        // Remove 'Errores' column if it exists (from error CSV files)
         if ($errorColumnIndex !== false) {
             unset($header[$errorColumnIndex]);
             $header = array_values($header); // Re-index array
@@ -133,6 +211,7 @@ class CompetitorRegistrationController extends Controller
         $data = [];
         $errors = [];
         $successful = 0;
+        $seenCis = [];
 
         // Process each row
         for ($i = 1; $i < count($lines); $i++) {
@@ -152,17 +231,36 @@ class CompetitorRegistrationController extends Controller
                     'row_number' => $i + 1,
                     'errors' => "Row has " . count($row) . " columns but header has " . count($header) . " columns. Please check for missing commas or extra commas in the data."
                 ];
-                continue;
             }
             
             $rowData = array_combine($header, $row);
+            // Normalize keys by trimming spaces (handles ' NIVEL' vs 'NIVEL')
+            $normalized = [];
+            foreach ($rowData as $k => $v) {
+                $normalized[is_string($k) ? trim($k) : $k] = $v;
+            }
+            $rowData = $normalized;
             $rowData['row_number'] = $i + 1;
             
+            // Normalize header keys that might include spaces or dots
+            if (isset($rowData['N.'])) { unset($rowData['N.']); }
+
+            // Duplicate CI within this CSV file
+            if (!empty($rowData['CI'])) {
+                $ci = $rowData['CI'];
+                if (isset($seenCis[$ci])) {
+                    $rowData['errors'] = 'CI Document duplicated within the same file';
+                    $errors[] = $rowData;
+                    continue;
+                }
+            }
+
             $validation = $this->validateContestantData($rowData, $olympiadId);
-            
+
             if ($validation['valid']) {
                 $this->createContestantAndRegistration($rowData, $olympiadId);
                 $successful++;
+                if (!empty($rowData['CI'])) { $seenCis[$rowData['CI']] = true; }
             } else {
                 $rowData['errors'] = implode('; ', $validation['errors']);
                 $errors[] = $rowData;
@@ -178,7 +276,9 @@ class CompetitorRegistrationController extends Controller
         return [
             'filename' => $filename,
             'successful' => $successful,
-            'errors' => count($errors),
+            'competitor_errors' => count($errors),
+            'header_errors' => 0,
+            'total_records' => count($lines) - 1, // Excluding header row
             'error_file' => $errorFile
         ];
     }
@@ -192,17 +292,16 @@ class CompetitorRegistrationController extends Controller
 
         // Required fields validation
         $requiredFields = [
-            'N.' => 'N.',
-            'ci' => 'CI Document',
+            'CI' => 'CI Document',
             'NOMBRE' => 'First Name',
-            'apellido' => 'Last Name',
-            'Genero' => 'Gender',
-            'Departamento' => 'Department',
+            'APELLIDO' => 'Last Name',
+            'GENERO' => 'Gender',
+            'DEPARTAMENTO' => 'Department',
             'COLEGIO' => 'School',
             'AREA' => 'Area',
-            'Grado' => 'Grade',
-            'Numero tutor' => 'Tutor Number',
-            'Nombre Tutor' => 'Tutor Name'
+            'GRADO' => 'Grade',
+            'NUMERO TUTOR' => 'Tutor Number',
+            'NOMBRE TUTOR' => 'Tutor Name'
         ];
 
         foreach ($requiredFields as $field => $label) {
@@ -219,33 +318,33 @@ class CompetitorRegistrationController extends Controller
         }
 
         // Last Name validation (2-50 characters, only letters)
-        if (!empty($data['apellido'])) {
-            if (!preg_match('/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]{2,50}$/', $data['apellido'])) {
+        if (!empty($data['APELLIDO'])) {
+            if (!preg_match('/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]{2,50}$/', $data['APELLIDO'])) {
                 $errors[] = 'Last Name must be 2-50 characters and contain only letters';
             }
         }
 
         // CI Document validation (8-13 characters, unique)
-        if (!empty($data['ci'])) {
-            if (!preg_match('/^[0-9]{8,13}$/', $data['ci'])) {
+        if (!empty($data['CI'])) {
+            if (!preg_match('/^[0-9]{8,13}$/', $data['CI'])) {
                 $errors[] = 'CI Document must be 8-13 digits';
             } else {
-                if (Contestant::where('ci_document', $data['ci'])->exists()) {
+                if (Contestant::where('ci_document', $data['CI'])->exists()) {
                     $errors[] = 'CI Document already exists';
                 }
             }
         }
 
         // Gender validation (F or M)
-        if (!empty($data['Genero'])) {
-            if (!in_array(strtoupper($data['Genero']), ['F', 'M'])) {
+        if (!empty($data['GENERO'])) {
+            if (!in_array(strtoupper($data['GENERO']), ['F', 'M'])) {
                 $errors[] = 'Gender must be F or M';
             }
         }
 
         // Department validation (2-50 characters, only letters)
-        if (!empty($data['Departamento'])) {
-            if (!preg_match('/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]{2,50}$/', $data['Departamento'])) {
+        if (!empty($data['DEPARTAMENTO'])) {
+            if (!preg_match('/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]{2,50}$/', $data['DEPARTAMENTO'])) {
                 $errors[] = 'Department must be 2-50 characters and contain only letters';
             }
         }
@@ -275,39 +374,57 @@ class CompetitorRegistrationController extends Controller
             }
         }
 
-        // Area validation (must exist and max 3 areas)
+        // Area validation (must exist under olympiad and max 3 areas)
         if (!empty($data['AREA'])) {
-            // Only support semicolon separator for multiple areas
-            $areas = array_map('trim', explode(';', $data['AREA']));
+            // Support comma or semicolon separators for multiple areas
+            $areas = array_map('trim', preg_split('/[,;]+/', $data['AREA']));
             if (count($areas) > 3) {
                 $errors[] = 'Maximum 3 areas allowed';
             }
             
-            $validAreas = Area::pluck('name')->toArray();
-            foreach ($areas as $area) {
-                if (!in_array($area, $validAreas)) {
-                    $errors[] = "Area '$area' does not exist";
+            foreach ($areas as $areaName) {
+                $area = Area::where('name', $areaName)->first();
+                if (!$area) {
+                    $errors[] = "Area '$areaName' does not exist";
+                    continue;
+                }
+                $existsInOlympiad = OlympiadArea::where('olympiad_id', $olympiadId)
+                    ->where('area_id', $area->id)
+                    ->exists();
+                if (!$existsInOlympiad) {
+                    $errors[] = "Area '$areaName' is not configured for the selected Olympiad";
                 }
             }
         }
 
         // Grade validation (only letters)
-        if (!empty($data['Grado'])) {
-            if (!preg_match('/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/', $data['Grado'])) {
+        if (!empty($data['GRADO'])) {
+            if (!preg_match('/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/', $data['GRADO'])) {
                 $errors[] = 'Grade must contain only letters';
             }
         }
 
+        // Level validation (required, only letters). Accept key with or without leading space
+        $levelValue = $data['NIVEL'] ?? ($data[' NIVEL'] ?? null);
+        if (!empty($levelValue)) {
+            if (!preg_match('/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]{2,50}$/', $levelValue)) {
+                $errors[] = 'Level must be 2-50 characters and contain only letters';
+            }
+        }
+        if (empty($levelValue)) {
+            $errors[] = 'Level is required';
+        }
+
         // Tutor Name validation (2-50 characters, only letters)
-        if (!empty($data['Nombre Tutor'])) {
-            if (!preg_match('/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]{2,50}$/', $data['Nombre Tutor'])) {
+        if (!empty($data['NOMBRE TUTOR'])) {
+            if (!preg_match('/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]{2,50}$/', $data['NOMBRE TUTOR'])) {
                 $errors[] = 'Tutor Name must be 2-50 characters and contain only letters';
             }
         }
 
         // Tutor Number validation (8 digits)
-        if (!empty($data['Numero tutor'])) {
-            if (!preg_match('/^[0-9]{8}$/', $data['Numero tutor'])) {
+        if (!empty($data['NUMERO TUTOR'])) {
+            if (!preg_match('/^[0-9]{8}$/', $data['NUMERO TUTOR'])) {
                 $errors[] = 'Tutor Number must be exactly 8 digits';
             }
         }
@@ -323,23 +440,30 @@ class CompetitorRegistrationController extends Controller
      */
     private function createContestantAndRegistration(array $data, $olympiadId): void
     {
-        // Create contestant
+        // Create contestant (no grade in table per new schema)
         $contestant = Contestant::create([
             'first_name' => $data['NOMBRE'],
-            'last_name' => $data['apellido'],
-            'ci_document' => $data['ci'],
-            'gender' => strtoupper($data['Genero']),
+            'last_name' => $data['APELLIDO'],
+            'ci_document' => $data['CI'],
+            'gender' => strtoupper($data['GENERO']),
             'school_name' => $data['COLEGIO'],
-            'department' => $data['Departamento'],
+            'department' => $data['DEPARTAMENTO'],
             'phone_number' => $data['CELULAR'] ?? null,
             'email' => $data['E-MAIL'] ?? null,
-            'tutor_name' => $data['Nombre Tutor'],
-            'tutor_number' => $data['Numero tutor'],
-            'grade' => $data['Grado']
+            'tutor_name' => $data['NOMBRE TUTOR'],
+            'tutor_number' => $data['NUMERO TUTOR']
         ]);
 
-        // Get areas and create registrations
-        $areas = array_map('trim', explode(';', $data['AREA']));
+        // Resolve grade and level for registration
+        $grade = null;
+        if (!empty($data['GRADO'])) {
+            $grade = Grade::firstOrCreate(['name' => trim($data['GRADO'])]);
+        }
+        $levelName = $data['NIVEL'] ?? ($data[' NIVEL'] ?? null);
+        $level = $levelName ? Level::firstOrCreate(['name' => trim($levelName)]) : null;
+
+        // Get areas and create registrations (support comma or semicolon separators)
+        $areas = array_map('trim', preg_split('/[,;]+/', $data['AREA']));
         foreach ($areas as $areaName) {
             $area = Area::where('name', $areaName)->first();
             if ($area) {
@@ -349,19 +473,11 @@ class CompetitorRegistrationController extends Controller
                 
                 if ($olympiadArea) {
                     $registration = Registration::create([
-                        'is_group' => !empty($data['Grupo']),
                         'contestant_id' => $contestant->id,
-                        'olympiad_area_id' => $olympiadArea->id
+                        'olympiad_area_id' => $olympiadArea->id,
+                        'grade_id' => $grade?->id,
+                        'level_id' => $level?->id
                     ]);
-
-                    // Create group if specified
-                    if (!empty($data['Grupo'])) {
-                        Group::create([
-                            'group_name' => $data['Grupo'],
-                            'contestant_id' => $contestant->id,
-                            'registration_id' => $registration->id
-                        ]);
-                    }
                 }
             }
         }
@@ -370,33 +486,85 @@ class CompetitorRegistrationController extends Controller
     /**
      * Generate error CSV file
      */
-    private function generateErrorCsv(string $originalFilename, array $header, array $errors): string
+    private function generateErrorCsv(string $originalFilename, array $header, array $errors, array $lines = null): string
     {
-        $errorFilename = pathinfo($originalFilename, PATHINFO_FILENAME) . '-errores.csv';
+        $baseFilename = pathinfo($originalFilename, PATHINFO_FILENAME);
+        $errorFilename = $baseFilename . '-errores.csv';
         $errorPath = 'error-csvs/' . $errorFilename;
-        
+
         // Add error column to header
         $errorHeader = array_merge($header, ['Errores']);
-        
+
         $csvContent = implode(',', array_map(function($field) {
             return '"' . str_replace('"', '""', $field) . '"';
         }, $errorHeader)) . "\n";
-        
-        foreach ($errors as $error) {
-            $row = [];
-            foreach ($header as $field) {
-                $row[] = $error[$field] ?? '';
+
+        // If we have original lines (for header validation errors), include all data
+        if ($lines !== null && !empty($lines)) {
+            // Skip the header row (index 0) and process data rows
+            for ($i = 1; $i < count($lines); $i++) {
+                if (empty(trim($lines[$i]))) continue;
+
+                $row = str_getcsv($lines[$i]);
+
+                // Remove 'Errores' column data if it exists (from error CSV files)
+                $errorColumnIndex = array_search('Errores', $header);
+                if ($errorColumnIndex !== false && isset($row[$errorColumnIndex])) {
+                    unset($row[$errorColumnIndex]);
+                    $row = array_values($row); // Re-index array
+                }
+
+                // For header validation errors, provide better guidance
+                $errorMessage = '';
+                if (!empty($errors)) {
+                    // Check if this is a header validation error
+                    $headerError = null;
+                    foreach ($errors as $error) {
+                        if (isset($error['row_number']) && $error['row_number'] === 1) {
+                            $headerError = $error;
+                            break;
+                        }
+                    }
+
+                    if ($headerError) {
+                        if ($i === 1) { // First data row - add detailed error info
+                            $errorMessage = "ERROR EN CABECERAS: " . $headerError['errors'] .
+                                          " | CORRECCIÓN: Cambie las cabeceras a: " . implode(', ', [
+                                              'N.', 'CI', 'NOMBRE', 'APELLIDO', 'GENERO', 'DEPARTAMENTO',
+                                              'COLEGIO', 'CELULAR', 'E-MAIL', 'AREA', 'GRADO', 'NIVEL',
+                                              'NUMERO TUTOR', 'NOMBRE TUTOR'
+                                          ]);
+                        } else {
+                            $errorMessage = "Ver fila anterior para detalles del error de cabeceras";
+                        }
+                    }
+                }
+
+                $row[] = $errorMessage;
+
+                $csvContent .= implode(',', array_map(function($value) {
+                    return '"' . str_replace('"', '""', $value) . '"';
+                }, $row)) . "\n";
             }
-            $row[] = $error['errors'] ?? '';
-            
-            $csvContent .= implode(',', array_map(function($value) {
-                return '"' . str_replace('"', '""', $value) . '"';
-            }, $row)) . "\n";
+        } else {
+            // Original logic for row validation errors
+            foreach ($errors as $error) {
+                $row = [];
+                foreach ($header as $field) {
+                    $row[] = $error[$field] ?? '';
+                }
+                $row[] = $error['errors'] ?? '';
+
+                $csvContent .= implode(',', array_map(function($value) {
+                    return '"' . str_replace('"', '""', $value) . '"';
+                }, $row)) . "\n";
+            }
         }
-        
+
         Storage::disk('public')->put($errorPath, $csvContent);
-        
-        return $errorPath;
+
+        // Return only the filename, not the storage path
+        return $errorFilename;
     }
 
     /**

@@ -74,7 +74,6 @@ Route::middleware(['auth:sanctum', 'evaluator'])->group(function(){
 //Route::middleware(['auth:sanctum', 'academic_responsible'])->group(function(){
     // Competitor registration routes
     Route::post('/competitors/upload-csv', [CompetitorRegistrationController::class, 'uploadCsv']);
-    Route::post('/competitors/test-upload', [CompetitorRegistrationController::class, 'testUpload']);
     Route::get('/competitors/download-error-csv/{filename}', [CompetitorRegistrationController::class, 'downloadErrorCsv']);
 //});
 
@@ -82,6 +81,3 @@ Route::middleware(['auth:sanctum', 'evaluator'])->group(function(){
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
 });
-
-// CSV upload for competitors
-Route::post('/competitors/upload-csv', [CompetitorUploadController::class, 'upload']);
