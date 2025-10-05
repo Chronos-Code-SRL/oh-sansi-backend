@@ -12,6 +12,9 @@ use App\Models\Registration;
 use App\Models\Group;
 use App\Models\Area;
 use App\Models\OlympiadArea;
+use App\Models\Grade;
+use App\Models\Level;
+use App\Models\GradeLevel;
 use Carbon\Carbon;
 
 class CompetitorRegistrationController extends Controller
@@ -93,6 +96,11 @@ class CompetitorRegistrationController extends Controller
                     'total_errors' => $totalErrors,
                     'files_processed' => count($files),
                     'error_files' => $errorFiles,
+                    'summary' => [
+                        'total_competitors_registered' => $totalSuccessful,
+                        'total_competitors_with_errors' => $totalErrors,
+                        'files_with_errors' => count($errorFiles)
+                    ],
                     'details' => $results
                 ]
             ]);
@@ -192,17 +200,16 @@ class CompetitorRegistrationController extends Controller
 
         // Required fields validation
         $requiredFields = [
-            'N.' => 'N.',
-            'ci' => 'CI Document',
+            'CI' => 'CI Document',
             'NOMBRE' => 'First Name',
-            'apellido' => 'Last Name',
-            'Genero' => 'Gender',
-            'Departamento' => 'Department',
+            'APELLIDO' => 'Last Name',
+            'GENERO' => 'Gender',
+            'DEPARTAMENTO' => 'Department',
             'COLEGIO' => 'School',
             'AREA' => 'Area',
-            'Grado' => 'Grade',
-            'Numero tutor' => 'Tutor Number',
-            'Nombre Tutor' => 'Tutor Name'
+            'GRADO' => 'Grade',
+            'NUMERO TUTOR' => 'Tutor Number',
+            'NOMBRE TUTOR' => 'Tutor Name'
         ];
 
         foreach ($requiredFields as $field => $label) {
@@ -219,33 +226,33 @@ class CompetitorRegistrationController extends Controller
         }
 
         // Last Name validation (2-50 characters, only letters)
-        if (!empty($data['apellido'])) {
-            if (!preg_match('/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]{2,50}$/', $data['apellido'])) {
+        if (!empty($data['APELLIDO'])) {
+            if (!preg_match('/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]{2,50}$/', $data['APELLIDO'])) {
                 $errors[] = 'Last Name must be 2-50 characters and contain only letters';
             }
         }
 
         // CI Document validation (8-13 characters, unique)
-        if (!empty($data['ci'])) {
-            if (!preg_match('/^[0-9]{8,13}$/', $data['ci'])) {
+        if (!empty($data['CI'])) {
+            if (!preg_match('/^[0-9]{8,13}$/', $data['CI'])) {
                 $errors[] = 'CI Document must be 8-13 digits';
             } else {
-                if (Contestant::where('ci_document', $data['ci'])->exists()) {
+                if (Contestant::where('ci_document', $data['CI'])->exists()) {
                     $errors[] = 'CI Document already exists';
                 }
             }
         }
 
         // Gender validation (F or M)
-        if (!empty($data['Genero'])) {
-            if (!in_array(strtoupper($data['Genero']), ['F', 'M'])) {
+        if (!empty($data['GENERO'])) {
+            if (!in_array(strtoupper($data['GENERO']), ['F', 'M'])) {
                 $errors[] = 'Gender must be F or M';
             }
         }
 
         // Department validation (2-50 characters, only letters)
-        if (!empty($data['Departamento'])) {
-            if (!preg_match('/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]{2,50}$/', $data['Departamento'])) {
+        if (!empty($data['DEPARTAMENTO'])) {
+            if (!preg_match('/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]{2,50}$/', $data['DEPARTAMENTO'])) {
                 $errors[] = 'Department must be 2-50 characters and contain only letters';
             }
         }
@@ -277,8 +284,8 @@ class CompetitorRegistrationController extends Controller
 
         // Area validation (must exist and max 3 areas)
         if (!empty($data['AREA'])) {
-            // Only support semicolon separator for multiple areas
-            $areas = array_map('trim', explode(';', $data['AREA']));
+            // Support comma separator for multiple areas
+            $areas = array_map('trim', explode(',', $data['AREA']));
             if (count($areas) > 3) {
                 $errors[] = 'Maximum 3 areas allowed';
             }
@@ -292,22 +299,22 @@ class CompetitorRegistrationController extends Controller
         }
 
         // Grade validation (only letters)
-        if (!empty($data['Grado'])) {
-            if (!preg_match('/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/', $data['Grado'])) {
+        if (!empty($data['GRADO'])) {
+            if (!preg_match('/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/', $data['GRADO'])) {
                 $errors[] = 'Grade must contain only letters';
             }
         }
 
         // Tutor Name validation (2-50 characters, only letters)
-        if (!empty($data['Nombre Tutor'])) {
-            if (!preg_match('/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]{2,50}$/', $data['Nombre Tutor'])) {
+        if (!empty($data['NOMBRE TUTOR'])) {
+            if (!preg_match('/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]{2,50}$/', $data['NOMBRE TUTOR'])) {
                 $errors[] = 'Tutor Name must be 2-50 characters and contain only letters';
             }
         }
 
         // Tutor Number validation (8 digits)
-        if (!empty($data['Numero tutor'])) {
-            if (!preg_match('/^[0-9]{8}$/', $data['Numero tutor'])) {
+        if (!empty($data['NUMERO TUTOR'])) {
+            if (!preg_match('/^[0-9]{8}$/', $data['NUMERO TUTOR'])) {
                 $errors[] = 'Tutor Number must be exactly 8 digits';
             }
         }
@@ -323,23 +330,26 @@ class CompetitorRegistrationController extends Controller
      */
     private function createContestantAndRegistration(array $data, $olympiadId): void
     {
+        // Find or create grade
+        $grade = Grade::firstOrCreate(['name' => $data['GRADO']]);
+
         // Create contestant
         $contestant = Contestant::create([
             'first_name' => $data['NOMBRE'],
-            'last_name' => $data['apellido'],
-            'ci_document' => $data['ci'],
-            'gender' => strtoupper($data['Genero']),
+            'last_name' => $data['APELLIDO'],
+            'ci_document' => $data['CI'],
+            'gender' => strtoupper($data['GENERO']),
             'school_name' => $data['COLEGIO'],
-            'department' => $data['Departamento'],
+            'department' => $data['DEPARTAMENTO'],
             'phone_number' => $data['CELULAR'] ?? null,
             'email' => $data['E-MAIL'] ?? null,
-            'tutor_name' => $data['Nombre Tutor'],
-            'tutor_number' => $data['Numero tutor'],
-            'grade' => $data['Grado']
+            'tutor_name' => $data['NOMBRE TUTOR'],
+            'tutor_number' => $data['NUMERO TUTOR'],
+            'grade_id' => $grade->id
         ]);
 
         // Get areas and create registrations
-        $areas = array_map('trim', explode(';', $data['AREA']));
+        $areas = array_map('trim', explode(',', $data['AREA']));
         foreach ($areas as $areaName) {
             $area = Area::where('name', $areaName)->first();
             if ($area) {
@@ -349,19 +359,10 @@ class CompetitorRegistrationController extends Controller
                 
                 if ($olympiadArea) {
                     $registration = Registration::create([
-                        'is_group' => !empty($data['Grupo']),
+                        'is_group' => false, // Individual registration
                         'contestant_id' => $contestant->id,
                         'olympiad_area_id' => $olympiadArea->id
                     ]);
-
-                    // Create group if specified
-                    if (!empty($data['Grupo'])) {
-                        Group::create([
-                            'group_name' => $data['Grupo'],
-                            'contestant_id' => $contestant->id,
-                            'registration_id' => $registration->id
-                        ]);
-                    }
                 }
             }
         }
@@ -372,7 +373,8 @@ class CompetitorRegistrationController extends Controller
      */
     private function generateErrorCsv(string $originalFilename, array $header, array $errors): string
     {
-        $errorFilename = pathinfo($originalFilename, PATHINFO_FILENAME) . '-errores.csv';
+        $baseFilename = pathinfo($originalFilename, PATHINFO_FILENAME);
+        $errorFilename = $baseFilename . '-errores.csv';
         $errorPath = 'error-csvs/' . $errorFilename;
         
         // Add error column to header

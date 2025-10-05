@@ -2,20 +2,22 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Level extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name'];
+    protected $fillable = [
+        'name'
+    ];
 
-    public function inscriptions(): HasMany
+    /**
+     * Get the grade levels for the level
+     */
+    public function gradeLevels()
     {
-        return $this->hasMany(Inscription::class);
+        return $this->hasMany(GradeLevel::class);
     }
 }
-
-
