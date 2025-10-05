@@ -22,6 +22,248 @@
         }
     ],
     "paths": {
+        "/api/areas": {
+            "get": {
+                "tags": [
+                    "Areas"
+                ],
+                "summary": "Get list of areas",
+                "operationId": "66b2587228ab800278cfe23645d7a7f1",
+                "responses": {
+                    "200": {
+                        "description": "List of areas retrieved successfully"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Areas"
+                ],
+                "summary": "Create a new area",
+                "operationId": "8514e0b9e0cabb2b5ef6a3f129615ea5",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "name",
+                                    "description"
+                                ],
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "example": "Matemáticas"
+                                    },
+                                    "description": {
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Area created successfully"
+                    }
+                }
+            }
+        },
+        "/api/areas/{id}": {
+            "get": {
+                "tags": [
+                    "Areas"
+                ],
+                "summary": "Get specific area by ID",
+                "operationId": "8e8d9c93202aee14a1c64087e9aadd5d",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Area found"
+                    },
+                    "404": {
+                        "description": "Area not found"
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "Areas"
+                ],
+                "summary": "Update an area by ID",
+                "operationId": "0eed2212fbabbbf851b8a509b57b1724",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "description": {
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Area updated successfully"
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "Areas"
+                ],
+                "summary": "Delete an area by ID",
+                "operationId": "58eea6aa22738364ca3a2d9698732756",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Area deleted successfully"
+                    }
+                }
+            }
+        },
+        "/api/areas/{id}/users": {
+            "get": {
+                "tags": [
+                    "Areas"
+                ],
+                "summary": "Get users assigned to an area",
+                "operationId": "b5cdad2b62d0bdd88d2b826947984a1a",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of users assigned to the area"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Areas"
+                ],
+                "summary": "Assign users to an area",
+                "operationId": "5e571a99f22e80dd09535cac7d12b580",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "users": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Users assigned successfully"
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "Areas"
+                ],
+                "summary": "Remove users from an area",
+                "operationId": "fde48e4d54261a4d6ebfbfd6253220cf",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "users": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Users removed successfully"
+                    }
+                }
+            }
+        },
         "/api/register": {
             "post": {
                 "tags": [
@@ -262,10 +504,477 @@
                     }
                 }
             }
+        },
+        "/api/olympiads": {
+            "get": {
+                "tags": [
+                    "Olympiads"
+                ],
+                "summary": "Get list of olympiads",
+                "operationId": "6d42db91375121708dfbdcbee4e1677e",
+                "responses": {
+                    "200": {
+                        "description": "Returns a list of all olympiads with their associated areas"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Olympiads"
+                ],
+                "summary": "Create a new olympiad",
+                "operationId": "f0b97241692ca74daeecc60468c21e46",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "name",
+                                    "description",
+                                    "start_date",
+                                    "end_date"
+                                ],
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "example": "Olimpiada de Matemáticas 2025"
+                                    },
+                                    "description": {
+                                        "type": "string"
+                                    },
+                                    "start_date": {
+                                        "type": "string",
+                                        "format": "date"
+                                    },
+                                    "end_date": {
+                                        "type": "string",
+                                        "format": "date"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Olympiad created successfully"
+                    },
+                    "422": {
+                        "description": "Error in data validation"
+                    }
+                }
+            }
+        },
+        "/api/olympiads/{id}": {
+            "get": {
+                "tags": [
+                    "Olympiads"
+                ],
+                "summary": "Get a specific olympiad by ID",
+                "operationId": "d6df3cc61583c22551d6a36e156e0a3e",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Olympiad ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Olympiad found and returned successfully"
+                    },
+                    "404": {
+                        "description": "Olympiad not found"
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "Olympiads"
+                ],
+                "summary": "Update an existing olympiad",
+                "operationId": "1398a9e332e9df7dff7cc1587aab2ec7",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "description": {
+                                        "type": "string"
+                                    },
+                                    "start_date": {
+                                        "type": "string",
+                                        "format": "date"
+                                    },
+                                    "end_date": {
+                                        "type": "string",
+                                        "format": "date"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Olympiad updated successfully"
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "Olympiads"
+                ],
+                "summary": "Delete an olympiad by ID",
+                "operationId": "78ecdc464c8ebcba18aa7a128c625172",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Olympiad deleted successfully"
+                    }
+                }
+            }
+        },
+        "/api/olympiads/{id}/areas": {
+            "get": {
+                "tags": [
+                    "Olympiads"
+                ],
+                "summary": "Get areas of a specific olympiad",
+                "operationId": "aec709fa81dc7c88a6d3f82abcd24103",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of areas for the specified olympiad"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Olympiads"
+                ],
+                "summary": "Assign areas to an olympiad",
+                "operationId": "0fca564480fb1b61a9e61939b4585b95",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "areas": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Areas assigned successfully"
+                    }
+                }
+            }
+        },
+        "/api/phases": {
+            "get": {
+                "tags": [
+                    "Phases"
+                ],
+                "summary": "Get list of phases",
+                "operationId": "1b392f740d2304c14536eceeab488f5b",
+                "responses": {
+                    "200": {
+                        "description": "List of phases retrieved successfully"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Phases"
+                ],
+                "summary": "Create a new phase",
+                "operationId": "fe5d4ab4a51c2409b832c8c97a0bb2fc",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "name",
+                                    "description",
+                                    "start_date",
+                                    "end_date"
+                                ],
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "example": "Fase Clasificatoria"
+                                    },
+                                    "description": {
+                                        "type": "string"
+                                    },
+                                    "start_date": {
+                                        "type": "string",
+                                        "format": "date"
+                                    },
+                                    "end_date": {
+                                        "type": "string",
+                                        "format": "date"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Phase created successfully"
+                    }
+                }
+            }
+        },
+        "/api/phases/{id}": {
+            "get": {
+                "tags": [
+                    "Phases"
+                ],
+                "summary": "Get a phase by ID",
+                "operationId": "e820085218adb936219f0f4e1f88cd62",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Phase found"
+                    },
+                    "404": {
+                        "description": "Phase not found"
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "Phases"
+                ],
+                "summary": "Update a phase by ID",
+                "operationId": "932772abf97d37344fa772803a975c8e",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "description": {
+                                        "type": "string"
+                                    },
+                                    "start_date": {
+                                        "type": "string",
+                                        "format": "date"
+                                    },
+                                    "end_date": {
+                                        "type": "string",
+                                        "format": "date"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Phase updated successfully"
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "Phases"
+                ],
+                "summary": "Delete a phase by ID",
+                "operationId": "092abb9a40c5a9e03ea1f69e6575ee50",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Phase deleted successfully"
+                    }
+                }
+            }
         }
     },
     "components": {
         "schemas": {
+            "Olympiad": {
+                "required": [
+                    "name",
+                    "description",
+                    "start_date",
+                    "end_date"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Olimpiada de Matemáticas 2025"
+                    },
+                    "description": {
+                        "type": "string",
+                        "example": "Competencia nacional de matemáticas"
+                    },
+                    "start_date": {
+                        "type": "string",
+                        "format": "date",
+                        "example": "2025-01-01"
+                    },
+                    "end_date": {
+                        "type": "string",
+                        "format": "date",
+                        "example": "2025-12-31"
+                    }
+                },
+                "type": "object"
+            },
+            "Area": {
+                "required": [
+                    "name",
+                    "description"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Matemáticas"
+                    },
+                    "description": {
+                        "type": "string",
+                        "example": "Área de matemáticas"
+                    }
+                },
+                "type": "object"
+            },
+            "Phase": {
+                "required": [
+                    "name",
+                    "description",
+                    "start_date",
+                    "end_date"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Fase Clasificatoria"
+                    },
+                    "description": {
+                        "type": "string",
+                        "example": "Primera fase de la olimpiada"
+                    },
+                    "start_date": {
+                        "type": "string",
+                        "format": "date",
+                        "example": "2025-01-01"
+                    },
+                    "end_date": {
+                        "type": "string",
+                        "format": "date",
+                        "example": "2025-02-28"
+                    }
+                },
+                "type": "object"
+            },
             "CompetitorRowError": {
                 "required": [
                     "message"
@@ -456,6 +1165,18 @@
         }
     },
     "tags": [
+        {
+            "name": "Areas",
+            "description": "Operaciones relacionadas con áreas"
+        },
+        {
+            "name": "Olympiads",
+            "description": "Operaciones relacionadas con olimpiadas"
+        },
+        {
+            "name": "Phases",
+            "description": "Operaciones relacionadas con fases"
+        },
         {
             "name": "Competitors",
             "description": "Operaciones relacionadas con competidores"

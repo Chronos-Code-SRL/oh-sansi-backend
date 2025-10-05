@@ -13,10 +13,24 @@ use App\Models\Phase;
 use App\Models\OlympiadArea;
 use App\Models\OlympiadAreaPhase;
 
+/**
+ * @OA\Tag(
+ *     name="Olympiads",
+ *     description="Endpoints for Olympiad management"
+ * )
+ */
 class OlympiadController extends Controller
 {
     /**
-     * Display a listing of the resource.
+     * @OA\Get(
+     *     path="/api/olympiads",
+     *     summary="Get list of olympiads",
+     *     tags={"Olympiads"},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Returns a list of all olympiads with their associated areas",
+     *     )
+     * )
      */
     public function index()
     {
@@ -46,7 +60,29 @@ class OlympiadController extends Controller
     }
 
     /**
-     * Store a newly created resource in storage.
+     * @OA\Post(
+     *     path="/api/olympiads",
+     *     summary="Create a new olympiad",
+     *     tags={"Olympiads"},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"name","description","start_date","end_date"},
+     *             @OA\Property(property="name", type="string", example="Olimpiada de Matemáticas 2025"),
+     *             @OA\Property(property="description", type="string"),
+     *             @OA\Property(property="start_date", type="string", format="date"),
+     *             @OA\Property(property="end_date", type="string", format="date")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=201,
+     *         description="Olympiad created successfully",
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Error in data validation",
+     *     )
+     * )
      */
     public function store(Request $request)
     {
@@ -99,7 +135,26 @@ class OlympiadController extends Controller
     }
 
     /**
-     * Display the specified resource.
+     * @OA\Get(
+     *     path="/api/olympiads/{id}",
+     *     summary="Get a specific olympiad by ID",
+     *     tags={"Olympiads"},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="Olympiad ID",
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Olympiad found and returned successfully",
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Olympiad not found",
+     *     )
+     * )
      */
     public function show(string $id)
     {
@@ -125,7 +180,30 @@ class OlympiadController extends Controller
     }
 
     /**
-     * Update the specified resource in storage.
+     * @OA\Put(
+     *     path="/api/olympiads/{id}",
+     *     summary="Update an existing olympiad",
+     *     tags={"Olympiads"},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             @OA\Property(property="name", type="string"),
+     *             @OA\Property(property="description", type="string"),
+     *             @OA\Property(property="start_date", type="string", format="date"),
+     *             @OA\Property(property="end_date", type="string", format="date")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Olympiad updated successfully",
+     *     )
+     * )
      */
     public function update(Request $request, string $id)
     {
@@ -180,7 +258,21 @@ class OlympiadController extends Controller
     }
 
     /**
-     * Remove the specified resource from storage.
+     * @OA\Delete(
+     *     path="/api/olympiads/{id}",
+     *     summary="Delete an olympiad by ID",
+     *     tags={"Olympiads"},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Olympiad deleted successfully",
+     *     )
+     * )
      */
     public function destroy(string $id)
     {
@@ -204,6 +296,33 @@ class OlympiadController extends Controller
         return response()->json($data, 200);
     }
 
+    /**
+     * @OA\Post(
+     *     path="/api/olympiads/{id}/areas",
+     *     summary="Assign areas to an olympiad",
+     *     tags={"Olympiads"},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             @OA\Property(
+     *                 property="areas",
+     *                 type="array",
+     *                 @OA\Items(type="integer")
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Areas assigned successfully",
+     *     )
+     * )
+     */
     public function assignAreas(Request $request, $id)
     {
         $olympiad = Olympiad::find($id);
@@ -237,6 +356,23 @@ class OlympiadController extends Controller
         ], 200);
     }
 
+    /**
+     * @OA\Get(
+     *     path="/api/olympiads/{id}/areas",
+     *     summary="Get areas of a specific olympiad",
+     *     tags={"Olympiads"},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="List of areas for the specified olympiad",
+     *     )
+     * )
+     */
     public function getAreas(string $id)
     {
         $olympiad = Olympiad::find($id);

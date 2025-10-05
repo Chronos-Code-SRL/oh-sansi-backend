@@ -24,6 +24,52 @@ namespace App\OpenApi;
  * )
  *
  * @OA\Tag(
+ *     name="Olympiads",
+ *     description="Operaciones relacionadas con olimpiadas"
+ * )
+ *
+ * @OA\Tag(
+ *     name="Areas",
+ *     description="Operaciones relacionadas con áreas"
+ * )
+ *
+ * @OA\Tag(
+ *     name="Phases",
+ *     description="Operaciones relacionadas con fases"
+ * )
+ *
+ * @OA\Schema(
+ *     schema="Olympiad",
+ *     type="object",
+ *     required={"name", "description", "start_date", "end_date"},
+ *     @OA\Property(property="id", type="integer", example=1),
+ *     @OA\Property(property="name", type="string", example="Olimpiada de Matemáticas 2025"),
+ *     @OA\Property(property="description", type="string", example="Competencia nacional de matemáticas"),
+ *     @OA\Property(property="start_date", type="string", format="date", example="2025-01-01"),
+ *     @OA\Property(property="end_date", type="string", format="date", example="2025-12-31")
+ * )
+ *
+ * @OA\Schema(
+ *     schema="Area",
+ *     type="object",
+ *     required={"name", "description"},
+ *     @OA\Property(property="id", type="integer", example=1),
+ *     @OA\Property(property="name", type="string", example="Matemáticas"),
+ *     @OA\Property(property="description", type="string", example="Área de matemáticas")
+ * )
+ *
+ * @OA\Schema(
+ *     schema="Phase",
+ *     type="object",
+ *     required={"name", "description", "start_date", "end_date"},
+ *     @OA\Property(property="id", type="integer", example=1),
+ *     @OA\Property(property="name", type="string", example="Fase Clasificatoria"),
+ *     @OA\Property(property="description", type="string", example="Primera fase de la olimpiada"),
+ *     @OA\Property(property="start_date", type="string", format="date", example="2025-01-01"),
+ *     @OA\Property(property="end_date", type="string", format="date", example="2025-02-28")
+ * )
+ *
+ * @OA\Tag(
  *   name="Competitors",
  *   description="Operaciones relacionadas con competidores"
  * )
