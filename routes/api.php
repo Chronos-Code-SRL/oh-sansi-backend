@@ -81,6 +81,3 @@ Route::middleware(['auth:sanctum', 'evaluator'])->group(function(){
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
 });
-
-// CSV upload for competitors
-Route::post('/competitors/upload-csv', [CompetitorUploadController::class, 'upload']);
