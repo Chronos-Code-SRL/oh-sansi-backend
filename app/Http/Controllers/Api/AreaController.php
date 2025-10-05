@@ -10,10 +10,24 @@ use Illuminate\Http\JsonResponse;
 
 use App\Models\Area;
 
+/**
+ * @OA\Tag(
+ *     name="Areas",
+ *     description="Endpoints for Areas management"
+ * )
+ */
 class AreaController extends Controller
 {
     /**
-     * Display a listing of the resource.
+     * @OA\Get(
+     *     path="/api/areas",
+     *     summary="Get list of areas",
+     *     tags={"Areas"},
+     *     @OA\Response(
+     *         response=200,
+     *         description="List of areas retrieved successfully",
+     *     )
+     * )
      */
     public function index()
     {
@@ -37,7 +51,23 @@ class AreaController extends Controller
     }
 
     /**
-     * Store a newly created resource in storage.
+     * @OA\Post(
+     *     path="/api/areas",
+     *     summary="Create a new area",
+     *     tags={"Areas"},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"name","description"},
+     *             @OA\Property(property="name", type="string", example="Matemáticas"),
+     *             @OA\Property(property="description", type="string")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=201,
+     *         description="Area created successfully",
+     *     )
+     * )
      */
     public function store(Request $request)
     {
@@ -69,7 +99,25 @@ class AreaController extends Controller
     }
 
     /**
-     * Display the specified resource.
+     * @OA\Get(
+     *     path="/api/areas/{id}",
+     *     summary="Get specific area by ID",
+     *     tags={"Areas"},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Area found"
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Area not found"
+     *     )
+     * )
      */
     public function show(string $id)
     {
@@ -92,7 +140,28 @@ class AreaController extends Controller
     }
 
     /**
-     * Update the specified resource in storage.
+     * @OA\Put(
+     *     path="/api/areas/{id}",
+     *     summary="Update an area by ID",
+     *     tags={"Areas"},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             @OA\Property(property="name", type="string"),
+     *             @OA\Property(property="description", type="string")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Area updated successfully",
+     *     )
+     * )
      */
     public function update(Request $request, string $id)
     {
@@ -138,7 +207,21 @@ class AreaController extends Controller
     }
 
     /**
-     * Remove the specified resource from storage.
+     * @OA\Delete(
+     *     path="/api/areas/{id}",
+     *     summary="Delete an area by ID",
+     *     tags={"Areas"},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Area deleted successfully",
+     *     )
+     * )
      */
     public function destroy(string $id)
     {
@@ -164,6 +247,23 @@ class AreaController extends Controller
 
     // <--- Manage users assigned to an area --->
 
+    /**
+     * @OA\Get(
+     *     path="/api/areas/{id}/users",
+     *     summary="Get users assigned to an area",
+     *     tags={"Areas"},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="List of users assigned to the area"
+     *     )
+     * )
+     */
     public function getUsers(string $id): JsonResponse
     {
         $area = Area::find($id);
@@ -185,6 +285,33 @@ class AreaController extends Controller
         return response()->json($data, 200);
     }
 
+    /**
+     * @OA\Post(
+     *     path="/api/areas/{id}/users",
+     *     summary="Assign users to an area",
+     *     tags={"Areas"},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             @OA\Property(
+     *                 property="users",
+     *                 type="array",
+     *                 @OA\Items(type="integer")
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Users assigned successfully",
+     *     )
+     * )
+     */
     public function assignUsers(Request $request, $areaId): JsonResponse
     {
         $request->validate([
@@ -201,6 +328,33 @@ class AreaController extends Controller
         ], 200);
     }
 
+    /**
+     * @OA\Delete(
+     *     path="/api/areas/{id}/users",
+     *     summary="Remove users from an area",
+     *     tags={"Areas"},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             @OA\Property(
+     *                 property="users",
+     *                 type="array",
+     *                 @OA\Items(type="integer")
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Users removed successfully",
+     *     )
+     * )
+     */
     public function removeUsers(Request $request, $areaId): JsonResponse
     {
         $request->validate([

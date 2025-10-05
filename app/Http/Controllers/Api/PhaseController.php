@@ -9,10 +9,24 @@ use Illuminate\Validation\Rule;
 
 use App\Models\Phase;
 
+/**
+ * @OA\Tag(
+ *     name="Phases",
+ *     description="Endpoints for Phases management"
+ * )
+ */
 class PhaseController extends Controller
 {
     /**
-     * Display a listing of the resource.
+     * @OA\Get(
+     *     path="/api/phases",
+     *     summary="Get list of phases",
+     *     tags={"Phases"},
+     *     @OA\Response(
+     *         response=200,
+     *         description="List of phases retrieved successfully",
+     *     )
+     * )
      */
     public function index()
     {
@@ -35,7 +49,25 @@ class PhaseController extends Controller
     }
 
     /**
-     * Store a newly created resource in storage.
+     * @OA\Post(
+     *     path="/api/phases",
+     *     summary="Create a new phase",
+     *     tags={"Phases"},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"name","description","start_date","end_date"},
+     *             @OA\Property(property="name", type="string", example="Fase Clasificatoria"),
+     *             @OA\Property(property="description", type="string"),
+     *             @OA\Property(property="start_date", type="string", format="date"),
+     *             @OA\Property(property="end_date", type="string", format="date")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=201,
+     *         description="Phase created successfully",
+     *     )
+     * )
      */
     public function store(Request $request)
     {
@@ -77,7 +109,25 @@ class PhaseController extends Controller
     }
 
     /**
-     * Display the specified resource.
+     * @OA\Get(
+     *     path="/api/phases/{id}",
+     *     summary="Get a phase by ID",
+     *     tags={"Phases"},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Phase found",
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Phase not found",
+     *     )
+     * )
      */
     public function show(string $id)
     {
@@ -100,7 +150,30 @@ class PhaseController extends Controller
     }
 
     /**
-     * Update the specified resource in storage.
+     * @OA\Put(
+     *     path="/api/phases/{id}",
+     *     summary="Update a phase by ID",
+     *     tags={"Phases"},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             @OA\Property(property="name", type="string"),
+     *             @OA\Property(property="description", type="string"),
+     *             @OA\Property(property="start_date", type="string", format="date"),
+     *             @OA\Property(property="end_date", type="string", format="date")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Phase updated successfully"
+     *     )
+     * )
      */
     public function update(Request $request, string $id)
     {
@@ -160,7 +233,21 @@ class PhaseController extends Controller
     }
 
     /**
-     * Remove the specified resource from storage.
+     * @OA\Delete(
+     *     path="/api/phases/{id}",
+     *     summary="Delete a phase by ID",
+     *     tags={"Phases"},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Phase deleted successfully"
+     *     )
+     * )
      */
     public function destroy(string $id)
     {
