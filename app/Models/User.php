@@ -20,7 +20,7 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'first_name',
-        'last_name', 
+        'last_name',
         'email',
         'password',
         'ci',
@@ -50,5 +50,10 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    public function areas()
+    {
+        return $this->belongsToMany(Area::class, 'user_areas');
     }
 }

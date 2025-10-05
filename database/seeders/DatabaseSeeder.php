@@ -22,7 +22,7 @@ class DatabaseSeeder extends Seeder
         $user->ci = '12345678';
         $user->phone_number = '+59 12345678';
         $user->genre = 'femenino';
-        $user->roles_id = 1; 
+        $user->roles_id = 1;
         $user->save();
     }
 }
