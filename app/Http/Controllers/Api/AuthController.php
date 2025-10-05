@@ -50,12 +50,16 @@ class AuthController extends Controller
             'first_name' => 'required|string|min:2|max:50',
             'last_name' => 'required|string|min:2|max:50',
             'email' => 'required|email|unique:users,email',
-            // 'password' => 'required|string|confirmed',
             'ci' => 'required|min:6|max:12|unique:users,ci',
             'phone_number' => 'required|min:7|max:15',
             'genre' => 'required|in:masculino,femenino',
             'roles_id' => 'required|exists:roles,id',
-        ]);
+            'areas_id' => 'required|array',
+        ],
+            ['email.unique' => 'El correo electrónico ya está en uso.',
+            'ci.unique' => 'El carnet de identidad ya está registrado.',
+            ]
+        );
 
         if ($validator->fails()) {
             $data = [
@@ -86,6 +90,8 @@ class AuthController extends Controller
                 'status' => 500
             ];
             return response()->json($data, 500);
+        }else{
+            $user->areas()->attach($request->areas_id);
         }
 
         $token = $user->createToken('auth_token')->plainTextToken;
