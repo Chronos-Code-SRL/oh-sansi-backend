@@ -388,7 +388,7 @@ class OlympiadController extends Controller
             ], 404);
         }
 
-        $areas = $olympiad->areas;
+        $areas = $olympiad->areas()->select('areas.id', 'areas.name')->get();
 
         if ($areas->isEmpty()) {
             return response()->json([
@@ -398,7 +398,7 @@ class OlympiadController extends Controller
         }
 
         return response()->json([
-            'areas' => $areas->pluck('name')->toArray(),
+            'areas' => $areas,
             'status' => 200
         ], 200);
     }
