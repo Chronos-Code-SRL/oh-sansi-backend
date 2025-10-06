@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\AreaController;
 use App\Http\Controllers\Api\PhaseController;
 use App\Http\Controllers\Api\CompetitorUploadController;
+use App\Http\Controllers\Api\GradeController;
 use App\Http\Controllers\CompetitorRegistrationController;
 
 Route::get('/user', function (Request $request) {
@@ -46,6 +47,22 @@ Route::get('/phases/{id}', [PhaseController::class, 'show']);
 Route::post('/phases', [PhaseController::class, 'store']);
 Route::put('/phases/{id}', [PhaseController::class, 'update']);
 Route::delete('/phases/{id}', [PhaseController::class, 'destroy']);
+
+// <--- CRUD Olympiad-Area-Level-Grades --->
+Route::post('/olympiads/{olympiadId}/areas/{areaId}/level-grades', [OlympiadController::class, 'assignLevelGradesToArea']);
+Route::get('/olympiads/{olympiadId}/areas/{areaId}/level-grades', [OlympiadController::class, 'getLevelGradesFromArea']);
+Route::delete('/olympiads/{olympiadId}/areas/{areaId}/level-grades', [OlympiadController::class, 'removeLevelGradesFromArea']);
+
+// <--- CRUD Grade --->
+Route::get('/grades', [GradeController::class, 'index']);
+Route::get('/grades/{id}', [GradeController::class, 'show']);
+Route::post('/grades', [GradeController::class, 'store']);
+Route::put('/grades/{id}', [GradeController::class, 'update']);
+Route::delete('/grades/{id}', [GradeController::class, 'destroy']);
+
+// <--- CRUD Olympiad-Area-Phase-Level-Grades (Score Cuts) --->
+Route::post('/olympiads/{olympiadId}/areas/{areaId}/score-cuts', [OlympiadController::class, 'assignScoreCuts']);
+Route::get('/olympiads/{olympiadId}/areas/{areaId}/score-cuts', [OlympiadController::class, 'getScoreCuts']);
 
 // login
 Route::post('/login', [AuthController::class, 'login']);
