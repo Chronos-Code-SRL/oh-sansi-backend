@@ -13,6 +13,13 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        $this->call([
+            AreaSeeder::class,
+            LevelSeeder::class,
+            GradeSeeder::class,
+            OlympiadSeeder::class,
+            OlympiadAndMappingsSeeder::class
+        ]);
 
         $user = new User();
         $user->first_name = 'Admin';
