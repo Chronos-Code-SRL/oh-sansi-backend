@@ -14,6 +14,8 @@ use App\Models\LevelGrade;
 use App\Models\Phase;
 use App\Models\OlympiadArea;
 use App\Models\OlympiadAreaPhase;
+use App\Models\OlympiadAreaLevelGrade;
+use App\Models\OlympiadAreaPhaseLevelGrade;
 
 /**
  * @OA\Tag(
@@ -415,12 +417,12 @@ class OlympiadController extends Controller
             ->where('id', $areaId)
             ->firstOrFail();
 
-        // Crear el nivel
+        // Create the level
         $level = Level::create([
             'name' => $request->level_name
         ]);
 
-        // Crear las relaciones level_grades
+        // Create the level_grades relationships
         $levelGrades = [];
         foreach ($request->grade_ids as $gradeId) {
             $levelGrade = LevelGrade::create([
@@ -430,7 +432,7 @@ class OlympiadController extends Controller
             $levelGrades[] = $levelGrade->id;
         }
 
-        // Asignar los level_grades al área de la olimpiada
+        // Assign the level_grades to the olympiad area
         $olympiadArea->levelGrades()->attach($levelGrades);
 
         return response()->json([
@@ -466,5 +468,66 @@ class OlympiadController extends Controller
         return response()->json([
             'message' => 'Level grades removed successfully'
         ]);
+    }
+
+    // <--- Score cuts per phase/area/level-grade --->
+
+    public function assignScoreCuts(Request $request, $olympiadId, $areaId)
+    {
+        $request->validate([
+            'phase_id' => 'required|exists:phases,id',
+            'score_cuts' => 'required|array',
+            'score_cuts.*.level_grade_id' => 'required|exists:level_grades,id',
+            'score_cuts.*.score_cut' => 'required|numeric|min:0|max:100'
+        ]);
+
+        $olympiadArea = OlympiadArea::where('olympiad_id', $olympiadId)
+            ->where('id', $areaId)
+            ->firstOrFail();
+
+        // Get or create OlympiadAreaPhase
+        $olympiadAreaPhase = OlympiadAreaPhase::firstOrCreate([
+            'olympiad_area_id' => $olympiadArea->id,
+            'phase_id' => $request->phase_id
+        ]);
+
+        foreach ($request->score_cuts as $scoreCut) {
+            // Validate that the level_grade is assigned to this area
+            $olympiadAreaLevelGrade = OlympiadAreaLevelGrade::where('olympiad_area_id', $areaId)
+                ->where('level_grade_id', $scoreCut['level_grade_id'])
+                ->firstOrFail();
+
+            // Create or update the score cut
+            OlympiadAreaPhaseLevelGrade::updateOrCreate(
+                [
+                    'olympiad_area_phase_id' => $olympiadAreaPhase->id,
+                    'olympiad_area_level_grade_id' => $olympiadAreaLevelGrade->id,
+                ],
+                [
+                    'score_cut' => $scoreCut['score_cut']
+                ]
+            );
+        }
+
+        return response()->json([
+            'message' => 'Score cuts assigned successfully',
+            'data' => $olympiadAreaPhase->load([
+                'olympiadAreaPhaseLevelGrades.olympiadAreaLevelGrade.levelGrade',
+                'phase'
+            ])
+        ]);
+    }
+
+    public function getScoreCuts($olympiadId, $areaId)
+    {
+        $olympiadArea = OlympiadArea::where('olympiad_id', $olympiadId)
+            ->where('id', $areaId)
+            ->firstOrFail();
+
+        $data = OlympiadAreaPhase::where('olympiad_area_id', $areaId)
+            ->with(['phase', 'olympiadAreaPhaseLevelGrades.olympiadAreaLevelGrade.levelGrade'])
+            ->get();
+
+        return response()->json(['data' => $data]);
     }
 }

@@ -5,20 +5,21 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
-class OlympiadAreaPhase extends Model
+class OlympiadAreaLevelGrade extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['olympiad_area_id', 'phase_id', 'score_cut'];
+    protected $table = 'olympiad_area_level_grades';
+    protected $fillable = ['olympiad_area_id', 'level_grade_id'];
 
     public function olympiadArea()
     {
         return $this->belongsTo(OlympiadArea::class);
     }
 
-    public function phase()
+    public function levelGrade()
     {
-        return $this->belongsTo(Phase::class);
+        return $this->belongsTo(LevelGrade::class);
     }
 
     public function olympiadAreaPhaseLevelGrades()

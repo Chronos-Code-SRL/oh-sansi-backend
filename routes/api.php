@@ -60,6 +60,10 @@ Route::post('/grades', [GradeController::class, 'store']);
 Route::put('/grades/{id}', [GradeController::class, 'update']);
 Route::delete('/grades/{id}', [GradeController::class, 'destroy']);
 
+// <--- CRUD Olympiad-Area-Phase-Level-Grades (Score Cuts) --->
+Route::post('/olympiads/{olympiadId}/areas/{areaId}/score-cuts', [OlympiadController::class, 'assignScoreCuts']);
+Route::get('/olympiads/{olympiadId}/areas/{areaId}/score-cuts', [OlympiadController::class, 'getScoreCuts']);
+
 // login
 Route::post('/login', [AuthController::class, 'login']);
 
