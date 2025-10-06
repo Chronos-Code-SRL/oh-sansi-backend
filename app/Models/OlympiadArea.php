@@ -25,4 +25,9 @@ class OlympiadArea extends Model
     {
         return $this->hasMany(OlympiadAreaPhase::class);
     }
+
+    public function levelGrades()
+{
+    return $this->belongsToMany(LevelGrade::class, 'olympiad_area_level_grades');
+}
 }

@@ -13,5 +13,8 @@ class Level extends Model
         'name'
     ];
 
-    // gradeLevels() relation removed; grade_levels table not used in new schema
+    public function grades()
+    {
+        return $this->belongsToMany(Grade::class, 'level_grades');
+    }
 }
