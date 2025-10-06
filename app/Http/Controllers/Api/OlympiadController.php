@@ -405,6 +405,67 @@ class OlympiadController extends Controller
 
     // <--- Level-Grades to Areas in Olympiads --->
 
+    /**
+     * @OA\Post(
+     *     path="/api/olympiads/{olympiadId}/areas/{areaId}/level-grades",
+     *     summary="Assign a level and its grades to an olympiad area",
+     *     description="Creates a new level, associates it with the given grades, and attaches the resulting level-grade relationships to the specified olympiad area.",
+     *     tags={"Level (with Grades) - Olympiad Areas"},
+     *     @OA\Parameter(
+     *         name="olympiadId",
+     *         in="path",
+     *         required=true,
+     *         description="ID of the olympiad",
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Parameter(
+     *         name="areaId",
+     *         in="path",
+     *         required=true,
+     *         description="ID of the olympiad area",
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"level_name", "grade_ids"},
+     *             @OA\Property(property="level_name", type="string", example="Primary Level"),
+     *             @OA\Property(
+     *                 property="grade_ids",
+     *                 type="array",
+     *                 @OA\Items(type="integer", example=1)
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Level and grades assigned successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Level and grades assigned successfully"),
+     *             @OA\Property(property="level", type="object",
+     *                 @OA\Property(property="id", type="integer", example=10),
+     *                 @OA\Property(property="name", type="string", example="Primary Level"),
+     *                 @OA\Property(
+     *                     property="grades",
+     *                     type="array",
+     *                     @OA\Items(
+     *                         @OA\Property(property="id", type="integer", example=1),
+     *                         @OA\Property(property="name", type="string", example="3rd Grade")
+     *                     )
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error"
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Olympiad area not found"
+     *     )
+     * )
+     */
     public function assignLevelGradesToArea(Request $request, $olympiadId, $areaId)
     {
         $request->validate([
@@ -441,6 +502,57 @@ class OlympiadController extends Controller
         ]);
     }
 
+    /**
+     * @OA\Get(
+     *     path="/api/olympiads/{olympiadId}/areas/{areaId}/level-grades",
+     *     summary="Get all level-grade associations from an olympiad area",
+     *     description="Retrieves all level-grade relationships attached to the specified olympiad area, including their associated level and grade data.",
+     *     tags={"Level (with Grades) - Olympiad Areas"},
+     *     @OA\Parameter(
+     *         name="olympiadId",
+     *         in="path",
+     *         required=true,
+     *         description="ID of the olympiad",
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Parameter(
+     *         name="areaId",
+     *         in="path",
+     *         required=true,
+     *         description="ID of the olympiad area",
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="List of level-grade relationships retrieved successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(
+     *                 property="level_grades",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="integer", example=25),
+     *                     @OA\Property(
+     *                         property="level",
+     *                         type="object",
+     *                         @OA\Property(property="id", type="integer", example=10),
+     *                         @OA\Property(property="name", type="string", example="Primary Level")
+     *                     ),
+     *                     @OA\Property(
+     *                         property="grade",
+     *                         type="object",
+     *                         @OA\Property(property="id", type="integer", example=3),
+     *                         @OA\Property(property="name", type="string", example="4th Grade")
+     *                     )
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Olympiad area not found"
+     *     )
+     * )
+     */
     public function getLevelGradesFromArea($olympiadId, $areaId)
     {
         $olympiadArea = OlympiadArea::where('olympiad_id', $olympiadId)
@@ -452,6 +564,54 @@ class OlympiadController extends Controller
         ]);
     }
 
+    /**
+     * @OA\Delete(
+     *     path="/api/olympiads/{olympiadId}/areas/{areaId}/level-grades",
+     *     summary="Remove level-grade associations from an olympiad area",
+     *     description="Detaches one or more level-grade relationships from the specified olympiad area without deleting the underlying data.",
+     *     tags={"Level (with Grades) - Olympiad Areas"},
+     *     @OA\Parameter(
+     *         name="olympiadId",
+     *         in="path",
+     *         required=true,
+     *         description="ID of the olympiad",
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Parameter(
+     *         name="areaId",
+     *         in="path",
+     *         required=true,
+     *         description="ID of the olympiad area",
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"level_grade_ids"},
+     *             @OA\Property(
+     *                 property="level_grade_ids",
+     *                 type="array",
+     *                 @OA\Items(type="integer", example=25)
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Level grades removed successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Level grades removed successfully")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Olympiad area not found"
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error"
+     *     )
+     * )
+     */
     public function removeLevelGradesFromArea(Request $request, $olympiadId, $areaId)
     {
         $request->validate([
@@ -472,6 +632,99 @@ class OlympiadController extends Controller
 
     // <--- Score cuts per phase/area/level-grade --->
 
+    /**
+     * @OA\Post(
+     *     path="/api/olympiads/{olympiadId}/areas/{areaId}/score-cuts",
+     *     summary="Assign score cuts to level-grades for a specific phase in an olympiad area",
+     *     description="Creates or updates the score cut (minimum passing score) for each level-grade within a specific phase of an olympiad area.",
+     *     tags={"Score cuts"},
+     *     @OA\Parameter(
+     *         name="olympiadId",
+     *         in="path",
+     *         required=true,
+     *         description="ID of the olympiad",
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     @OA\Parameter(
+     *         name="areaId",
+     *         in="path",
+     *         required=true,
+     *         description="ID of the olympiad area",
+     *         @OA\Schema(type="integer", example=2)
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         description="Phase ID and list of score cuts per level-grade",
+     *         @OA\JsonContent(
+     *             required={"phase_id", "score_cuts"},
+     *             @OA\Property(property="phase_id", type="integer", example=3),
+     *             @OA\Property(
+     *                 property="score_cuts",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     type="object",
+     *                     required={"level_grade_id", "score_cut"},
+     *                     @OA\Property(property="level_grade_id", type="integer", example=12),
+     *                     @OA\Property(property="score_cut", type="number", format="float", example=75.5)
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Score cuts assigned successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Score cuts assigned successfully"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 description="The created or updated OlympiadAreaPhase with its related phase and score cuts",
+     *                 @OA\Property(property="id", type="integer", example=15),
+     *                 @OA\Property(property="phase", type="object",
+     *                     @OA\Property(property="id", type="integer", example=3),
+     *                     @OA\Property(property="name", type="string", example="Final Phase")
+     *                 ),
+     *                 @OA\Property(
+     *                     property="olympiad_area_phase_level_grades",
+     *                     type="array",
+     *                     @OA\Items(
+     *                         @OA\Property(
+     *                             property="id",
+     *                             type="integer",
+     *                             example=21
+     *                         ),
+     *                         @OA\Property(
+     *                             property="score_cut",
+     *                             type="number",
+     *                             format="float",
+     *                             example=80.0
+     *                         ),
+     *                         @OA\Property(
+     *                             property="olympiad_area_level_grade",
+     *                             type="object",
+     *                             @OA\Property(
+     *                                 property="level_grade",
+     *                                 type="object",
+     *                                 @OA\Property(property="id", type="integer", example=12),
+     *                                 @OA\Property(property="level_id", type="integer", example=5),
+     *                                 @OA\Property(property="grade_id", type="integer", example=9)
+     *                             )
+     *                         )
+     *                     )
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Olympiad area or level-grade not found"
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error (e.g. invalid phase_id or score_cut out of range)"
+     *     )
+     * )
+     */
     public function assignScoreCuts(Request $request, $olympiadId, $areaId)
     {
         $request->validate([
@@ -518,6 +771,69 @@ class OlympiadController extends Controller
         ]);
     }
 
+    /**
+     * @OA\Get(
+     *     path="/api/olympiads/{olympiadId}/areas/{areaId}/score-cuts",
+     *     summary="Get all score cuts for an olympiad area",
+     *     description="Retrieves all phases of the specified olympiad area, along with their associated level-grades and score cuts.",
+     *     tags={"Score cuts"},
+     *     @OA\Parameter(
+     *         name="olympiadId",
+     *         in="path",
+     *         required=true,
+     *         description="ID of the olympiad",
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     @OA\Parameter(
+     *         name="areaId",
+     *         in="path",
+     *         required=true,
+     *         description="ID of the olympiad area",
+     *         @OA\Schema(type="integer", example=2)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="List of score cuts retrieved successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     type="object",
+     *                     @OA\Property(property="id", type="integer", example=15),
+     *                     @OA\Property(property="phase", type="object",
+     *                         @OA\Property(property="id", type="integer", example=3),
+     *                         @OA\Property(property="name", type="string", example="Final Phase")
+     *                     ),
+     *                     @OA\Property(
+     *                         property="olympiad_area_phase_level_grades",
+     *                         type="array",
+     *                         @OA\Items(
+     *                             @OA\Property(property="id", type="integer", example=22),
+     *                             @OA\Property(property="score_cut", type="number", format="float", example=75.0),
+     *                             @OA\Property(
+     *                                 property="olympiad_area_level_grade",
+     *                                 type="object",
+     *                                 @OA\Property(
+     *                                     property="level_grade",
+     *                                     type="object",
+     *                                     @OA\Property(property="id", type="integer", example=12),
+     *                                     @OA\Property(property="level_id", type="integer", example=5),
+     *                                     @OA\Property(property="grade_id", type="integer", example=9)
+     *                                 )
+     *                             )
+     *                         )
+     *                     )
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Olympiad area not found"
+     *     )
+     * )
+     */
     public function getScoreCuts($olympiadId, $areaId)
     {
         $olympiadArea = OlympiadArea::where('olympiad_id', $olympiadId)
