@@ -14,6 +14,7 @@ use App\Models\OlympiadArea;
 use App\Models\Grade;
 use App\Models\Level;
 use App\Models\LevelGrade;
+use App\Models\Olympiad;
 
 class CompetitorRegistrationController extends Controller
 {
@@ -45,10 +46,18 @@ class CompetitorRegistrationController extends Controller
             ], 422);
         }
 
+        // Validate that olympiad exists before processing
+        $olympiad = Olympiad::find($request->olympiad_id);
+        if (!$olympiad) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Olympiad not found',
+                'errors' => ['olympiad_id' => ['The specified olympiad does not exist']]
+            ], 404);
+        }
+
         $olympiadId = $request->olympiad_id;
         $files = $request->file('files');
-        
-        // Handle single file upload
         if (!is_array($files)) {
             $files = [$files];
         }
@@ -79,7 +88,7 @@ class CompetitorRegistrationController extends Controller
 
         try {
             foreach ($files as $file) {
-                $result = $this->processCsvFile($file, $olympiadId);
+                $result = $this->processCsvFile($file, $olympiad);
                 $results[] = $result;
                 $totalSuccessful += $result['successful'];
                 $totalCompetitorErrors += $result['competitor_errors'];
@@ -124,7 +133,8 @@ class CompetitorRegistrationController extends Controller
                     'error_files' => $errorFiles,
                     'processing_time_seconds' => round($processingTime, 2),
                     'records_per_second' => $processingTime > 0 ? round($totalRecords / $processingTime, 2) : 0,
-                    'olympiad_id' => $olympiadId,
+                    'olympiad_id' => $olympiad->id,
+                    'olympiad_name' => $olympiad->name,
                     'summary' => [
                         'total_competitors_registered' => $totalSuccessful,
                         'total_competitors_with_errors' => $totalCompetitorErrors,
@@ -152,7 +162,7 @@ class CompetitorRegistrationController extends Controller
     /**
      * Process a single CSV file
      */
-    private function processCsvFile($file, $olympiadId): array
+    private function processCsvFile($file, $olympiad): array
     {
         $filename = $file->getClientOriginalName();
         $content = file_get_contents($file->getPathname());
@@ -255,10 +265,10 @@ class CompetitorRegistrationController extends Controller
                 }
             }
 
-            $validation = $this->validateContestantData($rowData, $olympiadId);
+            $validation = $this->validateContestantData($rowData, $olympiad->id);
 
             if ($validation['valid']) {
-                $this->createContestantAndRegistration($rowData, $olympiadId);
+                $this->createContestantAndRegistration($rowData, $olympiad->id);
                 $successful++;
                 if (!empty($rowData['CI'])) { $seenCis[$rowData['CI']] = true; }
             } else {
@@ -374,6 +384,14 @@ class CompetitorRegistrationController extends Controller
             }
         }
 
+        // Olympiad validation (must exist)
+        if (!empty($olympiadId)) {
+            $olympiad = Olympiad::find($olympiadId);
+            if (!$olympiad) {
+                $errors[] = "Olympiad with ID '$olympiadId' does not exist";
+            }
+        }
+
         // Area validation (must exist under olympiad and max 3 areas)
         if (!empty($data['AREA'])) {
             // Support comma or semicolon separators for multiple areas
@@ -381,11 +399,11 @@ class CompetitorRegistrationController extends Controller
             if (count($areas) > 3) {
                 $errors[] = 'Maximum 3 areas allowed';
             }
-            
+
             foreach ($areas as $areaName) {
                 $area = Area::where('name', $areaName)->first();
                 if (!$area) {
-                    $errors[] = "Area '$areaName' does not exist";
+                    $errors[] = "Area '$areaName' does not exist in database";
                     continue;
                 }
                 $existsInOlympiad = OlympiadArea::where('olympiad_id', $olympiadId)
@@ -397,18 +415,28 @@ class CompetitorRegistrationController extends Controller
             }
         }
 
-        // Grade validation (only letters)
+        // Grade validation (must exist in database, only letters)
         if (!empty($data['GRADO'])) {
             if (!preg_match('/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/', $data['GRADO'])) {
                 $errors[] = 'Grade must contain only letters';
+            } else {
+                $grade = Grade::where('name', trim($data['GRADO']))->first();
+                if (!$grade) {
+                    $errors[] = "Grade '" . trim($data['GRADO']) . "' does not exist in database";
+                }
             }
         }
 
-        // Level validation (required, only letters). Accept key with or without leading space
+        // Level validation (must exist in database, only letters). Accept key with or without leading space
         $levelValue = $data['NIVEL'] ?? ($data[' NIVEL'] ?? null);
         if (!empty($levelValue)) {
             if (!preg_match('/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]{2,50}$/', $levelValue)) {
                 $errors[] = 'Level must be 2-50 characters and contain only letters';
+            } else {
+                $level = Level::where('name', trim($levelValue))->first();
+                if (!$level) {
+                    $errors[] = "Level '" . trim($levelValue) . "' does not exist in database";
+                }
             }
         }
         if (empty($levelValue)) {
@@ -454,13 +482,13 @@ class CompetitorRegistrationController extends Controller
             'tutor_number' => $data['NUMERO TUTOR']
         ]);
 
-        // Resolve grade and level for registration
+        // Resolve grade and level for registration (only use existing records)
         $grade = null;
         if (!empty($data['GRADO'])) {
-            $grade = Grade::firstOrCreate(['name' => trim($data['GRADO'])]);
+            $grade = Grade::where('name', trim($data['GRADO']))->first();
         }
         $levelName = $data['NIVEL'] ?? ($data[' NIVEL'] ?? null);
-        $level = $levelName ? Level::firstOrCreate(['name' => trim($levelName)]) : null;
+        $level = $levelName ? Level::where('name', trim($levelName))->first() : null;
 
         // Get areas and create registrations (support comma or semicolon separators)
         $areas = array_map('trim', preg_split('/[,;]+/', $data['AREA']));
@@ -470,7 +498,7 @@ class CompetitorRegistrationController extends Controller
                 $olympiadArea = OlympiadArea::where('olympiad_id', $olympiadId)
                     ->where('area_id', $area->id)
                     ->first();
-                
+
                 if ($olympiadArea) {
                     // Create registration (without grade_id and level_id as per new schema)
                     $registration = Registration::create([
@@ -478,13 +506,21 @@ class CompetitorRegistrationController extends Controller
                         'olympiad_area_id' => $olympiadArea->id
                     ]);
 
-                    // Create LevelGrade if both grade and level exist
+                    // Create LevelGrade for THIS SPECIFIC area, level, and grade combination
+                    // Each area should have its own level-grade mapping
                     if ($grade && $level) {
-                        LevelGrade::firstOrCreate([
-                            'olympiad_area_id' => $olympiadArea->id,
-                            'level_id' => $level->id,
-                            'grade_id' => $grade->id
-                        ]);
+                        $existingLevelGrade = LevelGrade::where('olympiad_area_id', $olympiadArea->id)
+                            ->where('level_id', $level->id)
+                            ->where('grade_id', $grade->id)
+                            ->first();
+
+                        if (!$existingLevelGrade) {
+                            LevelGrade::create([
+                                'olympiad_area_id' => $olympiadArea->id,
+                                'level_id' => $level->id,
+                                'grade_id' => $grade->id
+                            ]);
+                        }
                     }
                 }
             }
