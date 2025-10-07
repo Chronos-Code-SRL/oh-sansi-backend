@@ -18,7 +18,7 @@ return new class extends Migration
             $table->timestamps();
 
             // Avoid duplicates
-            $table->unique(['level_id', 'grade_id']);
+            //$table->unique(['level_id', 'grade_id']);
         });
     }
 

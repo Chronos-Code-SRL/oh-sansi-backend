@@ -32,7 +32,7 @@ return new class extends Migration
             }
 
             // Update unique constraint to include olympiad_area_id
-            $table->unique(['olympiad_area_id', 'level_id', 'grade_id']);
+            //$table->unique(['olympiad_area_id', 'level_id', 'grade_id']);
         });
     }
 
