@@ -93,7 +93,7 @@ class OlympiadController extends Controller
         // Data validation
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:30',
-            'edition' => 'required|string|max:10|unique:olympiads,edition',
+            'edition' => 'required|string|max:25', //|unique:olympiads,edition',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after:start_date',
             'number_of_phases' => 'required|integer|min:1',
@@ -224,12 +224,13 @@ class OlympiadController extends Controller
         // Rule set to ignore the edition if it is the same as the one sent
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
-            'edition' => [
-                'required',
-                'string',
-                'max:20',
-                Rule::unique('olympiads', 'edition')->ignore($olympiad->id),
-            ],
+            'edition' => 'required|string|max:25',
+            // 'edition' => [
+            //     'required',
+            //     'string',
+            //     'max:20',
+            //     Rule::unique('olympiads', 'edition')->ignore($olympiad->id),
+            // ],
             'start_date' => 'required|date',
             'end_date' => 'required|date|after:start_date',
             'status' => 'in:En planificación,Activa,Terminada',
