@@ -67,6 +67,9 @@ Route::get('/olympiads/{olympiadId}/areas/{areaId}/score-cuts', [OlympiadControl
 // login
 Route::post('/login', [AuthController::class, 'login']);
 
+//POST register evaluator or responsible academic
+Route::post('/register', [AuthController::class, 'register']);
+
 //admin routes
 Route::middleware(['auth:sanctum', 'admin'])->group(function(){
     // // <--- CRUD Olympiad --->
@@ -75,9 +78,6 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function(){
     // Route::post('/olympiads', [OlympiadController::class, 'store']);
     // Route::put('/olympiads/{id}', [OlympiadController::class, 'update']);
     // Route::delete('/olympiads/{id}', [OlympiadController::class, 'destroy']);
-
-    //POST register evaluator or responsible academic
-    Route::post('/register', [AuthController::class, 'register']);
     //GET all users
     Route::get('/users', [AdminController::class, 'index']);
 });
