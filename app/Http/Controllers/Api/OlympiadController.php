@@ -615,19 +615,35 @@ class OlympiadController extends Controller
     public function removeLevelGradesFromArea(Request $request, $olympiadId, $areaId)
     {
         $request->validate([
-            'level_grade_ids' => 'required|array',
-            'level_grade_ids.*' => 'exists:level_grades,id'
+            'level_id' => 'required|exists:levels,id'
         ]);
 
         $olympiadArea = OlympiadArea::where('olympiad_id', $olympiadId)
             ->where('id', $areaId)
             ->firstOrFail();
 
-        $olympiadArea->levelGrades()->detach($request->level_grade_ids);
+        $levelGradeIds = LevelGrade::where('level_id', $request->level_id)->pluck('id');
+
+        $olympiadArea->levelGrades()->detach($levelGradeIds);
 
         return response()->json([
-            'message' => 'Level grades removed successfully'
+            'message' => 'Level and all its grades removed from area successfully'
         ]);
+
+        // $request->validate([
+        //     'level_grade_ids' => 'required|array',
+        //     'level_grade_ids.*' => 'exists:level_grades,id'
+        // ]);
+
+        // $olympiadArea = OlympiadArea::where('olympiad_id', $olympiadId)
+        //     ->where('id', $areaId)
+        //     ->firstOrFail();
+
+        // $olympiadArea->levelGrades()->detach($request->level_grade_ids);
+
+        // return response()->json([
+        //     'message' => 'Level grades removed successfully'
+        // ]);
     }
 
     // <--- Score cuts per phase/area/level-grade --->
