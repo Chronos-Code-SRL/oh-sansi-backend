@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('olympiad_area_phase_level_grades', function (Blueprint $table) {
             $table->id();
             $table->foreignId('olympiad_area_phase_id')->constrained('olympiad_area_phases')->onDelete('cascade');
-            $table->foreignId('olympiad_area_level_grade_id')->constrained('olympiad_area_level_grades')->onDelete('cascade');
+            $table->foreignId('level_grade_id')->constrained('level_grades')->onDelete('cascade');
             $table->integer('score_cut');
             $table->timestamps();
         });

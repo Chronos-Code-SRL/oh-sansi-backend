@@ -24,7 +24,7 @@ class AreaSeeder extends Seeder
         ];
 
         foreach ($areas as $area) {
-            \App\Models\Area::create($area);
+            \App\Models\Area::firstOrCreate($area);
         }
     }
 }

@@ -17,7 +17,6 @@ class DatabaseSeeder extends Seeder
             AreaSeeder::class,
             LevelSeeder::class,
             GradeSeeder::class,
-            OlympiadSeeder::class,
             OlympiadAndMappingsSeeder::class
         ]);
 

@@ -13,7 +13,7 @@ use App\Models\Area;
 use App\Models\OlympiadArea;
 use App\Models\Grade;
 use App\Models\Level;
-use Carbon\Carbon;
+use App\Models\LevelGrade;
 
 class CompetitorRegistrationController extends Controller
 {
@@ -472,12 +472,20 @@ class CompetitorRegistrationController extends Controller
                     ->first();
                 
                 if ($olympiadArea) {
+                    // Create registration (without grade_id and level_id as per new schema)
                     $registration = Registration::create([
                         'contestant_id' => $contestant->id,
-                        'olympiad_area_id' => $olympiadArea->id,
-                        'grade_id' => $grade?->id,
-                        'level_id' => $level?->id
+                        'olympiad_area_id' => $olympiadArea->id
                     ]);
+
+                    // Create LevelGrade if both grade and level exist
+                    if ($grade && $level) {
+                        LevelGrade::firstOrCreate([
+                            'olympiad_area_id' => $olympiadArea->id,
+                            'level_id' => $level->id,
+                            'grade_id' => $grade->id
+                        ]);
+                    }
                 }
             }
         }
