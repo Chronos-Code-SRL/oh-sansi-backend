@@ -9,7 +9,12 @@ class LevelGrade extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['level_id', 'grade_id'];
+    protected $fillable = ['olympiad_area_id', 'level_id', 'grade_id'];
+
+    public function olympiadArea()
+    {
+        return $this->belongsTo(OlympiadArea::class);
+    }
 
     public function level()
     {
@@ -19,10 +24,5 @@ class LevelGrade extends Model
     public function grade()
     {
         return $this->belongsTo(Grade::class);
-    }
-
-    public function olympiadAreas()
-    {
-        return $this->belongsToMany(OlympiadArea::class, 'olympiad_area_level_grades');
     }
 }

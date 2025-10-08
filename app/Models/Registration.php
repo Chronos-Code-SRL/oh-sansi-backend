@@ -11,9 +11,7 @@ class Registration extends Model
 
     protected $fillable = [
         'contestant_id',
-        'olympiad_area_id',
-        'grade_id',
-        'level_id'
+        'olympiad_area_id'
     ];
 
     protected $casts = [];
@@ -42,21 +40,5 @@ class Registration extends Model
     public function evaluations()
     {
         return $this->hasMany(Evaluation::class);
-    }
-
-    /**
-     * Get the grade for the registration
-     */
-    public function grade()
-    {
-        return $this->belongsTo(Grade::class);
-    }
-
-    /**
-     * Get the level for the registration
-     */
-    public function level()
-    {
-        return $this->belongsTo(Level::class);
     }
 }
