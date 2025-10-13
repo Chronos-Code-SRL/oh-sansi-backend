@@ -467,40 +467,221 @@ class OlympiadController extends Controller
      *     )
      * )
      */
+    // public function assignLevelGradesToArea(Request $request, $olympiadId, $areaId)
+    // {
+    //     $request->validate([
+    //         'level_name' => 'required|string',
+    //         'grade_ids' => 'required|array',
+    //         'grade_ids.*' => 'exists:grades,id'
+    //     ]);
+
+    //     $olympiadArea = OlympiadArea::where('olympiad_id', $olympiadId)
+    //         ->where('area_id', $areaId)
+    //         ->firstOrFail();
+
+    //     // Create the level
+    //     $level = Level::create([
+    //         'name' => $request->level_name
+    //     ]);
+
+    //     // Create the level_grades relationships
+    //     $levelGrades = [];
+    //     foreach ($request->grade_ids as $gradeId) {
+    //         $levelGrade = LevelGrade::create([
+    //             'level_id' => $level->id,
+    //             'grade_id' => $gradeId
+    //         ]);
+    //         $levelGrades[] = $levelGrade->id;
+    //     }
+
+    //     // Assign the level_grades to the olympiad area
+    //     $olympiadArea->levelGrades()->attach($levelGrades);
+
+    //     return response()->json([
+    //         'message' => 'Level and grades assigned successfully',
+    //         'level' => $level->load('grades'),
+    //     ]);
+    // }
+
     public function assignLevelGradesToArea(Request $request, $olympiadId, $areaId)
     {
-        $request->validate([
-            'level_name' => 'required|string',
-            'grade_ids' => 'required|array',
-            'grade_ids.*' => 'exists:grades,id'
-        ]);
-
-        $olympiadArea = OlympiadArea::where('olympiad_id', $olympiadId)
-            ->where('id', $areaId)
-            ->firstOrFail();
-
-        // Create the level
-        $level = Level::create([
-            'name' => $request->level_name
-        ]);
-
-        // Create the level_grades relationships
-        $levelGrades = [];
-        foreach ($request->grade_ids as $gradeId) {
-            $levelGrade = LevelGrade::create([
-                'level_id' => $level->id,
-                'grade_id' => $gradeId
+        try {
+            // Input validation
+            $validator = Validator::make($request->all(), [
+                'level_name' => 'required|string|max:255',
+                'grade_ids' => 'required|array|min:1',
+                'grade_ids.*' => 'exists:grades,id'
             ]);
-            $levelGrades[] = $levelGrade->id;
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors(),
+                    'status' => 422
+                ], 422);
+            }
+
+            // Verify olympiad exists
+            $olympiad = Olympiad::find($olympiadId);
+            if (!$olympiad) {
+                return response()->json([
+                    'message' => 'Olympiad not found',
+                    'error' => "No olympiad found with ID: {$olympiadId}",
+                    'status' => 404
+                ], 404);
+            }
+
+            // Verify area exists
+            $area = Area::find($areaId);
+            if (!$area) {
+                return response()->json([
+                    'message' => 'Area not found',
+                    'error' => "No area found with ID: {$areaId}",
+                    'status' => 404
+                ], 404);
+            }
+
+            // Verify olympiad-area relationship exists
+            $olympiadArea = OlympiadArea::where('olympiad_id', $olympiadId)
+                ->where('area_id', $areaId)
+                ->first();
+
+            if (!$olympiadArea) {
+                return response()->json([
+                    'message' => 'Olympiad-Area relationship not found',
+                    'error' => "The area with ID {$areaId} is not associated with olympiad ID {$olympiadId}. Please verify the area is assigned to this olympiad.",
+                    'status' => 404
+                ], 404);
+            }
+
+            // Check if level name already exists (optional validation)
+            $existingLevel = Level::where('name', $request->level_name)->first();
+            if ($existingLevel) {
+                return response()->json([
+                    'message' => 'Level name already exists',
+                    'error' => "A level with the name '{$request->level_name}' already exists with ID: {$existingLevel->id}",
+                    'status' => 409
+                ], 409);
+            }
+
+            // Verify all grade IDs exist (additional check beyond validation)
+            $existingGrades = \App\Models\Grade::whereIn('id', $request->grade_ids)->pluck('id')->toArray();
+            $missingGradeIds = array_diff($request->grade_ids, $existingGrades);
+
+            if (!empty($missingGradeIds)) {
+                return response()->json([
+                    'message' => 'Some grades not found',
+                    'error' => 'The following grade IDs do not exist: ' . implode(', ', $missingGradeIds),
+                    'status' => 404
+                ], 404);
+            }
+
+            // Check for duplicate grade assignments in this olympiad area
+            $existingLevelGrades = LevelGrade::where('olympiad_area_id', $olympiadArea->id)
+                ->whereIn('grade_id', $request->grade_ids)
+                ->with('level')
+                ->get();
+
+            if ($existingLevelGrades->isNotEmpty()) {
+                $duplicateInfo = $existingLevelGrades->map(function ($levelGrade) {
+                    return "Grade ID {$levelGrade->grade_id} (Level: {$levelGrade->level->name})";
+                })->toArray();
+
+                return response()->json([
+                    'message' => 'Duplicate grade assignments found',
+                    'error' => 'The following grades are already assigned to levels in this olympiad area: ' . implode(', ', $duplicateInfo),
+                    'status' => 409
+                ], 409);
+            }
+
+            // Create the level
+            $level = Level::create([
+                'name' => $request->level_name
+            ]);
+
+            if (!$level) {
+                return response()->json([
+                    'message' => 'Failed to create level',
+                    'error' => 'Database error occurred while creating the level. Please try again.',
+                    'status' => 500
+                ], 500);
+            }
+
+            // Create the level_grades relationships
+            $createdLevelGrades = [];
+            $failedGrades = [];
+
+            foreach ($request->grade_ids as $gradeId) {
+                try {
+                    $levelGrade = LevelGrade::create([
+                        'olympiad_area_id' => $olympiadArea->id,
+                        'level_id' => $level->id,
+                        'grade_id' => $gradeId
+                    ]);
+
+                    if ($levelGrade) {
+                        $createdLevelGrades[] = $levelGrade;
+                    } else {
+                        $failedGrades[] = $gradeId;
+                    }
+                } catch (\Exception $e) {
+                    $failedGrades[] = $gradeId;
+                    \Log::error("Failed to create LevelGrade for grade ID {$gradeId}: " . $e->getMessage());
+                }
+            }
+
+            // Check if any grade assignments failed
+            if (!empty($failedGrades)) {
+                // Rollback: delete the level if some grades failed
+                $level->delete();
+
+                return response()->json([
+                    'message' => 'Failed to assign some grades to level',
+                    'error' => 'Failed to create level-grade relationships for grade IDs: ' . implode(', ', $failedGrades),
+                    'status' => 500
+                ], 500);
+            }
+
+            // Verify all level-grades were created
+            if (count($createdLevelGrades) !== count($request->grade_ids)) {
+                return response()->json([
+                    'message' => 'Incomplete level-grade creation',
+                    'error' => sprintf(
+                        'Expected to create %d level-grade relationships but only created %d. This may indicate a database constraint issue.',
+                        count($request->grade_ids),
+                        count($createdLevelGrades)
+                    ),
+                    'status' => 500
+                ], 500);
+            }
+
+            return response()->json([
+                'message' => 'Level and grades assigned successfully',
+                'level' => $level->load('grades'),
+                'created_relationships' => count($createdLevelGrades),
+                'status' => 201
+            ], 201);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'Resource not found',
+                'error' => 'The requested olympiad area relationship could not be found. Please verify the olympiad and area IDs.',
+                'status' => 404
+            ], 404);
+        } catch (\Illuminate\Database\QueryException $e) {
+            \Log::error('Database error in assignLevelGradesToArea: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Database error',
+                'error' => 'A database constraint or connection error occurred. Please check your data and try again.',
+                'status' => 500
+            ], 500);
+        } catch (\Exception $e) {
+            \Log::error('Unexpected error in assignLevelGradesToArea: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Internal server error',
+                'error' => 'An unexpected error occurred while processing your request. Please try again later.',
+                'status' => 500
+            ], 500);
         }
-
-        // Assign the level_grades to the olympiad area
-        $olympiadArea->levelGrades()->attach($levelGrades);
-
-        return response()->json([
-            'message' => 'Level and grades assigned successfully',
-            'level' => $level->load('grades'),
-        ]);
     }
 
     /**
@@ -554,66 +735,165 @@ class OlympiadController extends Controller
      *     )
      * )
      */
+    // public function getLevelGradesFromArea($olympiadId, $areaId)
+    // {
+    //     $olympiadArea = OlympiadArea::where('olympiad_id', $olympiadId)
+    //         ->where('id', $areaId)
+    //         ->firstOrFail();
+
+    //     return response()->json([
+    //         'level_grades' => $olympiadArea->levelGrades()->with(['level', 'grade'])->get()
+    //     ]);
+    // }
     public function getLevelGradesFromArea($olympiadId, $areaId)
     {
-        $olympiadArea = OlympiadArea::where('olympiad_id', $olympiadId)
-            ->where('id', $areaId)
-            ->firstOrFail();
+        try {
+            // Validate input parameters
+            if (!is_numeric($olympiadId) || $olympiadId <= 0) {
+                return response()->json([
+                    'message' => 'Invalid olympiad ID',
+                    'error' => 'Olympiad ID must be a positive integer',
+                    'status' => 400
+                ], 400);
+            }
 
-        return response()->json([
-            'level_grades' => $olympiadArea->levelGrades()->with(['level', 'grade'])->get()
-        ]);
+            if (!is_numeric($areaId) || $areaId <= 0) {
+                return response()->json([
+                    'message' => 'Invalid area ID',
+                    'error' => 'Area ID must be a positive integer',
+                    'status' => 400
+                ], 400);
+            }
+
+            // Verify olympiad exists
+            $olympiad = Olympiad::find($olympiadId);
+            if (!$olympiad) {
+                return response()->json([
+                    'message' => 'Olympiad not found',
+                    'error' => "No olympiad found with ID: {$olympiadId}",
+                    'status' => 404
+                ], 404);
+            }
+
+            // Verify area exists
+            $area = Area::find($areaId);
+            if (!$area) {
+                return response()->json([
+                    'message' => 'Area not found',
+                    'error' => "No area found with ID: {$areaId}",
+                    'status' => 404
+                ], 404);
+            }
+
+            // Find the olympiad-area relationship
+            $olympiadArea = OlympiadArea::where('olympiad_id', $olympiadId)
+                ->where('area_id', $areaId)
+                ->first();
+
+            if (!$olympiadArea) {
+                return response()->json([
+                    'message' => 'Olympiad-Area relationship not found',
+                    'error' => "The area with ID {$areaId} is not associated with olympiad ID {$olympiadId}. Please verify the area is assigned to this olympiad.",
+                    'status' => 404
+                ], 404);
+            }
+
+            // Get level-grades with their relationships
+            $levelGrades = $olympiadArea->levelGrades()->with(['level', 'grade'])->get();
+
+            // Check if any level-grades exist
+            if ($levelGrades->isEmpty()) {
+                return response()->json([
+                    'message' => 'No level-grades found',
+                    'error' => "No level-grade relationships found for olympiad area. The area '{$area->name}' in olympiad '{$olympiad->name}' has no assigned level-grades.",
+                    'level_grades' => [],
+                    'status' => 200
+                ], 200);
+            }
+
+            // Validate data integrity
+            $invalidLevelGrades = [];
+            $validLevelGrades = [];
+
+            foreach ($levelGrades as $levelGrade) {
+                if (!$levelGrade->level) {
+                    $invalidLevelGrades[] = "Level-Grade ID {$levelGrade->id} has missing level relationship";
+                    continue;
+                }
+
+                if (!$levelGrade->grade) {
+                    $invalidLevelGrades[] = "Level-Grade ID {$levelGrade->id} has missing grade relationship";
+                    continue;
+                }
+
+                $validLevelGrades[] = $levelGrade;
+            }
+
+            // If there are data integrity issues, log them but still return valid data
+            if (!empty($invalidLevelGrades)) {
+                \Log::warning('Data integrity issues found in getLevelGradesFromArea', [
+                    'olympiad_id' => $olympiadId,
+                    'area_id' => $areaId,
+                    'issues' => $invalidLevelGrades
+                ]);
+            }
+
+            // Prepare response data with additional context
+            $responseData = [
+                'level_grades' => $validLevelGrades,
+                'olympiad' => [
+                    'id' => $olympiad->id,
+                    'name' => $olympiad->name
+                ],
+                'area' => [
+                    'id' => $area->id,
+                    'name' => $area->name
+                ],
+                'total_count' => count($validLevelGrades),
+                'status' => 200
+            ];
+
+            // Add warnings if there were invalid records
+            if (!empty($invalidLevelGrades)) {
+                $responseData['warnings'] = [
+                    'message' => 'Some level-grade relationships have missing data',
+                    'details' => $invalidLevelGrades,
+                    'total_invalid' => count($invalidLevelGrades)
+                ];
+            }
+
+            return response()->json($responseData, 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'Resource not found',
+                'error' => 'The requested olympiad area relationship could not be found. Please verify the olympiad and area IDs.',
+                'status' => 404
+            ], 404);
+        } catch (\Illuminate\Database\QueryException $e) {
+            \Log::error('Database error in getLevelGradesFromArea: ' . $e->getMessage(), [
+                'olympiad_id' => $olympiadId,
+                'area_id' => $areaId
+            ]);
+            return response()->json([
+                'message' => 'Database error',
+                'error' => 'A database error occurred while retrieving level-grade relationships. Please try again.',
+                'status' => 500
+            ], 500);
+        } catch (\Exception $e) {
+            \Log::error('Unexpected error in getLevelGradesFromArea: ' . $e->getMessage(), [
+                'olympiad_id' => $olympiadId,
+                'area_id' => $areaId,
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json([
+                'message' => 'Internal server error',
+                'error' => 'An unexpected error occurred while retrieving level-grade relationships. Please try again later.',
+                'status' => 500
+            ], 500);
+        }
     }
 
-    /**
-     * @OA\Delete(
-     *     path="/api/olympiads/{olympiadId}/areas/{areaId}/level-grades",
-     *     summary="Remove level-grade associations from an olympiad area",
-     *     description="Detaches one or more level-grade relationships from the specified olympiad area without deleting the underlying data.",
-     *     tags={"Level (with Grades) - Olympiad Areas"},
-     *     @OA\Parameter(
-     *         name="olympiadId",
-     *         in="path",
-     *         required=true,
-     *         description="ID of the olympiad",
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\Parameter(
-     *         name="areaId",
-     *         in="path",
-     *         required=true,
-     *         description="ID of the olympiad area",
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"level_grade_ids"},
-     *             @OA\Property(
-     *                 property="level_grade_ids",
-     *                 type="array",
-     *                 @OA\Items(type="integer", example=25)
-     *             )
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Level grades removed successfully",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Level grades removed successfully")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=404,
-     *         description="Olympiad area not found"
-     *     ),
-     *     @OA\Response(
-     *         response=422,
-     *         description="Validation error"
-     *     )
-     * )
-     */
-    public function removeLevelGradesFromArea(Request $request, $olympiadId, $areaId)
+    /* public function removeLevelGradesFromArea(Request $request, $olympiadId, $areaId)
     {
         $request->validate([
             'level_id' => 'required|exists:levels,id'
@@ -630,21 +910,245 @@ class OlympiadController extends Controller
         return response()->json([
             'message' => 'Level and all its grades removed from area successfully'
         ]);
+    } */
+    public function removeLevelGradesFromArea(Request $request, $olympiadId, $areaId)
+    {
+        try {
+            // Validate input parameters
+            if (!is_numeric($olympiadId) || $olympiadId <= 0) {
+                return response()->json([
+                    'message' => 'Invalid olympiad ID',
+                    'error' => 'Olympiad ID must be a positive integer',
+                    'status' => 400
+                ], 400);
+            }
 
-        // $request->validate([
-        //     'level_grade_ids' => 'required|array',
-        //     'level_grade_ids.*' => 'exists:level_grades,id'
-        // ]);
+            if (!is_numeric($areaId) || $areaId <= 0) {
+                return response()->json([
+                    'message' => 'Invalid area ID',
+                    'error' => 'Area ID must be a positive integer',
+                    'status' => 400
+                ], 400);
+            }
 
-        // $olympiadArea = OlympiadArea::where('olympiad_id', $olympiadId)
-        //     ->where('id', $areaId)
-        //     ->firstOrFail();
+            // Input validation
+            $validator = Validator::make($request->all(), [
+                'level_id' => 'required|integer|exists:levels,id'
+            ]);
 
-        // $olympiadArea->levelGrades()->detach($request->level_grade_ids);
+            if ($validator->fails()) {
+                return response()->json([
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors(),
+                    'status' => 422
+                ], 422);
+            }
 
-        // return response()->json([
-        //     'message' => 'Level grades removed successfully'
-        // ]);
+            // Verify olympiad exists
+            $olympiad = Olympiad::find($olympiadId);
+            if (!$olympiad) {
+                return response()->json([
+                    'message' => 'Olympiad not found',
+                    'error' => "No olympiad found with ID: {$olympiadId}",
+                    'status' => 404
+                ], 404);
+            }
+
+            // Verify area exists
+            $area = Area::find($areaId);
+            if (!$area) {
+                return response()->json([
+                    'message' => 'Area not found',
+                    'error' => "No area found with ID: {$areaId}",
+                    'status' => 404
+                ], 404);
+            }
+
+            // Verify level exists
+            $level = Level::find($request->level_id);
+            if (!$level) {
+                return response()->json([
+                    'message' => 'Level not found',
+                    'error' => "No level found with ID: {$request->level_id}",
+                    'status' => 404
+                ], 404);
+            }
+
+            // Find the olympiad-area relationship
+            $olympiadArea = OlympiadArea::where('olympiad_id', $olympiadId)
+                ->where('area_id', $areaId)
+                ->first();
+
+            if (!$olympiadArea) {
+                return response()->json([
+                    'message' => 'Olympiad-Area relationship not found',
+                    'error' => "The area with ID {$areaId} is not associated with olympiad ID {$olympiadId}. Please verify the area is assigned to this olympiad.",
+                    'status' => 404
+                ], 404);
+            }
+
+            // Find level-grades for the specified level in this olympiad area
+            $levelGrades = LevelGrade::where('olympiad_area_id', $olympiadArea->id)
+                ->where('level_id', $request->level_id)
+                ->with(['grade'])
+                ->get();
+
+            if ($levelGrades->isEmpty()) {
+                return response()->json([
+                    'message' => 'No level-grades found to remove',
+                    'error' => "The level '{$level->name}' (ID: {$level->id}) has no grade associations in the area '{$area->name}' for olympiad '{$olympiad->name}'. There might be nothing to remove or the level was never assigned to this area.",
+                    'status' => 404
+                ], 404);
+            }
+
+            // Check for related data that might be affected
+            $levelGradeIds = $levelGrades->pluck('id')->toArray();
+
+            // Check if there are score cuts using these level-grades
+            $relatedScoreCuts = OlympiadAreaPhaseLevelGrade::whereIn('level_grade_id', $levelGradeIds)->count();
+
+            // Collect information about what will be removed
+            $removalInfo = [
+                'level_name' => $level->name,
+                'level_id' => $level->id,
+                'area_name' => $area->name,
+                'olympiad_name' => $olympiad->name,
+                'grades_to_remove' => $levelGrades->map(function ($lg) {
+                    return [
+                        'id' => $lg->id,
+                        'grade_name' => $lg->grade ? $lg->grade->name : 'Unknown Grade',
+                        'grade_id' => $lg->grade_id
+                    ];
+                })->toArray(),
+                'total_relationships' => $levelGrades->count(),
+                'related_score_cuts' => $relatedScoreCuts
+            ];
+
+            // Warning if there are related score cuts
+            $warnings = [];
+            if ($relatedScoreCuts > 0) {
+                $warnings[] = "This action will affect {$relatedScoreCuts} score cut configuration(s) that reference these level-grade relationships.";
+            }
+
+            try {
+                // Begin transaction to ensure data consistency
+                \DB::beginTransaction();
+
+                // Remove related score cuts first (if any)
+                if ($relatedScoreCuts > 0) {
+                    $deletedScoreCuts = OlympiadAreaPhaseLevelGrade::whereIn('level_grade_id', $levelGradeIds)->delete();
+                    \Log::info("Removed {$deletedScoreCuts} score cuts related to level-grades being removed", [
+                        'olympiad_id' => $olympiadId,
+                        'area_id' => $areaId,
+                        'level_id' => $request->level_id
+                    ]);
+                }
+
+                // Remove the level-grade relationships from this olympiad area
+                $removedCount = 0;
+                $failedRemovals = [];
+
+                foreach ($levelGrades as $levelGrade) {
+                    try {
+                        if ($levelGrade->delete()) {
+                            $removedCount++;
+                        } else {
+                            $failedRemovals[] = $levelGrade->id;
+                        }
+                    } catch (\Exception $e) {
+                        $failedRemovals[] = $levelGrade->id;
+                        \Log::error("Failed to delete LevelGrade ID {$levelGrade->id}: " . $e->getMessage());
+                    }
+                }
+
+                // Check if all removals were successful
+                if (!empty($failedRemovals)) {
+                    \DB::rollBack();
+                    return response()->json([
+                        'message' => 'Failed to remove some level-grade relationships',
+                        'error' => 'Failed to remove level-grade relationship IDs: ' . implode(', ', $failedRemovals),
+                        'partially_removed' => $removedCount,
+                        'total_expected' => $levelGrades->count(),
+                        'status' => 500
+                    ], 500);
+                }
+
+                // Verify all were removed
+                if ($removedCount !== $levelGrades->count()) {
+                    \DB::rollBack();
+                    return response()->json([
+                        'message' => 'Incomplete removal of level-grade relationships',
+                        'error' => sprintf(
+                            'Expected to remove %d level-grade relationships but only removed %d. This may indicate a database constraint issue.',
+                            $levelGrades->count(),
+                            $removedCount
+                        ),
+                        'status' => 500
+                    ], 500);
+                }
+
+                \DB::commit();
+
+                // Prepare success response
+                $response = [
+                    'message' => 'Level and all its grades removed from area successfully',
+                    'removed_count' => $removedCount,
+                    'level_name' => $level->name,
+                    'level_id' => $level->id,
+                    'area_name' => $area->name,
+                    'olympiad_name' => $olympiad->name,
+                    'removed_relationships' => $removalInfo['grades_to_remove'],
+                    'status' => 200
+                ];
+
+                // Add warnings if any
+                if (!empty($warnings)) {
+                    $response['warnings'] = $warnings;
+                }
+
+                // Add info about score cuts if they were removed
+                if ($relatedScoreCuts > 0) {
+                    $response['additional_actions'] = [
+                        'score_cuts_removed' => $relatedScoreCuts,
+                        'message' => 'Related score cut configurations were also removed to maintain data consistency.'
+                    ];
+                }
+
+                return response()->json($response, 200);
+            } catch (\Exception $e) {
+                \DB::rollBack();
+                throw $e; // Re-throw to be caught by outer catch block
+            }
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'Resource not found',
+                'error' => 'One of the requested resources (olympiad, area, or level) could not be found. Please verify the IDs.',
+                'status' => 404
+            ], 404);
+        } catch (\Illuminate\Database\QueryException $e) {
+            \Log::error('Database error in removeLevelGradesFromArea: ' . $e->getMessage(), [
+                'olympiad_id' => $olympiadId,
+                'area_id' => $areaId,
+                'level_id' => $request->level_id ?? null
+            ]);
+            return response()->json([
+                'message' => 'Database error',
+                'error' => 'A database error occurred while removing level-grade relationships. This might be due to foreign key constraints or connection issues.',
+                'status' => 500
+            ], 500);
+        } catch (\Exception $e) {
+            \Log::error('Unexpected error in removeLevelGradesFromArea: ' . $e->getMessage(), [
+                'olympiad_id' => $olympiadId,
+                'area_id' => $areaId,
+                'level_id' => $request->level_id ?? null,
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json([
+                'message' => 'Internal server error',
+                'error' => 'An unexpected error occurred while removing level-grade relationships. Please try again later.',
+                'status' => 500
+            ], 500);
+        }
     }
 
     // <--- Score cuts per phase/area/level-grade --->
@@ -763,7 +1267,8 @@ class OlympiadController extends Controller
 
         foreach ($request->score_cuts as $scoreCut) {
             // Validate that the level_grade is assigned to this area
-            $olympiadAreaLevelGrade = OlympiadAreaLevelGrade::where('olympiad_area_id', $areaId)
+            //$olympiadAreaLevelGrade = OlympiadAreaLevelGrade::where('olympiad_area_id', $areaId)
+            $levelGrade = LevelGrade::where('olympiad_area_id', $areaId)
                 ->where('level_grade_id', $scoreCut['level_grade_id'])
                 ->firstOrFail();
 
@@ -771,7 +1276,7 @@ class OlympiadController extends Controller
             OlympiadAreaPhaseLevelGrade::updateOrCreate(
                 [
                     'olympiad_area_phase_id' => $olympiadAreaPhase->id,
-                    'olympiad_area_level_grade_id' => $olympiadAreaLevelGrade->id,
+                    'level_grade_id' => $levelGrade->id,
                 ],
                 [
                     'score_cut' => $scoreCut['score_cut']
@@ -858,7 +1363,7 @@ class OlympiadController extends Controller
             ->firstOrFail();
 
         $data = OlympiadAreaPhase::where('olympiad_area_id', $areaId)
-            ->with(['phase', 'olympiadAreaPhaseLevelGrades.olympiadAreaLevelGrade.levelGrade'])
+            ->with(['phase', 'olympiadAreaPhaseLevelGrades.levelGrade'])
             ->get();
 
         return response()->json(['data' => $data]);
