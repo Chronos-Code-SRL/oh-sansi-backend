@@ -11,7 +11,8 @@ class OlympiadAreaPhaseLevelGrade extends Model
 
     protected $fillable = [
         'olympiad_area_phase_id',
-        'olympiad_area_level_grade_id',
+        //'olympiad_area_level_grade_id',
+        'level_grade_id',
         'score_cut'
     ];
 
@@ -20,8 +21,13 @@ class OlympiadAreaPhaseLevelGrade extends Model
         return $this->belongsTo(OlympiadAreaPhase::class);
     }
 
-    public function olympiadAreaLevelGrade()
+    // public function olympiadAreaLevelGrade()
+    // {
+    //     return $this->belongsTo(OlympiadAreaLevelGrade::class);
+    // }
+
+    public function levelGrade()
     {
-        return $this->belongsTo(OlympiadAreaLevelGrade::class);
+        return $this->belongsTo(LevelGrade::class);
     }
 }
