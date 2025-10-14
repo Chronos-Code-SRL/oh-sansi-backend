@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('olympiads', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->string('edition'); // Changed "period" for "edition", I think it is a better term to refer "gestión"
+            //$table->string('edition'); // Changed "period" for "edition", I think it is a better term to refer "gestión"
             $table->date('start_date');
             $table->date('end_date');
             $table->timestamps();

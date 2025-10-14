@@ -17,7 +17,7 @@ class OlympiadWithAreasSeeder extends Seeder
         // Create first Olympiad with all areas
         $olympiad1 = Olympiad::firstOrCreate([
             'name' => 'Olimpiada Científica',
-            'edition' => '2025',
+            //'edition' => '2025',
         ], [
             'start_date' => now()->toDateString(),
             'end_date' => now()->addMonth()->toDateString(),
@@ -37,7 +37,7 @@ class OlympiadWithAreasSeeder extends Seeder
         // Create second Olympiad with only 4 specific areas
         $olympiad2 = Olympiad::firstOrCreate([
             'name' => 'Olimpiada Nacional de Ciencias',
-            'edition' => '2025',
+            //'edition' => '2025',
         ], [
             'start_date' => now()->toDateString(),
             'end_date' => now()->addMonths(2)->toDateString(),

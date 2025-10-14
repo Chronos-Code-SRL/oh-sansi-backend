@@ -93,7 +93,7 @@ class OlympiadController extends Controller
         // Data validation
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:30',
-            'edition' => 'required|string|max:25', //|unique:olympiads,edition',
+            // 'edition' => 'required|string|max:25', //|unique:olympiads,edition',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after:start_date',
             'number_of_phases' => 'required|integer|min:1',
@@ -113,7 +113,7 @@ class OlympiadController extends Controller
 
         $olympiad = Olympiad::create([
             'name' => $request->name,
-            'edition' => $request->edition,
+            //'edition' => $request->edition,
             'start_date' => $request->start_date,
             'end_date' => $request->end_date,
             'number_of_phases' => $request->number_of_phases,
@@ -224,7 +224,7 @@ class OlympiadController extends Controller
         // Rule set to ignore the edition if it is the same as the one sent
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
-            'edition' => 'required|string|max:25',
+            // 'edition' => 'required|string|max:25',
             // 'edition' => [
             //     'required',
             //     'string',
@@ -246,7 +246,7 @@ class OlympiadController extends Controller
         }
 
         $olympiad->name = $request->name;
-        $olympiad->edition = $request->edition;
+        // $olympiad->edition = $request->edition;
         $olympiad->start_date = $request->start_date;
         $olympiad->end_date = $request->end_date;
         $olympiad->status = $request->status ?? $olympiad->status;
