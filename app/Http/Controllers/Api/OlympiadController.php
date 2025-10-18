@@ -99,6 +99,7 @@ class OlympiadController extends Controller
             'start_date' => 'required|date',
             'end_date' => 'required|date|after:start_date',
             'number_of_phases' => 'required|integer|min:1',
+            'default_score_cut' => 'required|integer|min:0',
             'status' => 'in:En planificación,Activa,Terminada',
             'areas' => 'required|array|min:1',
             'areas.*' => 'required|string|max:25|exists:areas,name',
@@ -119,6 +120,7 @@ class OlympiadController extends Controller
             'start_date' => $request->start_date,
             'end_date' => $request->end_date,
             'number_of_phases' => $request->number_of_phases,
+            'default_score_cut' => $request->default_score_cut ?? 0,
             'status' => $request->status ?? 'En planificación',
         ]);
 
@@ -556,14 +558,27 @@ class OlympiadController extends Controller
                 ], 404);
             }
 
-            // Check if level name already exists (optional validation)
+            // Find existing level or create new one
             $existingLevel = Level::where('name', $request->level_name)->first();
+
             if ($existingLevel) {
-                return response()->json([
-                    'message' => 'Level name already exists',
-                    'error' => "A level with the name '{$request->level_name}' already exists with ID: {$existingLevel->id}",
-                    'status' => 409
-                ], 409);
+                // Use existing level
+                $level = $existingLevel;
+                $levelWasCreated = false;
+            } else {
+                // Create new level
+                $level = Level::create([
+                    'name' => $request->level_name
+                ]);
+
+                if (!$level) {
+                    return response()->json([
+                        'message' => 'Failed to create level',
+                        'error' => 'Database error occurred while creating the level. Please try again.',
+                        'status' => 500
+                    ], 500);
+                }
+                $levelWasCreated = true;
             }
 
             // Verify all grade IDs exist (additional check beyond validation)
@@ -594,19 +609,6 @@ class OlympiadController extends Controller
                     'error' => 'The following grades are already assigned to levels in this olympiad area: ' . implode(', ', $duplicateInfo),
                     'status' => 409
                 ], 409);
-            }
-
-            // Create the level
-            $level = Level::create([
-                'name' => $request->level_name
-            ]);
-
-            if (!$level) {
-                return response()->json([
-                    'message' => 'Failed to create level',
-                    'error' => 'Database error occurred while creating the level. Please try again.',
-                    'status' => 500
-                ], 500);
             }
 
             // Create the level_grades relationships
@@ -657,12 +659,72 @@ class OlympiadController extends Controller
                 ], 500);
             }
 
-            return response()->json([
+            // Auto-assign default score cuts to all phases for this area if olympiad has default_score_cut
+            $defaultScoreCutAssignments = [];
+            if ($olympiad->default_score_cut !== null) {
+                try {
+                    // Get all phases for this olympiad
+                    $phases = $olympiad->phases;
+
+                    if ($phases->isNotEmpty()) {
+                        foreach ($phases as $phase) {
+                            // Get or create OlympiadAreaPhase
+                            $olympiadAreaPhase = OlympiadAreaPhase::firstOrCreate([
+                                'olympiad_area_id' => $olympiadArea->id,
+                                'phase_id' => $phase->id
+                            ]);
+
+                            // Assign default score cut to all newly created level-grades for this phase
+                            $scoreCutsCreated = 0;
+                            foreach ($createdLevelGrades as $levelGrade) {
+                                $scoreCutRecord = OlympiadAreaPhaseLevelGrade::firstOrCreate([
+                                    'olympiad_area_phase_id' => $olympiadAreaPhase->id,
+                                    'level_grade_id' => $levelGrade->id
+                                ], [
+                                    'score_cut' => $olympiad->default_score_cut
+                                ]);
+
+                                if ($scoreCutRecord->wasRecentlyCreated) {
+                                    $scoreCutsCreated++;
+                                }
+                            }
+
+                            $defaultScoreCutAssignments[] = [
+                                'phase_name' => $phase->name,
+                                'phase_id' => $phase->id,
+                                'score_cuts_created' => $scoreCutsCreated,
+                                'default_score_cut' => $olympiad->default_score_cut
+                            ];
+                        }
+                    }
+                } catch (\Exception $e) {
+                    Log::warning('Failed to assign default score cuts: ' . $e->getMessage(), [
+                        'olympiad_id' => $olympiad->id,
+                        'area_id' => $areaId,
+                        'level_id' => $level->id
+                    ]);
+                    // Don't fail the entire operation, just log the warning
+                }
+            }
+
+            $response = [
                 'message' => 'Level and grades assigned successfully',
                 'level' => $level->load('grades'),
+                'level_was_created' => $levelWasCreated,
                 'created_relationships' => count($createdLevelGrades),
                 'status' => 201
-            ], 201);
+            ];
+
+            // Add default score cut info if applicable
+            if (!empty($defaultScoreCutAssignments)) {
+                $response['default_score_cut_assignments'] = [
+                    'olympiad_default_score_cut' => $olympiad->default_score_cut,
+                    'phases' => $defaultScoreCutAssignments,
+                    'total_phases_processed' => count($defaultScoreCutAssignments)
+                ];
+            }
+
+            return response()->json($response, 201);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return response()->json([
                 'message' => 'Resource not found',
