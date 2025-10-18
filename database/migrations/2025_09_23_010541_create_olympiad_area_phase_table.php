@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('olympiad_area_id')->constrained('olympiad_areas')->onDelete('cascade');
             $table->foreignId('phase_id')->constrained('phases')->onDelete('cascade');
-            $table->integer('score_cut')->nullable();
+            //$table->integer('score_cut')->nullable();
             $table->timestamps();
         });
     }
