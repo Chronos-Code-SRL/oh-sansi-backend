@@ -474,33 +474,76 @@
                     "Olympiads"
                 ],
                 "summary": "Create a new olympiad",
+                "description": "Creates a new olympiad with areas and automatically generates the specified number of phases. Areas are automatically assigned to the olympiad.",
                 "operationId": "f0b97241692ca74daeecc60468c21e46",
                 "requestBody": {
+                    "description": "Olympiad data including basic info, areas, phases and default score cut",
                     "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
                                 "required": [
                                     "name",
-                                    "description",
                                     "start_date",
-                                    "end_date"
+                                    "end_date",
+                                    "number_of_phases",
+                                    "default_score_cut",
+                                    "areas"
                                 ],
                                 "properties": {
                                     "name": {
+                                        "description": "Name of the olympiad",
                                         "type": "string",
-                                        "example": "Olimpiada de Matemáticas 2025"
-                                    },
-                                    "description": {
-                                        "type": "string"
+                                        "maxLength": 30,
+                                        "example": "OHSansi 2025"
                                     },
                                     "start_date": {
+                                        "description": "Start date of the olympiad",
                                         "type": "string",
-                                        "format": "date"
+                                        "format": "date",
+                                        "example": "2025-01-15"
                                     },
                                     "end_date": {
+                                        "description": "End date of the olympiad (must be after start_date)",
                                         "type": "string",
-                                        "format": "date"
+                                        "format": "date",
+                                        "example": "2025-06-15"
+                                    },
+                                    "number_of_phases": {
+                                        "description": "Number of phases to create for this olympiad",
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "example": 3
+                                    },
+                                    "default_score_cut": {
+                                        "description": "Default score cut that will be automatically assigned when creating level-grades",
+                                        "type": "integer",
+                                        "maximum": 100,
+                                        "minimum": 0,
+                                        "example": 75
+                                    },
+                                    "status": {
+                                        "description": "Status of the olympiad (optional, defaults to 'En planificación')",
+                                        "type": "string",
+                                        "enum": [
+                                            "En planificación",
+                                            "Activa",
+                                            "Terminada"
+                                        ],
+                                        "example": "En planificación"
+                                    },
+                                    "areas": {
+                                        "description": "Array of area names to assign to this olympiad",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string",
+                                            "maxLength": 25
+                                        },
+                                        "minItems": 1,
+                                        "example": [
+                                            "Matemáticas",
+                                            "Informática"
+                                        ]
                                     }
                                 },
                                 "type": "object"
@@ -510,10 +553,145 @@
                 },
                 "responses": {
                     "201": {
-                        "description": "Olympiad created successfully"
+                        "description": "Olympiad created successfully with areas and phases",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Olympiad created successfully with specific areas and phases"
+                                        },
+                                        "data": {
+                                            "description": "The created olympiad with loaded relationships",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "name": {
+                                                    "type": "string",
+                                                    "example": "OHSansi 2025"
+                                                },
+                                                "start_date": {
+                                                    "type": "string",
+                                                    "format": "date",
+                                                    "example": "2025-01-15"
+                                                },
+                                                "end_date": {
+                                                    "type": "string",
+                                                    "format": "date",
+                                                    "example": "2025-06-15"
+                                                },
+                                                "number_of_phases": {
+                                                    "type": "integer",
+                                                    "example": 3
+                                                },
+                                                "default_score_cut": {
+                                                    "type": "integer",
+                                                    "example": 75
+                                                },
+                                                "status": {
+                                                    "type": "string",
+                                                    "example": "En planificación"
+                                                },
+                                                "areas": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer"
+                                                            },
+                                                            "name": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    },
+                                                    "example": [
+                                                        {
+                                                            "id": 1,
+                                                            "name": "Matemáticas"
+                                                        },
+                                                        {
+                                                            "id": 2,
+                                                            "name": "Informática"
+                                                        }
+                                                    ]
+                                                },
+                                                "phases": {
+                                                    "description": "Automatically created phases based on number_of_phases",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "name": {
+                                                                "type": "string",
+                                                                "example": "Fase 1"
+                                                            },
+                                                            "order": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     },
-                    "422": {
-                        "description": "Error in data validation"
+                    "400": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Error in data validation"
+                                        },
+                                        "error": {
+                                            "description": "Validation errors details",
+                                            "type": "object"
+                                        },
+                                        "status": {
+                                            "type": "integer",
+                                            "example": 400
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server error during olympiad creation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Error creating the Olympiad"
+                                        },
+                                        "status": {
+                                            "type": "integer",
+                                            "example": 500
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -768,8 +946,8 @@
                 "tags": [
                     "Level (with Grades) - Olympiad Areas"
                 ],
-                "summary": "Assign a level and its grades to an olympiad area",
-                "description": "Creates a new level, associates it with the given grades, and attaches the resulting level-grade relationships to the specified olympiad area.",
+                "summary": "Assign a level and its grades to an olympiad area with smart level reuse",
+                "description": "Assigns grades to a level within an olympiad area. Reuses existing levels with the same name or creates new ones. Automatically assigns default score cuts to all phases if the olympiad has a default_score_cut configured. Prevents duplicate grade assignments within the same olympiad area.",
                 "operationId": "09a5ceeea7bcb9b8b1beb9c118b58bf3",
                 "parameters": [
                     {
@@ -778,20 +956,23 @@
                         "description": "ID of the olympiad",
                         "required": true,
                         "schema": {
-                            "type": "integer"
+                            "type": "integer",
+                            "example": 1
                         }
                     },
                     {
                         "name": "areaId",
                         "in": "path",
-                        "description": "ID of the olympiad area",
+                        "description": "ID of the area within the olympiad",
                         "required": true,
                         "schema": {
-                            "type": "integer"
+                            "type": "integer",
+                            "example": 2
                         }
                     }
                 ],
                 "requestBody": {
+                    "description": "Level name and grade IDs to assign",
                     "required": true,
                     "content": {
                         "application/json": {
@@ -802,15 +983,23 @@
                                 ],
                                 "properties": {
                                     "level_name": {
+                                        "description": "Name of the level. If a level with this name already exists, it will be reused instead of creating a new one.",
                                         "type": "string",
-                                        "example": "Primary Level"
+                                        "maxLength": 255,
+                                        "example": "Booster"
                                     },
                                     "grade_ids": {
+                                        "description": "Array of grade IDs to assign to this level. Each grade can only be assigned to one level per olympiad area.",
                                         "type": "array",
                                         "items": {
                                             "type": "integer",
-                                            "example": 1
-                                        }
+                                            "example": [
+                                                1,
+                                                2,
+                                                3
+                                            ]
+                                        },
+                                        "minItems": 1
                                     }
                                 },
                                 "type": "object"
@@ -819,7 +1008,7 @@
                     }
                 },
                 "responses": {
-                    "200": {
+                    "201": {
                         "description": "Level and grades assigned successfully",
                         "content": {
                             "application/json": {
@@ -830,33 +1019,94 @@
                                             "example": "Level and grades assigned successfully"
                                         },
                                         "level": {
+                                            "description": "The level with its assigned grades",
                                             "properties": {
                                                 "id": {
                                                     "type": "integer",
-                                                    "example": 10
+                                                    "example": 5
                                                 },
                                                 "name": {
                                                     "type": "string",
-                                                    "example": "Primary Level"
+                                                    "example": "Booster"
                                                 },
                                                 "grades": {
                                                     "type": "array",
                                                     "items": {
                                                         "properties": {
                                                             "id": {
+                                                                "type": "integer"
+                                                            },
+                                                            "name": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    },
+                                                    "example": [
+                                                        {
+                                                            "id": 1,
+                                                            "name": "1° Grado"
+                                                        },
+                                                        {
+                                                            "id": 2,
+                                                            "name": "2° Grado"
+                                                        },
+                                                        {
+                                                            "id": 3,
+                                                            "name": "3° Grado"
+                                                        }
+                                                    ]
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "level_was_created": {
+                                            "description": "Indicates if a new level was created (true) or an existing one was reused (false)",
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "created_relationships": {
+                                            "description": "Number of level-grade relationships created",
+                                            "type": "integer",
+                                            "example": 3
+                                        },
+                                        "default_score_cut_assignments": {
+                                            "description": "Information about automatic score cut assignments (only present if olympiad has default_score_cut)",
+                                            "properties": {
+                                                "olympiad_default_score_cut": {
+                                                    "type": "integer",
+                                                    "example": 75
+                                                },
+                                                "phases": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "phase_id": {
                                                                 "type": "integer",
                                                                 "example": 1
                                                             },
-                                                            "name": {
+                                                            "phase_name": {
                                                                 "type": "string",
-                                                                "example": "3rd Grade"
+                                                                "example": "Fase 1"
+                                                            },
+                                                            "score_cuts_assigned": {
+                                                                "type": "integer",
+                                                                "example": 3
                                                             }
                                                         },
                                                         "type": "object"
                                                     }
+                                                },
+                                                "total_phases_processed": {
+                                                    "type": "integer",
+                                                    "example": 2
                                                 }
                                             },
                                             "type": "object"
+                                        },
+                                        "status": {
+                                            "type": "integer",
+                                            "example": 201
                                         }
                                     },
                                     "type": "object"
@@ -865,72 +1115,22 @@
                         }
                     },
                     "422": {
-                        "description": "Validation error"
-                    },
-                    "404": {
-                        "description": "Olympiad area not found"
-                    }
-                }
-            },
-            "delete": {
-                "tags": [
-                    "Level (with Grades) - Olympiad Areas"
-                ],
-                "summary": "Remove level-grade associations from an olympiad area",
-                "description": "Detaches one or more level-grade relationships from the specified olympiad area without deleting the underlying data.",
-                "operationId": "35aa4cc95436c1b5b6092b0b56049c75",
-                "parameters": [
-                    {
-                        "name": "olympiadId",
-                        "in": "path",
-                        "description": "ID of the olympiad",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    },
-                    {
-                        "name": "areaId",
-                        "in": "path",
-                        "description": "ID of the olympiad area",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "required": [
-                                    "level_grade_ids"
-                                ],
-                                "properties": {
-                                    "level_grade_ids": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "integer",
-                                            "example": 25
-                                        }
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Level grades removed successfully",
+                        "description": "Validation error",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "properties": {
                                         "message": {
                                             "type": "string",
-                                            "example": "Level grades removed successfully"
+                                            "example": "Validation failed"
+                                        },
+                                        "errors": {
+                                            "description": "Detailed validation errors",
+                                            "type": "object"
+                                        },
+                                        "status": {
+                                            "type": "integer",
+                                            "example": 422
                                         }
                                     },
                                     "type": "object"
@@ -939,10 +1139,76 @@
                         }
                     },
                     "404": {
-                        "description": "Olympiad area not found"
+                        "description": "Resource not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Olympiad not found"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "No olympiad found with ID: 1"
+                                        },
+                                        "status": {
+                                            "type": "integer",
+                                            "example": 404
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     },
-                    "422": {
-                        "description": "Validation error"
+                    "409": {
+                        "description": "Duplicate grade assignment conflict",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Duplicate grade assignments found"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "The following grades are already assigned to levels in this olympiad area: Grade ID 3 (Level: Nivel Secundario)"
+                                        },
+                                        "status": {
+                                            "type": "integer",
+                                            "example": 409
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server error during level-grade assignment",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Database error"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "A database constraint or connection error occurred. Please check your data and try again."
+                                        },
+                                        "status": {
+                                            "type": "integer",
+                                            "example": 500
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -1063,8 +1329,8 @@
                 "tags": [
                     "Score cuts"
                 ],
-                "summary": "Assign score cuts to level-grades for a specific phase in an olympiad area",
-                "description": "Creates or updates the score cut (minimum passing score) for each level-grade within a specific phase of an olympiad area.",
+                "summary": "Assign score cut to all grades of a level for a specific phase",
+                "description": "Assigns the same score cut (minimum passing score) to ALL grades within a specific level for a given phase in an olympiad area. This simplified approach applies the score cut to every grade in the level at once, making it much easier to manage score cuts by educational level rather than individual grades.",
                 "operationId": "2269e4175ff1901edd0b82be3ccbdc12",
                 "parameters": [
                     {
@@ -1080,7 +1346,7 @@
                     {
                         "name": "areaId",
                         "in": "path",
-                        "description": "ID of the olympiad area",
+                        "description": "ID of the area within the olympiad",
                         "required": true,
                         "schema": {
                             "type": "integer",
@@ -1089,40 +1355,34 @@
                     }
                 ],
                 "requestBody": {
-                    "description": "Phase ID and list of score cuts per level-grade",
+                    "description": "Phase, level and score cut configuration",
                     "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
                                 "required": [
                                     "phase_id",
-                                    "score_cuts"
+                                    "level_id",
+                                    "score_cut"
                                 ],
                                 "properties": {
                                     "phase_id": {
+                                        "description": "ID of the phase where the score cut will be applied",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "level_id": {
+                                        "description": "ID of the level. Score cut will be applied to ALL grades within this level.",
                                         "type": "integer",
                                         "example": 3
                                     },
-                                    "score_cuts": {
-                                        "type": "array",
-                                        "items": {
-                                            "required": [
-                                                "level_grade_id",
-                                                "score_cut"
-                                            ],
-                                            "properties": {
-                                                "level_grade_id": {
-                                                    "type": "integer",
-                                                    "example": 12
-                                                },
-                                                "score_cut": {
-                                                    "type": "number",
-                                                    "format": "float",
-                                                    "example": 75.5
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
+                                    "score_cut": {
+                                        "description": "Minimum score required to pass this phase (0-100)",
+                                        "type": "number",
+                                        "format": "float",
+                                        "maximum": 100,
+                                        "minimum": 0,
+                                        "example": 75.5
                                     }
                                 },
                                 "type": "object"
@@ -1132,7 +1392,7 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "Score cuts assigned successfully",
+                        "description": "Score cuts assigned successfully to all grades in the level",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1142,7 +1402,7 @@
                                             "example": "Score cuts assigned successfully"
                                         },
                                         "data": {
-                                            "description": "The created or updated OlympiadAreaPhase with its related phase and score cuts",
+                                            "description": "The olympiad area phase with its score cut assignments",
                                             "properties": {
                                                 "id": {
                                                     "type": "integer",
@@ -1152,16 +1412,17 @@
                                                     "properties": {
                                                         "id": {
                                                             "type": "integer",
-                                                            "example": 3
+                                                            "example": 1
                                                         },
                                                         "name": {
                                                             "type": "string",
-                                                            "example": "Final Phase"
+                                                            "example": "Fase 1"
                                                         }
                                                     },
                                                     "type": "object"
                                                 },
                                                 "olympiad_area_phase_level_grades": {
+                                                    "description": "All level-grade relationships with their assigned score cuts",
                                                     "type": "array",
                                                     "items": {
                                                         "properties": {
@@ -1172,26 +1433,21 @@
                                                             "score_cut": {
                                                                 "type": "number",
                                                                 "format": "float",
-                                                                "example": 80
+                                                                "example": 75.5
                                                             },
-                                                            "olympiad_area_level_grade": {
+                                                            "level_grade": {
                                                                 "properties": {
-                                                                    "level_grade": {
-                                                                        "properties": {
-                                                                            "id": {
-                                                                                "type": "integer",
-                                                                                "example": 12
-                                                                            },
-                                                                            "level_id": {
-                                                                                "type": "integer",
-                                                                                "example": 5
-                                                                            },
-                                                                            "grade_id": {
-                                                                                "type": "integer",
-                                                                                "example": 9
-                                                                            }
-                                                                        },
-                                                                        "type": "object"
+                                                                    "id": {
+                                                                        "type": "integer",
+                                                                        "example": 12
+                                                                    },
+                                                                    "level_id": {
+                                                                        "type": "integer",
+                                                                        "example": 3
+                                                                    },
+                                                                    "grade_id": {
+                                                                        "type": "integer",
+                                                                        "example": 9
                                                                     }
                                                                 },
                                                                 "type": "object"
@@ -1202,6 +1458,62 @@
                                                 }
                                             },
                                             "type": "object"
+                                        },
+                                        "level_name": {
+                                            "type": "string",
+                                            "example": "Booster"
+                                        },
+                                        "level_id": {
+                                            "type": "integer",
+                                            "example": 3
+                                        },
+                                        "score_cut": {
+                                            "type": "number",
+                                            "format": "float",
+                                            "example": 75.5
+                                        },
+                                        "affected_grades_count": {
+                                            "description": "Number of grades affected by this score cut assignment",
+                                            "type": "integer",
+                                            "example": 4
+                                        },
+                                        "created_count": {
+                                            "description": "Number of new score cut records created",
+                                            "type": "integer",
+                                            "example": 2
+                                        },
+                                        "updated_count": {
+                                            "description": "Number of existing score cut records updated",
+                                            "type": "integer",
+                                            "example": 2
+                                        },
+                                        "status": {
+                                            "type": "integer",
+                                            "example": 200
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Validation failed"
+                                        },
+                                        "errors": {
+                                            "description": "Detailed validation errors",
+                                            "type": "object"
+                                        },
+                                        "status": {
+                                            "type": "integer",
+                                            "example": 422
                                         }
                                     },
                                     "type": "object"
@@ -1210,10 +1522,52 @@
                         }
                     },
                     "404": {
-                        "description": "Olympiad area or level-grade not found"
+                        "description": "Resource not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Level not found"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "The level 'Booster' (ID: 3) has no grade associations in the area 'Matemáticas' for olympiad 'Olimpiada 2025'. Please assign grades to this level first."
+                                        },
+                                        "status": {
+                                            "type": "integer",
+                                            "example": 404
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     },
-                    "422": {
-                        "description": "Validation error (e.g. invalid phase_id or score_cut out of range)"
+                    "500": {
+                        "description": "Server error during score cut assignment",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Database error"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "A database error occurred while assigning score cuts. Please try again."
+                                        },
+                                        "status": {
+                                            "type": "integer",
+                                            "example": 500
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     }
                 }
             }
