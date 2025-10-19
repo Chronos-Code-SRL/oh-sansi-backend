@@ -69,24 +69,132 @@ class OlympiadController extends Controller
      * @OA\Post(
      *     path="/api/olympiads",
      *     summary="Create a new olympiad",
+     *     description="Creates a new olympiad with areas and automatically generates the specified number of phases. Areas are automatically assigned to the olympiad.",
      *     tags={"Olympiads"},
      *     @OA\RequestBody(
      *         required=true,
+     *         description="Olympiad data including basic info, areas, phases and default score cut",
      *         @OA\JsonContent(
-     *             required={"name","description","start_date","end_date"},
-     *             @OA\Property(property="name", type="string", example="Olimpiada de Matemáticas 2025"),
-     *             @OA\Property(property="description", type="string"),
-     *             @OA\Property(property="start_date", type="string", format="date"),
-     *             @OA\Property(property="end_date", type="string", format="date")
+     *             required={"name", "start_date", "end_date", "number_of_phases", "default_score_cut", "areas"},
+     *             @OA\Property(
+     *                 property="name",
+     *                 type="string",
+     *                 maxLength=30,
+     *                 example="OHSansi 2025",
+     *                 description="Name of the olympiad"
+     *             ),
+     *             @OA\Property(
+     *                 property="start_date",
+     *                 type="string",
+     *                 format="date",
+     *                 example="2025-01-15",
+     *                 description="Start date of the olympiad"
+     *             ),
+     *             @OA\Property(
+     *                 property="end_date",
+     *                 type="string",
+     *                 format="date",
+     *                 example="2025-06-15",
+     *                 description="End date of the olympiad (must be after start_date)"
+     *             ),
+     *             @OA\Property(
+     *                 property="number_of_phases",
+     *                 type="integer",
+     *                 minimum=1,
+     *                 example=3,
+     *                 description="Number of phases to create for this olympiad"
+     *             ),
+     *             @OA\Property(
+     *                 property="default_score_cut",
+     *                 type="integer",
+     *                 minimum=0,
+     *                 maximum=100,
+     *                 example=75,
+     *                 description="Default score cut that will be automatically assigned when creating level-grades"
+     *             ),
+     *             @OA\Property(
+     *                 property="status",
+     *                 type="string",
+     *                 enum={"En planificación", "Activa", "Terminada"},
+     *                 example="En planificación",
+     *                 description="Status of the olympiad (optional, defaults to 'En planificación')"
+     *             ),
+     *             @OA\Property(
+     *                 property="areas",
+     *                 type="array",
+     *                 minItems=1,
+     *                 description="Array of area names to assign to this olympiad",
+     *                 example={"Matemáticas", "Informática"},
+     *                 @OA\Items(
+     *                     type="string",
+     *                     maxLength=25
+     *                 )
+     *             )
      *         )
      *     ),
      *     @OA\Response(
      *         response=201,
-     *         description="Olympiad created successfully",
+     *         description="Olympiad created successfully with areas and phases",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Olympiad created successfully with specific areas and phases"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 description="The created olympiad with loaded relationships",
+     *                 @OA\Property(property="id", type="integer", example=1),
+     *                 @OA\Property(property="name", type="string", example="OHSansi 2025"),
+     *                 @OA\Property(property="start_date", type="string", format="date", example="2025-01-15"),
+     *                 @OA\Property(property="end_date", type="string", format="date", example="2025-06-15"),
+     *                 @OA\Property(property="number_of_phases", type="integer", example=3),
+     *                 @OA\Property(property="default_score_cut", type="integer", example=75),
+     *                 @OA\Property(property="status", type="string", example="En planificación"),
+     *                 @OA\Property(
+     *                     property="areas",
+     *                     type="array",
+     *                     @OA\Items(
+     *                         type="object",
+     *                         @OA\Property(property="id", type="integer"),
+     *                         @OA\Property(property="name", type="string")
+     *                     ),
+     *                     example={
+     *                         {"id": 1, "name": "Matemáticas"},
+     *                         {"id": 2, "name": "Informática"}
+     *                     }
+     *                 ),
+     *                 @OA\Property(
+     *                     property="phases",
+     *                     type="array",
+     *                     description="Automatically created phases based on number_of_phases",
+     *                     @OA\Items(
+     *                         type="object",
+     *                         @OA\Property(property="id", type="integer", example=1),
+     *                         @OA\Property(property="name", type="string", example="Fase 1"),
+     *                         @OA\Property(property="order", type="integer", example=1)
+     *                     )
+     *                 )
+     *             )
+     *         )
      *     ),
      *     @OA\Response(
-     *         response=422,
-     *         description="Error in data validation",
+     *         response=400,
+     *         description="Validation error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Error in data validation"),
+     *             @OA\Property(
+     *                 property="error",
+     *                 type="object",
+     *                 description="Validation errors details"
+     *             ),
+     *             @OA\Property(property="status", type="integer", example=400)
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Server error during olympiad creation",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Error creating the Olympiad"),
+     *             @OA\Property(property="status", type="integer", example=500)
+     *         )
      *     )
      * )
      */
@@ -413,100 +521,144 @@ class OlympiadController extends Controller
     /**
      * @OA\Post(
      *     path="/api/olympiads/{olympiadId}/areas/{areaId}/level-grades",
-     *     summary="Assign a level and its grades to an olympiad area",
-     *     description="Creates a new level, associates it with the given grades, and attaches the resulting level-grade relationships to the specified olympiad area.",
+     *     summary="Assign a level and its grades to an olympiad area with smart level reuse",
+     *     description="Assigns grades to a level within an olympiad area. Reuses existing levels with the same name or creates new ones. Automatically assigns default score cuts to all phases if the olympiad has a default_score_cut configured. Prevents duplicate grade assignments within the same olympiad area.",
      *     tags={"Level (with Grades) - Olympiad Areas"},
      *     @OA\Parameter(
      *         name="olympiadId",
      *         in="path",
      *         required=true,
      *         description="ID of the olympiad",
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="integer", example=1)
      *     ),
      *     @OA\Parameter(
      *         name="areaId",
      *         in="path",
      *         required=true,
-     *         description="ID of the olympiad area",
-     *         @OA\Schema(type="integer")
+     *         description="ID of the area within the olympiad",
+     *         @OA\Schema(type="integer", example=2)
      *     ),
      *     @OA\RequestBody(
      *         required=true,
+     *         description="Level name and grade IDs to assign",
      *         @OA\JsonContent(
      *             required={"level_name", "grade_ids"},
-     *             @OA\Property(property="level_name", type="string", example="Primary Level"),
+     *             @OA\Property(
+     *                 property="level_name",
+     *                 type="string",
+     *                 maxLength=255,
+     *                 example="Booster",
+     *                 description="Name of the level. If a level with this name already exists, it will be reused instead of creating a new one."
+     *             ),
      *             @OA\Property(
      *                 property="grade_ids",
      *                 type="array",
-     *                 @OA\Items(type="integer", example=1)
+     *                 minItems=1,
+     *                 description="Array of grade IDs to assign to this level. Each grade can only be assigned to one level per olympiad area.",
+     *                 @OA\Items(type="integer", example={1,2,3})
      *             )
      *         )
      *     ),
      *     @OA\Response(
-     *         response=200,
+     *         response=201,
      *         description="Level and grades assigned successfully",
      *         @OA\JsonContent(
      *             @OA\Property(property="message", type="string", example="Level and grades assigned successfully"),
-     *             @OA\Property(property="level", type="object",
-     *                 @OA\Property(property="id", type="integer", example=10),
-     *                 @OA\Property(property="name", type="string", example="Primary Level"),
+     *             @OA\Property(
+     *                 property="level",
+     *                 type="object",
+     *                 description="The level with its assigned grades",
+     *                 @OA\Property(property="id", type="integer", example=5),
+     *                 @OA\Property(property="name", type="string", example="Booster"),
      *                 @OA\Property(
      *                     property="grades",
      *                     type="array",
      *                     @OA\Items(
-     *                         @OA\Property(property="id", type="integer", example=1),
-     *                         @OA\Property(property="name", type="string", example="3rd Grade")
-     *                     )
+     *                         type="object",
+     *                         @OA\Property(property="id", type="integer"),
+     *                         @OA\Property(property="name", type="string")
+     *                     ),
+     *                    example={
+     *                         {"id": 1, "name": "1° Grado"},
+     *                         {"id": 2, "name": "2° Grado"},
+     *                         {"id": 3, "name": "3° Grado"}
+     *                     }
      *                 )
-     *             )
+     *             ),
+     *             @OA\Property(
+     *                 property="level_was_created",
+     *                 type="boolean",
+     *                 example=false,
+     *                 description="Indicates if a new level was created (true) or an existing one was reused (false)"
+     *             ),
+     *             @OA\Property(
+     *                 property="created_relationships",
+     *                 type="integer",
+     *                 example=3,
+     *                 description="Number of level-grade relationships created"
+     *             ),
+     *             @OA\Property(
+     *                 property="default_score_cut_assignments",
+     *                 type="object",
+     *                 description="Information about automatic score cut assignments (only present if olympiad has default_score_cut)",
+     *                 @OA\Property(property="olympiad_default_score_cut", type="integer", example=75),
+     *                 @OA\Property(
+     *                     property="phases",
+     *                     type="array",
+     *                     @OA\Items(
+     *                         type="object",
+     *                         @OA\Property(property="phase_id", type="integer", example=1),
+     *                         @OA\Property(property="phase_name", type="string", example="Fase 1"),
+     *                         @OA\Property(property="score_cuts_assigned", type="integer", example=3)
+     *                     )
+     *                 ),
+     *                 @OA\Property(property="total_phases_processed", type="integer", example=2)
+     *             ),
+     *             @OA\Property(property="status", type="integer", example=201)
      *         )
      *     ),
      *     @OA\Response(
      *         response=422,
-     *         description="Validation error"
+     *         description="Validation error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Validation failed"),
+     *             @OA\Property(
+     *                 property="errors",
+     *                 type="object",
+     *                 description="Detailed validation errors"
+     *             ),
+     *             @OA\Property(property="status", type="integer", example=422)
+     *         )
      *     ),
      *     @OA\Response(
      *         response=404,
-     *         description="Olympiad area not found"
+     *         description="Resource not found",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Olympiad not found"),
+     *             @OA\Property(property="error", type="string", example="No olympiad found with ID: 1"),
+     *             @OA\Property(property="status", type="integer", example=404)
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=409,
+     *         description="Duplicate grade assignment conflict",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Duplicate grade assignments found"),
+     *             @OA\Property(property="error", type="string", example="The following grades are already assigned to levels in this olympiad area: Grade ID 3 (Level: Nivel Secundario)"),
+     *             @OA\Property(property="status", type="integer", example=409)
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Server error during level-grade assignment",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Database error"),
+     *             @OA\Property(property="error", type="string", example="A database constraint or connection error occurred. Please check your data and try again."),
+     *             @OA\Property(property="status", type="integer", example=500)
+     *         )
      *     )
      * )
      */
-    // public function assignLevelGradesToArea(Request $request, $olympiadId, $areaId)
-    // {
-    //     $request->validate([
-    //         'level_name' => 'required|string',
-    //         'grade_ids' => 'required|array',
-    //         'grade_ids.*' => 'exists:grades,id'
-    //     ]);
-
-    //     $olympiadArea = OlympiadArea::where('olympiad_id', $olympiadId)
-    //         ->where('area_id', $areaId)
-    //         ->firstOrFail();
-
-    //     // Create the level
-    //     $level = Level::create([
-    //         'name' => $request->level_name
-    //     ]);
-
-    //     // Create the level_grades relationships
-    //     $levelGrades = [];
-    //     foreach ($request->grade_ids as $gradeId) {
-    //         $levelGrade = LevelGrade::create([
-    //             'level_id' => $level->id,
-    //             'grade_id' => $gradeId
-    //         ]);
-    //         $levelGrades[] = $levelGrade->id;
-    //     }
-
-    //     // Assign the level_grades to the olympiad area
-    //     $olympiadArea->levelGrades()->attach($levelGrades);
-
-    //     return response()->json([
-    //         'message' => 'Level and grades assigned successfully',
-    //         'level' => $level->load('grades'),
-    //     ]);
-    // }
-
     public function assignLevelGradesToArea(Request $request, $olympiadId, $areaId)
     {
         try {
@@ -1220,8 +1372,8 @@ class OlympiadController extends Controller
     /**
      * @OA\Post(
      *     path="/api/olympiads/{olympiadId}/areas/{areaId}/score-cuts",
-     *     summary="Assign score cut to all grades of a level for a specific phase in an olympiad area",
-     *     description="Creates or updates the score cut (minimum passing score) for all level-grades of a specific level within a specific phase of an olympiad area.",
+     *     summary="Assign score cut to all grades of a level for a specific phase",
+     *     description="Assigns the same score cut (minimum passing score) to ALL grades within a specific level for a given phase in an olympiad area. This simplified approach applies the score cut to every grade in the level at once, making it much easier to manage score cuts by educational level rather than individual grades.",
      *     tags={"Score cuts"},
      *     @OA\Parameter(
      *         name="olympiadId",
@@ -1234,60 +1386,115 @@ class OlympiadController extends Controller
      *         name="areaId",
      *         in="path",
      *         required=true,
-     *         description="ID of the olympiad area",
+     *         description="ID of the area within the olympiad",
      *         @OA\Schema(type="integer", example=2)
      *     ),
      *     @OA\RequestBody(
      *         required=true,
-     *         description="Phase ID, level ID and score cut to apply to all grades of that level",
+     *         description="Phase, level and score cut configuration",
      *         @OA\JsonContent(
      *             required={"phase_id", "level_id", "score_cut"},
-     *             @OA\Property(property="phase_id", type="integer", example=3),
-     *             @OA\Property(property="level_id", type="integer", example=5),
-     *             @OA\Property(property="score_cut", type="number", format="float", example=75.5)
+     *             @OA\Property(
+     *                 property="phase_id",
+     *                 type="integer",
+     *                 example=1,
+     *                 description="ID of the phase where the score cut will be applied"
+     *             ),
+     *             @OA\Property(
+     *                 property="level_id",
+     *                 type="integer",
+     *                 example=3,
+     *                 description="ID of the level. Score cut will be applied to ALL grades within this level."
+     *             ),
+     *             @OA\Property(
+     *                 property="score_cut",
+     *                 type="number",
+     *                 format="float",
+     *                 minimum=0,
+     *                 maximum=100,
+     *                 example=75.5,
+     *                 description="Minimum score required to pass this phase (0-100)"
+     *             )
      *         )
      *     ),
      *     @OA\Response(
      *         response=200,
-     *         description="Score cuts assigned successfully",
+     *         description="Score cuts assigned successfully to all grades in the level",
      *         @OA\JsonContent(
      *             @OA\Property(property="message", type="string", example="Score cuts assigned successfully"),
      *             @OA\Property(
      *                 property="data",
      *                 type="object",
-     *                 description="The created or updated OlympiadAreaPhase with its related phase and score cuts",
+     *                 description="The olympiad area phase with its score cut assignments",
      *                 @OA\Property(property="id", type="integer", example=15),
-     *                 @OA\Property(property="phase", type="object",
-     *                     @OA\Property(property="id", type="integer", example=3),
-     *                     @OA\Property(property="name", type="string", example="Final Phase")
+     *                 @OA\Property(
+     *                     property="phase",
+     *                     type="object",
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="name", type="string", example="Fase 1")
      *                 ),
      *                 @OA\Property(
      *                     property="olympiad_area_phase_level_grades",
      *                     type="array",
+     *                     description="All level-grade relationships with their assigned score cuts",
      *                     @OA\Items(
+     *                         type="object",
      *                         @OA\Property(property="id", type="integer", example=21),
-     *                         @OA\Property(property="score_cut", type="number", format="float", example=80.0),
+     *                         @OA\Property(property="score_cut", type="number", format="float", example=75.5),
      *                         @OA\Property(
      *                             property="level_grade",
      *                             type="object",
      *                             @OA\Property(property="id", type="integer", example=12),
-     *                             @OA\Property(property="level_id", type="integer", example=5),
+     *                             @OA\Property(property="level_id", type="integer", example=3),
      *                             @OA\Property(property="grade_id", type="integer", example=9)
      *                         )
      *                     )
      *                 )
      *             ),
-     *             @OA\Property(property="level_name", type="string", example="Primary Level"),
-     *             @OA\Property(property="affected_grades_count", type="integer", example=3)
+     *             @OA\Property(property="level_name", type="string", example="Booster"),
+     *             @OA\Property(property="level_id", type="integer", example=3),
+     *             @OA\Property(property="score_cut", type="number", format="float", example=75.5),
+     *             @OA\Property(
+     *                 property="affected_grades_count",
+     *                 type="integer",
+     *                 example=4,
+     *                 description="Number of grades affected by this score cut assignment"
+     *             ),
+     *             @OA\Property(property="created_count", type="integer", example=2, description="Number of new score cut records created"),
+     *             @OA\Property(property="updated_count", type="integer", example=2, description="Number of existing score cut records updated"),
+     *             @OA\Property(property="status", type="integer", example=200)
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Validation failed"),
+     *             @OA\Property(
+     *                 property="errors",
+     *                 type="object",
+     *                 description="Detailed validation errors"
+     *             ),
+     *             @OA\Property(property="status", type="integer", example=422)
      *         )
      *     ),
      *     @OA\Response(
      *         response=404,
-     *         description="Olympiad area, level, or level-grades not found"
+     *         description="Resource not found",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Level not found"),
+     *             @OA\Property(property="error", type="string", example="The level 'Booster' (ID: 3) has no grade associations in the area 'Matemáticas' for olympiad 'Olimpiada 2025'. Please assign grades to this level first."),
+     *             @OA\Property(property="status", type="integer", example=404)
+     *         )
      *     ),
      *     @OA\Response(
-     *         response=422,
-     *         description="Validation error (e.g. invalid phase_id or score_cut out of range)"
+     *         response=500,
+     *         description="Server error during score cut assignment",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Database error"),
+     *             @OA\Property(property="error", type="string", example="A database error occurred while assigning score cuts. Please try again."),
+     *             @OA\Property(property="status", type="integer", example=500)
+     *         )
      *     )
      * )
      */
