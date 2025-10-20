@@ -103,7 +103,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
 // <--- CRUD Evaluation --->
 Route::post('/evaluations',[EvaluationController::class, 'registerEvaluation']);
-Route::update('/evaluations/{id}',[EvaluationController::class, 'updateEvaluation']);
+Route::put('/evaluations/{id}',[EvaluationController::class, 'updateEvaluation']);
 Route::patch('/evaluations/{id}',[EvaluationController::class, 'updatePartialEvaluation']);
 
 Route::get('/evaluations/check-updates/{lastUpdatedAt}',[EvaluationController::class, 'checksUpdates']);
