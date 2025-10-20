@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\PhaseController;
 use App\Http\Controllers\Api\CompetitorUploadController;
 use App\Http\Controllers\Api\GradeController;
 use App\Http\Controllers\CompetitorRegistrationController;
+use App\Http\Controllers\EvaluationController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -98,3 +99,11 @@ Route::middleware(['auth:sanctum', 'evaluator'])->group(function(){
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
 });
+
+
+// <--- CRUD Evaluation --->
+Route::post('/evaluations',[EvaluationController::class, 'registerEvaluation']);
+Route::update('/evaluations/{id}',[EvaluationController::class, 'updateEvaluation']);
+Route::patch('/evaluations/{id}',[EvaluationController::class, 'updatePartialEvaluation']);
+
+Route::get('/evaluations/check-updates/{lastUpdatedAt}',[EvaluationController::class, 'checksUpdates']);
