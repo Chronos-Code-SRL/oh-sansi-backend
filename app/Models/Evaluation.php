@@ -13,7 +13,8 @@ class Evaluation extends Model
         'score',
         'description',
         'registration_id',
-        'olympiad_area_phase_id'
+        'olympiad_area_phase_id',
+        'status'
     ];
 
     /**

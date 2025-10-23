@@ -13,7 +13,8 @@ use App\Http\Controllers\Api\PhaseController;
 use App\Http\Controllers\Api\CompetitorUploadController;
 use App\Http\Controllers\Api\GradeController;
 use App\Http\Controllers\CompetitorRegistrationController;
-use App\Http\Controllers\EvaluationController;
+use App\Http\Controllers\Api\EvaluationController;
+use App\Http\Controllers\Api\ContestantController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -107,3 +108,6 @@ Route::put('/evaluations/{id}',[EvaluationController::class, 'updateEvaluation']
 Route::patch('/evaluations/{id}',[EvaluationController::class, 'updatePartialEvaluation']);
 
 Route::get('/evaluations/check-updates/{lastUpdatedAt}',[EvaluationController::class, 'checksUpdates']);
+
+// <--- Get Contestants --->
+Route::get('/contestants/{phase_id}/{olympiad_id}/{area_id}', [ContestantController::class, 'showContestant']);
