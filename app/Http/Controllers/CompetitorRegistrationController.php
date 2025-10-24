@@ -12,7 +12,6 @@ use App\Models\Registration;
 use App\Models\Area;
 use App\Models\Evaluation;
 use App\Models\OlympiadArea;
-use App\Models\OlympiadAreaPhase;
 use App\Models\Grade;
 use App\Models\Level;
 use App\Models\LevelGrade;
