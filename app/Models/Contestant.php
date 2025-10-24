@@ -16,6 +16,7 @@ class Contestant extends Model
         'gender',
         'school_name',
         'department',
+        'grade',
         'phone_number',
         'email',
         'tutor_name',
