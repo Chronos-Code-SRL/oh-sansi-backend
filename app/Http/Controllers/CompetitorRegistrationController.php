@@ -15,6 +15,8 @@ use App\Models\Grade;
 use App\Models\Level;
 use App\Models\LevelGrade;
 use App\Models\Olympiad;
+use App\Models\OlympiadAreaPhase;
+use App\Models\OlympiadAreaPhaseLevelGrade;
 
 class CompetitorRegistrationController extends Controller
 {
@@ -30,7 +32,7 @@ class CompetitorRegistrationController extends Controller
             'all_files' => $request->allFiles(),
             'olympiad_id' => $request->olympiad_id
         ]);
-        
+
         // Validate that files are present and are CSV
         $validator = Validator::make($request->all(), [
             'files' => 'required|array|min:1',
@@ -61,12 +63,12 @@ class CompetitorRegistrationController extends Controller
         if (!is_array($files)) {
             $files = [$files];
         }
-        
+
         // Filter out null values
         $files = array_filter($files, function($file) {
             return $file !== null;
         });
-        
+
         if (empty($files)) {
             return response()->json([
                 'success' => false,
@@ -217,7 +219,7 @@ class CompetitorRegistrationController extends Controller
             unset($header[$errorColumnIndex]);
             $header = array_values($header); // Re-index array
         }
-        
+
         $data = [];
         $errors = [];
         $successful = 0;
@@ -226,15 +228,15 @@ class CompetitorRegistrationController extends Controller
         // Process each row
         for ($i = 1; $i < count($lines); $i++) {
             if (empty(trim($lines[$i]))) continue;
-            
+
             $row = str_getcsv($lines[$i]);
-            
+
             // Remove 'Errores' column data if it exists (from error CSV files)
             if ($errorColumnIndex !== false && isset($row[$errorColumnIndex])) {
                 unset($row[$errorColumnIndex]);
                 $row = array_values($row); // Re-index array
             }
-            
+
             // Check if row has same number of columns as header
             if (count($row) !== count($header)) {
                 $errors[] = [
@@ -242,7 +244,7 @@ class CompetitorRegistrationController extends Controller
                     'errors' => "Row has " . count($row) . " columns but header has " . count($header) . " columns. Please check for missing commas or extra commas in the data."
                 ];
             }
-            
+
             $rowData = array_combine($header, $row);
             // Normalize keys by trimming spaces (handles ' NIVEL' vs 'NIVEL')
             $normalized = [];
@@ -251,7 +253,7 @@ class CompetitorRegistrationController extends Controller
             }
             $rowData = $normalized;
             $rowData['row_number'] = $i + 1;
-            
+
             // Normalize header keys that might include spaces or dots
             if (isset($rowData['N.'])) { unset($rowData['N.']); }
 
@@ -334,13 +336,32 @@ class CompetitorRegistrationController extends Controller
             }
         }
 
-        // CI Document validation (8-13 characters, unique)
+        // CI Document validation (8-13 characters, unique per olympiad area)
         if (!empty($data['CI'])) {
             if (!preg_match('/^[0-9]{8,13}$/', $data['CI'])) {
                 $errors[] = 'CI Document must be 8-13 digits';
             } else {
-                if (Contestant::where('ci_document', $data['CI'])->exists()) {
-                    $errors[] = 'CI Document already exists';
+                // Check if contestant is already registered in the same olympiad areas
+                $existingContestant = Contestant::where('ci_document', $data['CI'])->first();
+                if ($existingContestant) {
+                    // Get areas from CSV data
+                    $areas = array_map('trim', preg_split('/[,;]+/', $data['AREA']));
+                    foreach ($areas as $areaName) {
+                        $area = Area::where('name', $areaName)->first();
+                        if ($area) {
+                            $olympiadArea = OlympiadArea::where('olympiad_id', $olympiadId)
+                                ->where('area_id', $area->id)
+                                ->first();
+                            if ($olympiadArea) {
+                                $existingRegistration = Registration::where('contestant_id', $existingContestant->id)
+                                    ->where('olympiad_area_id', $olympiadArea->id)
+                                    ->exists();
+                                if ($existingRegistration) {
+                                    $errors[] = "CI Document already registered in area '$areaName' for this olympiad";
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -378,7 +399,11 @@ class CompetitorRegistrationController extends Controller
             if (!filter_var($data['E-MAIL'], FILTER_VALIDATE_EMAIL)) {
                 $errors[] = 'Email format is invalid';
             } else {
-                if (Contestant::where('email', $data['E-MAIL'])->exists()) {
+                // Only check for duplicate email if it's not the same contestant
+                $emailExists = Contestant::where('email', $data['E-MAIL'])
+                    ->where('ci_document', '!=', $data['CI'])
+                    ->exists();
+                if ($emailExists) {
                     $errors[] = 'Email already exists';
                 }
             }
@@ -436,6 +461,29 @@ class CompetitorRegistrationController extends Controller
                 $level = Level::where('name', trim($levelValue))->first();
                 if (!$level) {
                     $errors[] = "Level '" . trim($levelValue) . "' does not exist in database";
+                } else {
+                    // Verify that the level is associated with the areas in this olympiad
+                    $areas = array_map('trim', preg_split('/[,;]+/', $data['AREA']));
+                    foreach ($areas as $areaName) {
+                        $area = Area::where('name', $areaName)->first();
+                        if ($area) {
+                            $olympiadArea = OlympiadArea::where('olympiad_id', $olympiadId)
+                                ->where('area_id', $area->id)
+                                ->first();
+                            if ($olympiadArea) {
+                                // Check if this level is configured for any phase of this olympiad area
+                                $levelExists = OlympiadAreaPhaseLevelGrade::whereHas('olympiadAreaPhase', function ($query) use ($olympiadArea) {
+                                    $query->where('olympiad_area_id', $olympiadArea->id);
+                                })->whereHas('levelGrade', function ($query) use ($level) {
+                                    $query->where('level_id', $level->id);
+                                })->exists();
+
+                                if (!$levelExists) {
+                                    $errors[] = "Level '" . trim($levelValue) . "' is not configured for area '$areaName' in this olympiad";
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -468,19 +516,25 @@ class CompetitorRegistrationController extends Controller
      */
     private function createContestantAndRegistration(array $data, $olympiadId): void
     {
-        // Create contestant (no grade in table per new schema)
-        $contestant = Contestant::create([
-            'first_name' => $data['NOMBRE'],
-            'last_name' => $data['APELLIDO'],
-            'ci_document' => $data['CI'],
-            'gender' => strtoupper($data['GENERO']),
-            'school_name' => $data['COLEGIO'],
-            'department' => $data['DEPARTAMENTO'],
-            'phone_number' => $data['CELULAR'] ?? null,
-            'email' => $data['E-MAIL'] ?? null,
-            'tutor_name' => $data['NOMBRE TUTOR'],
-            'tutor_number' => $data['NUMERO TUTOR']
-        ]);
+        // Get or create contestant (reuse if exists)
+        $contestant = Contestant::where('ci_document', $data['CI'])->first();
+
+        if (!$contestant) {
+            // Create new contestant if doesn't exist
+            $contestant = Contestant::create([
+                'first_name' => $data['NOMBRE'],
+                'last_name' => $data['APELLIDO'],
+                'ci_document' => $data['CI'],
+                'gender' => strtoupper($data['GENERO']),
+                'school_name' => $data['COLEGIO'],
+                'department' => $data['DEPARTAMENTO'],
+                'grade' => $data['GRADO'] ?? null,
+                'phone_number' => $data['CELULAR'] ?? null,
+                'email' => $data['E-MAIL'] ?? null,
+                'tutor_name' => $data['NOMBRE TUTOR'],
+                'tutor_number' => $data['NUMERO TUTOR']
+            ]);
+        }
 
         // Resolve grade and level for registration (only use existing records)
         $grade = null;
@@ -539,7 +593,8 @@ class CompetitorRegistrationController extends Controller
         // Add error column to header
         $errorHeader = array_merge($header, ['Errores']);
 
-        $csvContent = implode(',', array_map(function($field) {
+        // Add UTF-8 BOM to ensure proper encoding of special characters
+        $csvContent = "\xEF\xBB\xBF" . implode(',', array_map(function($field) {
             return '"' . str_replace('"', '""', $field) . '"';
         }, $errorHeader)) . "\n";
 
@@ -634,11 +689,11 @@ class CompetitorRegistrationController extends Controller
     public function downloadErrorCsv(string $filename): \Symfony\Component\HttpFoundation\StreamedResponse
     {
         $filePath = 'error-csvs/' . $filename;
-        
+
         if (!Storage::disk('public')->exists($filePath)) {
             abort(404, 'Error file not found');
         }
-        
+
         return Storage::disk('public')->download($filePath);
     }
 }
