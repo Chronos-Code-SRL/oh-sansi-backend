@@ -103,11 +103,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
 
 // <--- CRUD Evaluation --->
-Route::post('/evaluations',[EvaluationController::class, 'registerEvaluation']);
-Route::put('/evaluations/{id}',[EvaluationController::class, 'updateEvaluation']);
 Route::patch('/evaluations/{id}',[EvaluationController::class, 'updatePartialEvaluation']);
-
-Route::get('/evaluations/check-updates/{lastUpdatedAt}',[EvaluationController::class, 'checksUpdates']);
+Route::get('/evaluations/check-updates/',[EvaluationController::class, 'checksUpdates']);
 
 // <--- Get Contestants --->
 Route::get('/contestants/{phase_id}/{olympiad_id}/{area_id}', [ContestantController::class, 'showContestant']);
