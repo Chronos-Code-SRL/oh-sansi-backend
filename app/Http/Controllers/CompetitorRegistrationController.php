@@ -18,6 +18,7 @@ use App\Models\LevelGrade;
 use App\Models\Olympiad;
 use App\Models\OlympiadAreaPhase;
 use App\Models\OlympiadAreaPhaseLevelGrade;
+use App\Models\ContestantLevelGrade;
 
 class CompetitorRegistrationController extends Controller
 {
@@ -572,10 +573,22 @@ class CompetitorRegistrationController extends Controller
                             ->first();
 
                         if (!$existingLevelGrade) {
-                            LevelGrade::create([
+                            $existingLevelGrade = LevelGrade::create([
                                 'olympiad_area_id' => $olympiadArea->id,
                                 'level_id' => $level->id,
                                 'grade_id' => $grade->id
+                            ]);
+                        }
+
+                        // Create contestant-level-grade relationship if it doesn't exist
+                        $existingContestantLevelGrade = ContestantLevelGrade::where('contestant_id', $contestant->id)
+                            ->where('level_grade_id', $existingLevelGrade->id)
+                            ->first();
+
+                        if (!$existingContestantLevelGrade) {
+                            ContestantLevelGrade::create([
+                                'contestant_id' => $contestant->id,
+                                'level_grade_id' => $existingLevelGrade->id
                             ]);
                         }
                     }
