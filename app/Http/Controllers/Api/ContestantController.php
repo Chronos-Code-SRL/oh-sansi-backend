@@ -4,50 +4,56 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\Rule;
-use App\Models\Contestant;
-use App\Models\Registration;
-use App\Models\OlympiadArea;
 use App\Models\Evaluation;
-use Illuminate\Support\Facades\DB;
 
 class ContestantController extends Controller
 {
     public function showContestant(string $phase_id, string $olympiad_id, string $area_id): JsonResponse
     {
 
-        $evaluations = Evaluation::with([
-            'registration.contestant',
-        ])
-            ->whereHas('olympiadAreaPhase', function ($query) use ($phase_id, $area_id, $olympiad_id) {
-                $query->when($phase_id, fn($q) => $q->where('phase_id', $phase_id))
-                    ->whereHas('olympiadArea', function ($q) use ($area_id, $olympiad_id) {
-                        $q->when($area_id, fn($q2) => $q2->where('area_id', $area_id))
-                            ->when($olympiad_id, fn($q2) => $q2->where('olympiad_id', $olympiad_id));
-                    });
-            })
+        $contestants = Evaluation::query()
+            ->select(
+                'evaluations.id AS evaluation_id',
+                'contestants.id AS contestant_id',
+                'contestants.first_name',
+                'contestants.last_name',
+                'contestants.gender',
+                'contestants.ci_document',
+                'contestants.school_name',
+                'contestants.department',
+                'evaluations.score',
+                'evaluations.description',
+                'evaluations.status',
+                'grades.name AS grade_name',
+                'levels.name AS level_name'
+            )
+            ->join('registrations', 'evaluations.registration_id', '=', 'registrations.id')
+            ->join('contestants', 'registrations.contestant_id', '=', 'contestants.id')
+            ->leftJoin('contestant_level_grades', 'contestants.id', '=', 'contestant_level_grades.contestant_id')
+            ->leftJoin('level_grades', 'contestant_level_grades.level_grade_id', '=', 'level_grades.id')
+            ->leftJoin('grades', 'level_grades.grade_id', '=', 'grades.id')
+            ->leftJoin('levels', 'level_grades.level_id', '=', 'levels.id')
+            ->join('olympiad_area_phases', 'evaluations.olympiad_area_phase_id', '=', 'olympiad_area_phases.id')
+            ->join('olympiad_areas', 'registrations.olympiad_area_id', '=', 'olympiad_areas.id')
+            ->where('olympiad_areas.olympiad_id', $olympiad_id)
+            ->where('olympiad_areas.area_id', $area_id)
+            ->where('olympiad_area_phases.phase_id', $phase_id)
             ->get();
 
-        $result = $evaluations->map(function ($e) {
-            $contestant = $e->registration->contestant;
-
-            return [
-                'contestant_id' => $contestant->id,
-                'first_name' => $contestant->first_name,
-                'gender' => $contestant->gender,
-                'last_name' => $contestant->last_name,
-                'ci_document' => $contestant->ci_document,
-                'school_name' => $contestant->school_name,
-                'department' => $contestant->department,
-                
-                'score' => $e->score,
-                'description' => $e->description,
-                'status' => (bool)$e->status,
+        if ($contestants->isEmpty()) {
+            $data = [
+                'message' => 'Error in recovering competitors',
+                'status' => 404
             ];
-        });
 
-        return response()->json($result);
+            return response()->json($data, 404);
+        }
+
+        $data = [
+            'message' => 'Contestants retrieved successfully',
+            'data' => $contestants,
+            'status' => 200
+        ];
+        return response()->json($data, 200);
     }
 }
