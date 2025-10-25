@@ -41,7 +41,6 @@ class OlympiadController extends Controller
     public function index()
     {
         $olympiads = Olympiad::all();
-
         if ($olympiads->isEmpty()) {
             $data = [
                 'message' => 'No olympiads found',
@@ -50,6 +49,9 @@ class OlympiadController extends Controller
             return response()->json($data, 404);
         }
 
+        $olympiads->each(function ($olympiad) {
+            $olympiad->updateStatus();
+        });
         // Mapping olympiads and merging areas names
         $data = [
             'olympiads' => $olympiads->map(function ($olympiad) {
@@ -275,6 +277,7 @@ class OlympiadController extends Controller
     public function show(string $id)
     {
         $olympiad = Olympiad::find($id);
+        $olympiad->updateStatus();
 
         if (!$olympiad) {
             $data = [
