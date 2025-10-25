@@ -724,10 +724,11 @@ class CompetitorRegistrationController extends Controller
     {
         $filename = $file->getClientOriginalName();
         $fileSize = $file->getSize();
+        $time = time();
 
         // Store the original file in organized folders
-        $storagePath = "csv-uploads/{$olympiadId}/" . time() . '_' . $filename;
-        Storage::disk('public')->putFileAs("csv-uploads/{$olympiadId}", $file, time() . '_' . $filename);
+        $storagePath = "csv-uploads/{$olympiadId}/" . $time . '_' . $filename;
+        Storage::disk('public')->putFileAs("csv-uploads/{$olympiadId}", $file, $time . '_' . $filename);
 
         // Prepare error file path if exists
         $errorFilePath = null;

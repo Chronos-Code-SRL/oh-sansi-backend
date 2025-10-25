@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\CompetitorUploadController;
 use App\Http\Controllers\Api\GradeController;
 use App\Http\Controllers\Api\CsvUploadController;
 use App\Http\Controllers\CompetitorRegistrationController;
+use App\Http\Controllers\Api\UserAreaController;
 use App\Http\Controllers\Api\EvaluationController;
 use App\Http\Controllers\Api\ContestantController;
 
@@ -31,6 +32,9 @@ Route::delete('/olympiads/{id}', [OlympiadController::class, 'destroy']);
 // <--- CRUD Olympiad-Areas --->
 Route::post('/olympiads/{id}/areas', [OlympiadController::class, 'assignAreas']);
 Route::get('/olympiads/{id}/areas', [OlympiadController::class, 'getAreas']);
+
+// <--- CRUD Olympiad-Phases --->
+Route::get('/olympiads/{id}/phases', [OlympiadController::class, 'getPhases']);
 
 // <--- CRUD Area --->
 Route::get('/areas', [AreaController::class, 'index']);
@@ -89,6 +93,9 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function(){
 Route::middleware(['auth:sanctum', 'evaluator'])->group(function(){
 
 });
+
+//get user areas evaluator or academic manager
+Route::get('/user/areas', [UserAreaController::class, 'getUserAreas'])->middleware(['auth:sanctum', 'evaluator_or_academic']);
 
 // academic responsible routes
 //Route::middleware(['auth:sanctum', 'academic_responsible'])->group(function(){

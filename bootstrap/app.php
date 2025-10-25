@@ -17,6 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin' => \App\Http\Middleware\AdminMiddleware::class,
             'evaluator' => \App\Http\Middleware\EvaluatorMiddleware::class,
             'academic_responsible' => \App\Http\Middleware\EvaluatorMiddleware::class,
+            'evaluator_or_academic' => \App\Http\Middleware\EvaluatorAcademicMiddleware::class,
         ]);
     
     })
