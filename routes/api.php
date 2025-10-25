@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\AreaController;
 use App\Http\Controllers\Api\PhaseController;
 use App\Http\Controllers\Api\CompetitorUploadController;
 use App\Http\Controllers\Api\GradeController;
+use App\Http\Controllers\Api\CsvUploadController;
 use App\Http\Controllers\CompetitorRegistrationController;
 use App\Http\Controllers\Api\EvaluationController;
 use App\Http\Controllers\Api\ContestantController;
@@ -101,6 +102,11 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
 });
 
+// <--- CSV Upload Management --->
+Route::get('/olympiads/{olympiadId}/csv-uploads', [CsvUploadController::class, 'index']);
+Route::get('/csv-uploads/{id}', [CsvUploadController::class, 'show']);
+Route::get('/csv-uploads/{id}/download', [CsvUploadController::class, 'download']);
+Route::get('/csv-uploads/{id}/download-errors', [CsvUploadController::class, 'downloadErrors']);
 
 // <--- CRUD Evaluation --->
 Route::patch('/evaluations/{id}',[EvaluationController::class, 'updatePartialEvaluation']);

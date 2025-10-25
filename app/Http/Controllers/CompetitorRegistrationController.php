@@ -19,6 +19,7 @@ use App\Models\Olympiad;
 use App\Models\OlympiadAreaPhase;
 use App\Models\OlympiadAreaPhaseLevelGrade;
 use App\Models\ContestantLevelGrade;
+use App\Models\CsvUpload;
 
 class CompetitorRegistrationController extends Controller
 {
@@ -98,6 +99,9 @@ class CompetitorRegistrationController extends Controller
                 $totalCompetitorErrors += $result['competitor_errors'];
                 $totalHeaderErrors += $result['header_errors'];
                 $totalRecords += $result['total_records'];
+
+                // Store CSV upload record
+                $this->storeCsvUploadRecord($file, $result, $olympiad->id);
 
                 // Count files with different types of errors
                 if ($result['header_errors'] > 0) {
@@ -711,6 +715,37 @@ class CompetitorRegistrationController extends Controller
         }
 
         return Storage::disk('public')->download($filePath);
+    }
+
+    /**
+     * Store CSV upload record for tracking
+     */
+    private function storeCsvUploadRecord($file, array $result, $olympiadId): void
+    {
+        $filename = $file->getClientOriginalName();
+        $fileSize = $file->getSize();
+
+        // Store the original file in organized folders
+        $storagePath = "csv-uploads/{$olympiadId}/" . time() . '_' . $filename;
+        Storage::disk('public')->putFileAs("csv-uploads/{$olympiadId}", $file, time() . '_' . $filename);
+
+        // Prepare error file path if exists
+        $errorFilePath = null;
+        if ($result['error_file']) {
+            $errorFilePath = "error-csvs/" . $result['error_file'];
+        }
+
+        // Create CSV upload record
+        CsvUpload::create([
+            'olympiad_id' => $olympiadId,
+            'original_file_name' => $filename,
+            'successful_records' => $result['successful'],
+            'failed_records' => $result['competitor_errors'] + $result['header_errors'],
+            'total_records' => $result['total_records'],
+            'file_path' => $storagePath,
+            'error_file_path' => $errorFilePath,
+            'file_size' => $fileSize
+        ]);
     }
 
     //Function to create an evaluation for each competitor record
