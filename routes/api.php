@@ -30,6 +30,9 @@ Route::delete('/olympiads/{id}', [OlympiadController::class, 'destroy']);
 Route::post('/olympiads/{id}/areas', [OlympiadController::class, 'assignAreas']);
 Route::get('/olympiads/{id}/areas', [OlympiadController::class, 'getAreas']);
 
+// <--- CRUD Olympiad-Phases --->
+Route::get('/olympiads/{id}/phases', [OlympiadController::class, 'getPhases']);
+
 // <--- CRUD Area --->
 Route::get('/areas', [AreaController::class, 'index']);
 Route::get('/areas/{id}', [AreaController::class, 'show']);

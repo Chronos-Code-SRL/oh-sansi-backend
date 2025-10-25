@@ -858,6 +858,147 @@
                 }
             }
         },
+        "/api/olympiads/{id}/phases": {
+            "get": {
+                "tags": [
+                    "Olympiads"
+                ],
+                "summary": "Get all phases related to a specific olympiad",
+                "description": "Retrieves all phases that are associated with any area of the specified olympiad. When an olympiad is created, it generates a specified number of phases that are automatically related to each area through the olympiad_area_phases table.",
+                "operationId": "7c6ffa773217906ab2e46ce1a2ed68fb",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Olympiad ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of phases for the specified olympiad retrieved successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Phases retrieved successfully"
+                                        },
+                                        "olympiad": {
+                                            "description": "Basic olympiad information",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "name": {
+                                                    "type": "string",
+                                                    "example": "OHSansi 2025"
+                                                },
+                                                "number_of_phases": {
+                                                    "type": "integer",
+                                                    "example": 3
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "phases": {
+                                            "description": "List of phases associated with the olympiad",
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "name": {
+                                                        "type": "string",
+                                                        "example": "Fase 1"
+                                                    },
+                                                    "order": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "areas_count": {
+                                                        "description": "Number of areas this phase is associated with in this olympiad",
+                                                        "type": "integer",
+                                                        "example": 2
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        },
+                                        "total_phases": {
+                                            "description": "Total number of phases found",
+                                            "type": "integer",
+                                            "example": 3
+                                        },
+                                        "status": {
+                                            "type": "integer",
+                                            "example": 200
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Olympiad not found or no phases found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Olympiad not found"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "No olympiad found with ID: 1"
+                                        },
+                                        "status": {
+                                            "type": "integer",
+                                            "example": 404
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server error during phase retrieval",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Internal server error"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "An unexpected error occurred while retrieving phases"
+                                        },
+                                        "status": {
+                                            "type": "integer",
+                                            "example": 500
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/olympiads/{olympiadId}/areas/{areaId}/level-grades": {
             "get": {
                 "tags": [
