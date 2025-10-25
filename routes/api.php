@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\CompetitorUploadController;
 use App\Http\Controllers\Api\GradeController;
 use App\Http\Controllers\Api\CsvUploadController;
 use App\Http\Controllers\CompetitorRegistrationController;
+use App\Http\Controllers\Api\UserAreaController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -87,6 +88,9 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function(){
 Route::middleware(['auth:sanctum', 'evaluator'])->group(function(){
 
 });
+
+//get user areas evaluator or academic manager
+Route::get('/user/areas', [UserAreaController::class, 'getUserAreas'])->middleware(['auth:sanctum', 'evaluator_or_academic']);
 
 // academic responsible routes
 //Route::middleware(['auth:sanctum', 'academic_responsible'])->group(function(){

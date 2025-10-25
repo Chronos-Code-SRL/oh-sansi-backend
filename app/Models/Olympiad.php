@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Carbon\Carbon;
 
 class Olympiad extends Model
 {
@@ -80,5 +81,25 @@ class Olympiad extends Model
         }
 
         return $this->load('areas', 'phases');
+    }
+
+    public function updateStatus(){
+        $today = Carbon::now()->format('Y-m-d');
+        $newStatus = $this->status;
+
+        if ($today >= $this->start_date and $today <= $this->end_date) {
+            $newStatus = 'Activa';
+        }
+        
+        if ($today > $this->end_date) {
+            $newStatus = 'Terminada';
+        }
+
+        if ($newStatus != $this->status) {
+            $this->status = $newStatus;
+            $this->save();
+        }
+
+        return $this;
     }
 }
