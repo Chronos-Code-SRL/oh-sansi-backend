@@ -49,11 +49,23 @@ class ContestantController extends Controller
             return response()->json($data, 404);
         }
 
-        $data = [
-            'message' => 'Contestants retrieved successfully',
-            'data' => $contestants,
-            'status' => 200
-        ];
-        return response()->json($data, 200);
+        $result = $contestants->map(function ($item) {
+            return [
+                'contestant_id' => $item->contestant_id,
+                'first_name' => $item->first_name,
+                'last_name' => $item->last_name,
+                'gender' => $item->gender,
+                'ci_document' => $item->ci_document,
+                'school_name' => $item->school_name,
+                'department' => $item->department,
+                'grade_name' => $item->grade_name,
+                'level_name' => $item->level_name,
+                'score' => $item->score,
+                'description' => $item->description,
+                'status' => (bool)$item->status,
+            ];
+        });
+
+        return response()->json($result);
     }
 }
