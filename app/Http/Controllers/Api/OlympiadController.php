@@ -41,7 +41,6 @@ class OlympiadController extends Controller
     public function index()
     {
         $olympiads = Olympiad::all();
-
         if ($olympiads->isEmpty()) {
             $data = [
                 'message' => 'No olympiads found',
@@ -50,6 +49,9 @@ class OlympiadController extends Controller
             return response()->json($data, 404);
         }
 
+        $olympiads->each(function ($olympiad) {
+            $olympiad->updateStatus();
+        });
         // Mapping olympiads and merging areas names
         $data = [
             'olympiads' => $olympiads->map(function ($olympiad) {
@@ -275,6 +277,7 @@ class OlympiadController extends Controller
     public function show(string $id)
     {
         $olympiad = Olympiad::find($id);
+        $olympiad->updateStatus();
 
         if (!$olympiad) {
             $data = [
@@ -514,6 +517,159 @@ class OlympiadController extends Controller
             'areas' => $areas,
             'status' => 200
         ], 200);
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/olympiads/{id}/phases",
+     *     summary="Get all phases related to a specific olympiad",
+     *     description="Retrieves all phases that are associated with any area of the specified olympiad. When an olympiad is created, it generates a specified number of phases that are automatically related to each area through the olympiad_area_phases table.",
+     *     tags={"Olympiads"},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="Olympiad ID",
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="List of phases for the specified olympiad retrieved successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Phases retrieved successfully"),
+     *             @OA\Property(
+     *                 property="olympiad",
+     *                 type="object",
+     *                 description="Basic olympiad information",
+     *                 @OA\Property(property="id", type="integer", example=1),
+     *                 @OA\Property(property="name", type="string", example="OHSansi 2025"),
+     *                 @OA\Property(property="number_of_phases", type="integer", example=3)
+     *             ),
+     *             @OA\Property(
+     *                 property="phases",
+     *                 type="array",
+     *                 description="List of phases associated with the olympiad",
+     *                 @OA\Items(
+     *                     type="object",
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="name", type="string", example="Fase 1"),
+     *                     @OA\Property(property="order", type="integer", example=1),
+     *                     @OA\Property(
+     *                         property="areas_count",
+     *                         type="integer",
+     *                         example=2,
+     *                         description="Number of areas this phase is associated with in this olympiad"
+     *                     )
+     *                 )
+     *             ),
+     *             @OA\Property(property="total_phases", type="integer", example=3, description="Total number of phases found"),
+     *             @OA\Property(property="status", type="integer", example=200)
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Olympiad not found or no phases found",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Olympiad not found"),
+     *             @OA\Property(property="error", type="string", example="No olympiad found with ID: 1"),
+     *             @OA\Property(property="status", type="integer", example=404)
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Server error during phase retrieval",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Internal server error"),
+     *             @OA\Property(property="error", type="string", example="An unexpected error occurred while retrieving phases"),
+     *             @OA\Property(property="status", type="integer", example=500)
+     *         )
+     *     )
+     * )
+     */
+    public function getPhases(string $id)
+    {
+        try {
+            // Validate input parameter
+            if (!is_numeric($id) || $id <= 0) {
+                return response()->json([
+                    'message' => 'Invalid olympiad ID',
+                    'error' => 'Olympiad ID must be a positive integer',
+                    'status' => 400
+                ], 400);
+            }
+
+            // Verify olympiad exists
+            $olympiad = Olympiad::find($id);
+            if (!$olympiad) {
+                return response()->json([
+                    'message' => 'Olympiad not found',
+                    'error' => "No olympiad found with ID: {$id}",
+                    'status' => 404
+                ], 404);
+            }
+
+            // Get all phases related to this olympiad through olympiad_area_phases
+            // We need to get unique phases that are related to any area of this olympiad
+            $phases = Phase::whereHas('olympiadAreaPhases', function ($query) use ($id) {
+                $query->whereHas('olympiadArea', function ($subQuery) use ($id) {
+                    $subQuery->where('olympiad_id', $id);
+                });
+            })
+            ->withCount(['olympiadAreaPhases as areas_count' => function ($query) use ($id) {
+                $query->whereHas('olympiadArea', function ($subQuery) use ($id) {
+                    $subQuery->where('olympiad_id', $id);
+                });
+            }])
+            ->orderBy('order')
+            ->get();
+
+            if ($phases->isEmpty()) {
+                return response()->json([
+                    'message' => 'No phases found for this olympiad',
+                    'error' => "The olympiad '{$olympiad->name}' (ID: {$olympiad->id}) has no phases associated with its areas. This might indicate that the olympiad was not properly configured during creation.",
+                    'olympiad' => [
+                        'id' => $olympiad->id,
+                        'name' => $olympiad->name,
+                        'number_of_phases' => $olympiad->number_of_phases
+                    ],
+                    'phases' => [],
+                    'total_phases' => 0,
+                    'status' => 200
+                ], 200);
+            }
+
+            return response()->json([
+                'message' => 'Phases retrieved successfully',
+                'olympiad' => [
+                    'id' => $olympiad->id,
+                    'name' => $olympiad->name,
+                    'number_of_phases' => $olympiad->number_of_phases
+                ],
+                'phases' => $phases,
+                'total_phases' => $phases->count(),
+                'status' => 200
+            ], 200);
+
+        } catch (\Illuminate\Database\QueryException $e) {
+            Log::error('Database error in getPhases: ' . $e->getMessage(), [
+                'olympiad_id' => $id
+            ]);
+            return response()->json([
+                'message' => 'Database error',
+                'error' => 'A database error occurred while retrieving phases. Please try again.',
+                'status' => 500
+            ], 500);
+        } catch (\Exception $e) {
+            Log::error('Unexpected error in getPhases: ' . $e->getMessage(), [
+                'olympiad_id' => $id,
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json([
+                'message' => 'Internal server error',
+                'error' => 'An unexpected error occurred while retrieving phases. Please try again later.',
+                'status' => 500
+            ], 500);
+        }
     }
 
     // <--- Level-Grades to Areas in Olympiads --->

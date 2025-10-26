@@ -51,4 +51,27 @@ class Contestant extends Model
             'olympiad_area_id'
         );
     }
+
+    /**
+     * Get the contestant level grades
+     */
+    public function contestantLevelGrades()
+    {
+        return $this->hasMany(ContestantLevelGrade::class);
+    }
+
+    /**
+     * Get the level grades through contestant level grades
+     */
+    public function levelGrades()
+    {
+        return $this->hasManyThrough(
+            LevelGrade::class,
+            ContestantLevelGrade::class,
+            'contestant_id',
+            'id',
+            'id',
+            'level_grade_id'
+        );
+    }
 }

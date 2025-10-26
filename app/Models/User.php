@@ -26,7 +26,8 @@ class User extends Authenticatable
         'ci',
         'phone_number',
         'genre',
-        'roles_id'
+        'roles_id',
+        'profesion'
     ];
 
     /**
@@ -38,6 +39,31 @@ class User extends Authenticatable
         'password',
         'remember_token',
     ];
+
+    /**
+     * Get the validation rules for the model.
+     *
+     * @return array<string, string>
+     */
+    public static function rules(): array
+    {
+        return [
+            'profesion' => 'nullable|string|max:100|regex:/^[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s\']+$/',
+        ];
+    }
+
+    /**
+     * Get custom validation messages for the model.
+     *
+     * @return array<string, string>
+     */
+    public static function validationMessages(): array
+    {
+        return [
+            'profesion.regex' => 'El campo profesión solo puede contener letras, espacios y apóstrofes.',
+            'profesion.max' => 'El campo profesión no puede tener más de 100 caracteres.',
+        ];
+    }
 
     /**
      * Get the attributes that should be cast.
