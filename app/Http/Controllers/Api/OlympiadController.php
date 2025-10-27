@@ -49,9 +49,10 @@ class OlympiadController extends Controller
             return response()->json($data, 404);
         }
 
-        $olympiads->each(function ($olympiad) {
+        /* $olympiads->each(function ($olympiad) {
             $olympiad->updateStatus();
-        });
+        }); */
+
         // Mapping olympiads and merging areas names
         $data = [
             'olympiads' => $olympiads->map(function ($olympiad) {
@@ -2030,6 +2031,224 @@ class OlympiadController extends Controller
             return response()->json([
                 'message' => 'Internal server error',
                 'error' => 'An unexpected error occurred while retrieving score cuts. Please try again later.',
+                'status' => 500
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Put(
+     *     path="/api/olympiads/{id}/activate",
+     *     summary="Activate an olympiad and update status of related olympiads",
+     *     description="Sets the specified olympiad as 'Activa' and automatically updates the status of other olympiads based on their date ranges relative to the selected olympiad. Olympiads with dates before the selected range become 'Terminada', those after become 'En planificación' (if not already), and the selected olympiad becomes 'Activa'.",
+     *     tags={"Olympiads"},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ID of the olympiad to activate",
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Olympiad activated and related olympiads updated successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Olympiad activated and related olympiads updated successfully"),
+     *             @OA\Property(
+     *                 property="activated_olympiad",
+     *                 type="object",
+     *                 description="The olympiad that was activated",
+     *                 @OA\Property(property="id", type="integer", example=1),
+     *                 @OA\Property(property="name", type="string", example="OHSansi 2025"),
+     *                 @OA\Property(property="status", type="string", example="Activa"),
+     *                 @OA\Property(property="start_date", type="string", format="date", example="2025-01-15"),
+     *                 @OA\Property(property="end_date", type="string", format="date", example="2025-06-15")
+     *             ),
+     *             @OA\Property(
+     *                 property="updated_olympiads",
+     *                 type="object",
+     *                 description="Summary of olympiads that were updated",
+     *                 @OA\Property(
+     *                     property="terminated",
+     *                     type="array",
+     *                     description="Olympiads set to 'Terminada' (dates before selected range)",
+     *                     @OA\Items(
+     *                         type="object",
+     *                         @OA\Property(property="id", type="integer", example=2),
+     *                         @OA\Property(property="name", type="string", example="OHSansi 2024"),
+     *                         @OA\Property(property="previous_status", type="string", example="Activa"),
+     *                         @OA\Property(property="new_status", type="string", example="Terminada")
+     *                     )
+     *                 ),
+     *                 @OA\Property(
+     *                     property="planned",
+     *                     type="array",
+     *                     description="Olympiads set to 'En planificación' (dates after selected range)",
+     *                     @OA\Items(
+     *                         type="object",
+     *                         @OA\Property(property="id", type="integer", example=3),
+     *                         @OA\Property(property="name", type="string", example="OHSansi 2026"),
+     *                         @OA\Property(property="previous_status", type="string", example="Activa"),
+     *                         @OA\Property(property="new_status", type="string", example="En planificación")
+     *                     )
+     *                 )
+     *             ),
+     *             @OA\Property(property="status", type="integer", example=200)
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Olympiad not found",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Olympiad not found"),
+     *             @OA\Property(property="error", type="string", example="No olympiad found with ID: 1"),
+     *             @OA\Property(property="status", type="integer", example=404)
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Server error during olympiad activation",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Database error"),
+     *             @OA\Property(property="error", type="string", example="A database error occurred while updating olympiad statuses. Please try again."),
+     *             @OA\Property(property="status", type="integer", example=500)
+     *         )
+     *     )
+     * )
+     */
+    public function activateOlympiad($id)
+    {
+        try {
+            // Validate input parameter
+            if (!is_numeric($id) || $id <= 0) {
+                return response()->json([
+                    'message' => 'Invalid olympiad ID',
+                    'error' => 'Olympiad ID must be a positive integer',
+                    'status' => 400
+                ], 400);
+            }
+
+            // Find the selected olympiad
+            $selectedOlympiad = Olympiad::find($id);
+            if (!$selectedOlympiad) {
+                return response()->json([
+                    'message' => 'Olympiad not found',
+                    'error' => "No olympiad found with ID: {$id}",
+                    'status' => 404
+                ], 404);
+            }
+
+            // Begin transaction to ensure data consistency
+            DB::beginTransaction();
+
+            try {
+                $updatedOlympiads = [
+                    'terminated' => [],
+                    'planned' => []
+                ];
+
+                // Get all olympiads except the selected one
+                $allOlympiads = Olympiad::where('id', '!=', $id)->get();
+
+                foreach ($allOlympiads as $olympiad) {
+                    $previousStatus = $olympiad->status;
+                    $newStatus = null;
+
+                    // Check if olympiad dates are BEFORE the selected olympiad's date range
+                    if ($olympiad->end_date < $selectedOlympiad->start_date) {
+                        // This olympiad ends before the selected one starts -> Set to 'Terminada'
+                        if ($olympiad->status !== 'Terminada') {
+                            $olympiad->status = 'Terminada';
+                            $newStatus = 'Terminada';
+                        }
+                    }
+                    // Check if olympiad dates are AFTER the selected olympiad's date range
+                    elseif ($olympiad->start_date > $selectedOlympiad->end_date) {
+                        // This olympiad starts after the selected one ends -> Set to 'En planificación'
+                        if ($olympiad->status !== 'En planificación') {
+                            $olympiad->status = 'En planificación';
+                            $newStatus = 'En planificación';
+                        }
+                    }
+
+                    // Save changes if status was updated
+                    if ($newStatus && $olympiad->save()) {
+                        $olympiadData = [
+                            'id' => $olympiad->id,
+                            'name' => $olympiad->name,
+                            'previous_status' => $previousStatus,
+                            'new_status' => $newStatus,
+                            'start_date' => $olympiad->start_date,
+                            'end_date' => $olympiad->end_date
+                        ];
+
+                        if ($newStatus === 'Terminada') {
+                            $updatedOlympiads['terminated'][] = $olympiadData;
+                        } else {
+                            $updatedOlympiads['planned'][] = $olympiadData;
+                        }
+                    }
+                }
+
+                // Set the selected olympiad as 'Activa'
+                $previousSelectedStatus = $selectedOlympiad->status;
+                $selectedOlympiad->status = 'Activa';
+
+                if (!$selectedOlympiad->save()) {
+                    DB::rollBack();
+                    return response()->json([
+                        'message' => 'Failed to activate selected olympiad',
+                        'error' => 'Database error occurred while updating the selected olympiad status.',
+                        'status' => 500
+                    ], 500);
+                }
+
+                DB::commit();
+
+                // Prepare response data
+                $response = [
+                    'message' => 'Olympiad activated and related olympiads updated successfully',
+                    'activated_olympiad' => [
+                        'id' => $selectedOlympiad->id,
+                        'name' => $selectedOlympiad->name,
+                        'previous_status' => $previousSelectedStatus,
+                        'new_status' => 'Activa',
+                        'start_date' => $selectedOlympiad->start_date,
+                        'end_date' => $selectedOlympiad->end_date
+                    ],
+                    'updated_olympiads' => $updatedOlympiads,
+                    'summary' => [
+                        'total_terminated' => count($updatedOlympiads['terminated']),
+                        'total_planned' => count($updatedOlympiads['planned']),
+                        'total_updated' => count($updatedOlympiads['terminated']) + count($updatedOlympiads['planned'])
+                    ],
+                    'status' => 200
+                ];
+
+                return response()->json($response, 200);
+
+            } catch (\Exception $e) {
+                DB::rollBack();
+                throw $e;
+            }
+
+        } catch (\Illuminate\Database\QueryException $e) {
+            Log::error('Database error in activateOlympiad: ' . $e->getMessage(), [
+                'olympiad_id' => $id
+            ]);
+            return response()->json([
+                'message' => 'Database error',
+                'error' => 'A database error occurred while updating olympiad statuses. Please try again.',
+                'status' => 500
+            ], 500);
+        } catch (\Exception $e) {
+            Log::error('Unexpected error in activateOlympiad: ' . $e->getMessage(), [
+                'olympiad_id' => $id,
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json([
+                'message' => 'Internal server error',
+                'error' => 'An unexpected error occurred while activating the olympiad. Please try again later.',
                 'status' => 500
             ], 500);
         }
