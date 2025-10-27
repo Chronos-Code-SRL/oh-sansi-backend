@@ -91,16 +91,21 @@ class CompetitorRegistrationController extends Controller
         DB::beginTransaction();
 
         try {
+            $uploadedFileIds = [];
             foreach ($files as $file) {
                 $result = $this->processCsvFile($file, $olympiad);
+
+                // Store CSV upload record and get the ID
+                $csvUploadId = $this->storeCsvUploadRecord($file, $result, $olympiad->id);
+
+                // Add the ID to the result for details
+                $result['id'] = $csvUploadId;
                 $results[] = $result;
+
                 $totalSuccessful += $result['successful'];
                 $totalCompetitorErrors += $result['competitor_errors'];
                 $totalHeaderErrors += $result['header_errors'];
                 $totalRecords += $result['total_records'];
-
-                // Store CSV upload record
-                $this->storeCsvUploadRecord($file, $result, $olympiad->id);
 
                 // Count files with different types of errors
                 if ($result['header_errors'] > 0) {
@@ -717,7 +722,7 @@ class CompetitorRegistrationController extends Controller
     /**
      * Store CSV upload record for tracking
      */
-    private function storeCsvUploadRecord($file, array $result, $olympiadId): void
+    private function storeCsvUploadRecord($file, array $result, $olympiadId): int
     {
         $filename = $file->getClientOriginalName();
         $fileSize = $file->getSize();
@@ -734,15 +739,19 @@ class CompetitorRegistrationController extends Controller
         }
 
         // Create CSV upload record
-        CsvUpload::create([
+        $csvUpload = CsvUpload::create([
             'olympiad_id' => $olympiadId,
             'original_file_name' => $filename,
             'successful_records' => $result['successful'],
             'failed_records' => $result['competitor_errors'] + $result['header_errors'],
+            'header_errors' => $result['header_errors'],
+            'competitor_errors' => $result['competitor_errors'],
             'total_records' => $result['total_records'],
             'file_path' => $storagePath,
             'error_file_path' => $errorFilePath,
             'file_size' => $fileSize
         ]);
+
+        return $csvUpload->id;
     }
 }

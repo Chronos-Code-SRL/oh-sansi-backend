@@ -34,13 +34,17 @@ class CsvUploadController extends Controller
                     'original_file_name' => $upload->original_file_name,
                     'successful_records' => $upload->successful_records,
                     'failed_records' => $upload->failed_records,
+                    'header_errors' => $upload->header_errors,
+                    'competitor_errors' => $upload->competitor_errors,
                     'total_records' => $upload->total_records,
                     'success_rate' => $upload->success_rate,
                     'has_errors' => $upload->hasErrors(),
+                    'has_header_errors' => $upload->hasHeaderErrors(),
+                    'has_competitor_errors' => $upload->hasCompetitorErrors(),
                     'has_error_file' => $upload->hasErrorFile(),
                     'file_size' => $upload->file_size,
                     'uploaded_at' => $upload->created_at->format('Y-m-d H:i:s'),
-                    'uploaded_at_human' => $upload->created_at->diffForHumans()
+                    'uploaded_at_human' => $upload->created_at->locale('es')->diffForHumans()
                 ];
             });
 
@@ -85,13 +89,17 @@ class CsvUploadController extends Controller
                 'original_file_name' => $csvUpload->original_file_name,
                 'successful_records' => $csvUpload->successful_records,
                 'failed_records' => $csvUpload->failed_records,
+                'header_errors' => $csvUpload->header_errors,
+                'competitor_errors' => $csvUpload->competitor_errors,
                 'total_records' => $csvUpload->total_records,
                 'success_rate' => $csvUpload->success_rate,
                 'has_errors' => $csvUpload->hasErrors(),
+                'has_header_errors' => $csvUpload->hasHeaderErrors(),
+                'has_competitor_errors' => $csvUpload->hasCompetitorErrors(),
                 'has_error_file' => $csvUpload->hasErrorFile(),
                 'file_size' => $csvUpload->file_size,
                 'uploaded_at' => $csvUpload->created_at->format('Y-m-d H:i:s'),
-                'uploaded_at_human' => $csvUpload->created_at->diffForHumans()
+                'uploaded_at_human' => $csvUpload->created_at->locale('es')->diffForHumans()
             ]
         ]);
     }
@@ -111,16 +119,9 @@ class CsvUploadController extends Controller
         }
 
         if (!Storage::disk('public')->exists($csvUpload->file_path)) {
-            // Debug information
             return response()->json([
                 'success' => false,
-                'message' => 'File not found on storage',
-                'debug' => [
-                    'file_path_in_db' => $csvUpload->file_path,
-                    'full_storage_path' => storage_path('app/public/' . $csvUpload->file_path),
-                    'file_exists_on_disk' => file_exists(storage_path('app/public/' . $csvUpload->file_path)),
-                    'storage_public_files' => Storage::disk('public')->allFiles('csv-uploads')
-                ]
+                'message' => 'File not found on storage'
             ], 404);
         }
 
