@@ -7,6 +7,7 @@ use App\Models\Level;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\DB;
 
 class LevelController extends Controller
 {
@@ -155,6 +156,34 @@ class LevelController extends Controller
             'message' => 'Level deleted',
             'status' => 200
         ];
+
+        return response()->json($data, 200);
+    }
+
+    public function getLevelsOlympiad(){
+
+        $levelsOlympiad = DB::table('olympiads as o')
+        ->join('olympiad_areas as oa', 'oa.olympiad_id', '=', 'o.id')
+        ->join('level_grades as lg', 'lg.olympiad_area_id', '=', 'oa.id')
+        ->join('levels as l', 'lg.level_id', '=', 'l.id')
+        ->where('o.status', '=', 'Activa')
+        ->distinct()
+        ->select('l.id', 'l.name')
+        ->get();
+
+        if ($levelsOlympiad->isEmpty()) {
+            return response()->json([
+                'message' => 'No levels found for active Olympiads',
+                'status' => 404
+            ], 404);
+        }
+
+        $data = $levelsOlympiad->map(function ($item) {
+            return [
+                'id' => $item->id,
+                'name' => $item->name,
+            ];
+        });
 
         return response()->json($data, 200);
     }

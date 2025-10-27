@@ -17,6 +17,7 @@ use App\Http\Controllers\CompetitorRegistrationController;
 use App\Http\Controllers\Api\UserAreaController;
 use App\Http\Controllers\Api\EvaluationController;
 use App\Http\Controllers\Api\ContestantController;
+use App\Http\Controllers\Api\LevelController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -122,3 +123,6 @@ Route::get('/evaluations/check-updates/',[EvaluationController::class, 'checksUp
 // <--- Get Contestants --->
 Route::get('/contestants/{phase_id}/{olympiad_id}/{area_id}', [ContestantController::class, 'showContestant']);
 Route::get('/contestants/{olympiad_id}', [ContestantController::class, 'showContestantsOlympiad']);
+
+// <--- CRUD Level --->
+Route::get('/levels-olympiad', [App\Http\Controllers\Api\LevelController::class, 'getLevelsOlympiad']);
