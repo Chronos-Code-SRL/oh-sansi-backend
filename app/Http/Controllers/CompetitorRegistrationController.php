@@ -95,11 +95,13 @@ class CompetitorRegistrationController extends Controller
             foreach ($files as $file) {
                 $result = $this->processCsvFile($file, $olympiad);
 
-                // Store CSV upload record and get the ID
-                $csvUploadId = $this->storeCsvUploadRecord($file, $result, $olympiad->id);
+                // Store CSV upload record and get the complete record
+                $csvUpload = $this->storeCsvUploadRecord($file, $result, $olympiad->id);
 
-                // Add the ID to the result for details
-                $result['id'] = $csvUploadId;
+                // Add detailed information to the result
+                $result['id'] = $csvUpload->id;
+                $result['file_size'] = $csvUpload->file_size;
+                $result['uploaded_at_human'] = $csvUpload->created_at->locale('es')->diffForHumans();
                 $results[] = $result;
 
                 $totalSuccessful += $result['successful'];
@@ -722,7 +724,7 @@ class CompetitorRegistrationController extends Controller
     /**
      * Store CSV upload record for tracking
      */
-    private function storeCsvUploadRecord($file, array $result, $olympiadId): int
+    private function storeCsvUploadRecord($file, array $result, $olympiadId): CsvUpload
     {
         $filename = $file->getClientOriginalName();
         $fileSize = $file->getSize();
@@ -752,6 +754,6 @@ class CompetitorRegistrationController extends Controller
             'file_size' => $fileSize
         ]);
 
-        return $csvUpload->id;
+        return $csvUpload;
     }
 }
