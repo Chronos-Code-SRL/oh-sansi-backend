@@ -14,6 +14,8 @@ class CsvUpload extends Model
         'original_file_name',
         'successful_records',
         'failed_records',
+        'header_errors',
+        'competitor_errors',
         'total_records',
         'file_path',
         'error_file_path',
@@ -23,6 +25,8 @@ class CsvUpload extends Model
     protected $casts = [
         'successful_records' => 'integer',
         'failed_records' => 'integer',
+        'header_errors' => 'integer',
+        'competitor_errors' => 'integer',
         'total_records' => 'integer',
         'file_size' => 'integer',
     ];
@@ -52,6 +56,22 @@ class CsvUpload extends Model
     public function hasErrors()
     {
         return $this->failed_records > 0;
+    }
+
+    /**
+     * Check if the upload has header errors
+     */
+    public function hasHeaderErrors()
+    {
+        return $this->header_errors > 0;
+    }
+
+    /**
+     * Check if the upload has competitor errors
+     */
+    public function hasCompetitorErrors()
+    {
+        return $this->competitor_errors > 0;
     }
 
     /**
