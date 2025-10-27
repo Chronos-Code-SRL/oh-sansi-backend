@@ -15,6 +15,9 @@ use App\Http\Controllers\Api\GradeController;
 use App\Http\Controllers\Api\CsvUploadController;
 use App\Http\Controllers\CompetitorRegistrationController;
 use App\Http\Controllers\Api\UserAreaController;
+use App\Http\Controllers\Api\EvaluationController;
+use App\Http\Controllers\Api\ContestantController;
+use App\Http\Controllers\Api\LevelController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -113,3 +116,14 @@ Route::get('/olympiads/{olympiadId}/csv-uploads', [CsvUploadController::class, '
 Route::get('/csv-uploads/{id}', [CsvUploadController::class, 'show']);
 Route::get('/csv-uploads/{id}/download', [CsvUploadController::class, 'download']);
 Route::get('/csv-uploads/{id}/download-errors', [CsvUploadController::class, 'downloadErrors']);
+
+// <--- CRUD Evaluation --->
+Route::patch('/evaluations/{id}',[EvaluationController::class, 'updatePartialEvaluation']);
+Route::get('/evaluations/check-updates/',[EvaluationController::class, 'checksUpdates']);
+
+// <--- Get Contestants --->
+Route::get('/contestants/{phase_id}/{olympiad_id}/{area_id}', [ContestantController::class, 'showContestant']);
+Route::get('/contestants', [ContestantController::class, 'showContestantsOlympiad']);
+
+// <--- CRUD Level --->
+Route::get('/levels-olympiad', [App\Http\Controllers\Api\LevelController::class, 'getLevelsOlympiad']);

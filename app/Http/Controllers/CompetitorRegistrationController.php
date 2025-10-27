@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Storage;
 use App\Models\Contestant;
 use App\Models\Registration;
 use App\Models\Area;
+use App\Models\Evaluation;
 use App\Models\OlympiadArea;
 use App\Models\Grade;
 use App\Models\Level;
@@ -570,6 +571,8 @@ class CompetitorRegistrationController extends Controller
                         'olympiad_area_id' => $olympiadArea->id
                     ]);
 
+                    $this->createEvaluationForRegistration($registration->id, $olympiadArea);
+
                     // Create LevelGrade for THIS SPECIFIC area, level, and grade combination
                     // Each area should have its own level-grade mapping
                     if ($grade && $level) {
@@ -754,4 +757,19 @@ class CompetitorRegistrationController extends Controller
 
         return $csvUpload;
     }
+
+    //Function to create an evaluation for each competitor record
+    public function createEvaluationForRegistration($registration_id, $olympiad_area)
+    {
+        $olympiadAreaPhase = OlympiadAreaPhase::where('olympiad_area_id', $olympiad_area->id)->first();
+
+        Evaluation::create([
+            'registration_id' => $registration_id,
+            'olympiad_area_phase_id' => $olympiadAreaPhase->id,
+            'score' => null,
+            'description' => null,
+            'status' => false
+        ]);
+    }
+
 }

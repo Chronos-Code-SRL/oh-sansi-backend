@@ -55,6 +55,7 @@ class AuthController extends Controller
             'genre' => 'required|in:masculino,femenino',
             'roles_id' => 'required|exists:roles,id',
             'areas_id' => 'required|array',
+            'prefesion' => 'nullable|string|max:100'
         ],
             ['email.unique' => 'El correo electrónico ya está en uso.',
             'ci.unique' => 'El carnet de identidad ya está registrado.',
@@ -81,7 +82,8 @@ class AuthController extends Controller
             'ci' => $request->ci,
             'phone_number' => $request->phone_number,
             'genre' => $request->genre,
-            'roles_id' => $request->roles_id
+            'roles_id' => $request->roles_id,
+            'profesion' => $request->roles_id == 2 ? $request->profesion : null,
         ]);
 
         if (!$user) {
@@ -140,7 +142,7 @@ class AuthController extends Controller
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
-        return response()->json(['token' => $token, 'token_type' => 'Bearer'], 200);
+        return response()->json(['token' => $token, 'token_type' => 'Bearer', 'user' => $user], 200);
     }
     /**
      * @OA\Post(
