@@ -92,16 +92,23 @@ class CompetitorRegistrationController extends Controller
         DB::beginTransaction();
 
         try {
+            $uploadedFileIds = [];
             foreach ($files as $file) {
                 $result = $this->processCsvFile($file, $olympiad);
+
+                // Store CSV upload record and get the complete record
+                $csvUpload = $this->storeCsvUploadRecord($file, $result, $olympiad->id);
+
+                // Add detailed information to the result
+                $result['id'] = $csvUpload->id;
+                $result['file_size'] = $csvUpload->file_size;
+                $result['uploaded_at_human'] = $csvUpload->created_at->locale('es')->diffForHumans();
                 $results[] = $result;
+
                 $totalSuccessful += $result['successful'];
                 $totalCompetitorErrors += $result['competitor_errors'];
                 $totalHeaderErrors += $result['header_errors'];
                 $totalRecords += $result['total_records'];
-
-                // Store CSV upload record
-                $this->storeCsvUploadRecord($file, $result, $olympiad->id);
 
                 // Count files with different types of errors
                 if ($result['header_errors'] > 0) {
@@ -477,12 +484,10 @@ class CompetitorRegistrationController extends Controller
                                 ->where('area_id', $area->id)
                                 ->first();
                             if ($olympiadArea) {
-                                // Check if this level is configured for any phase of this olympiad area
-                                $levelExists = OlympiadAreaPhaseLevelGrade::whereHas('olympiadAreaPhase', function ($query) use ($olympiadArea) {
-                                    $query->where('olympiad_area_id', $olympiadArea->id);
-                                })->whereHas('levelGrade', function ($query) use ($level) {
-                                    $query->where('level_id', $level->id);
-                                })->exists();
+                                // Check if this level is configured for this olympiad area
+                                $levelExists = LevelGrade::where('olympiad_area_id', $olympiadArea->id)
+                                    ->where('level_id', $level->id)
+                                    ->exists();
 
                                 if (!$levelExists) {
                                     $errors[] = "Level '" . trim($levelValue) . "' is not configured for area '$areaName' in this olympiad";
@@ -720,7 +725,7 @@ class CompetitorRegistrationController extends Controller
     /**
      * Store CSV upload record for tracking
      */
-    private function storeCsvUploadRecord($file, array $result, $olympiadId): void
+    private function storeCsvUploadRecord($file, array $result, $olympiadId): CsvUpload
     {
         $filename = $file->getClientOriginalName();
         $fileSize = $file->getSize();
@@ -737,16 +742,20 @@ class CompetitorRegistrationController extends Controller
         }
 
         // Create CSV upload record
-        CsvUpload::create([
+        $csvUpload = CsvUpload::create([
             'olympiad_id' => $olympiadId,
             'original_file_name' => $filename,
             'successful_records' => $result['successful'],
             'failed_records' => $result['competitor_errors'] + $result['header_errors'],
+            'header_errors' => $result['header_errors'],
+            'competitor_errors' => $result['competitor_errors'],
             'total_records' => $result['total_records'],
             'file_path' => $storagePath,
             'error_file_path' => $errorFilePath,
             'file_size' => $fileSize
         ]);
+
+        return $csvUpload;
     }
 
     //Function to create an evaluation for each competitor record
