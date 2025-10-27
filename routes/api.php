@@ -121,3 +121,4 @@ Route::get('/evaluations/check-updates/',[EvaluationController::class, 'checksUp
 
 // <--- Get Contestants --->
 Route::get('/contestants/{phase_id}/{olympiad_id}/{area_id}', [ContestantController::class, 'showContestant']);
+Route::get('/contestants/{olympiad_id}', [ContestantController::class, 'showContestantsOlympiad']);
