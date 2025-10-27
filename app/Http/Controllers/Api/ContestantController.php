@@ -70,8 +70,20 @@ class ContestantController extends Controller
         return response()->json($result);
     }
 
-    public function showContestantsOlympiad($olympiad_id): JsonResponse
+    public function showContestantsOlympiad(): JsonResponse
     {
+
+        $activeOlympiad = DB::table('olympiads')
+            ->where('status', '=', 'Activa')
+            ->first();
+
+        if (!$activeOlympiad) {
+            return response()->json([
+                'message' => 'There are no active Olympiads currently',
+                'status' => 404
+            ], 404);
+        }
+
         $contestantsOlympiad = DB::table('contestants')
             ->join('registrations', 'registrations.contestant_id', '=', 'contestants.id')
             ->join('evaluations', 'evaluations.registration_id', '=', 'registrations.id')
@@ -81,7 +93,7 @@ class ContestantController extends Controller
             ->leftJoin('level_grades', 'contestant_level_grades.level_grade_id', '=', 'level_grades.id')
             ->leftJoin('grades', 'level_grades.grade_id', '=', 'grades.id')
             ->leftJoin('levels', 'level_grades.level_id', '=', 'levels.id')
-            ->where('olympiad_areas.olympiad_id', $olympiad_id)
+            ->where('olympiad_areas.olympiad_id', $activeOlympiad->id)
             ->select(
                 'contestants.id AS contestant_id',
                 'evaluations.id AS evaluation_id',
