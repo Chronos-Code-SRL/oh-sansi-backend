@@ -483,12 +483,10 @@ class CompetitorRegistrationController extends Controller
                                 ->where('area_id', $area->id)
                                 ->first();
                             if ($olympiadArea) {
-                                // Check if this level is configured for any phase of this olympiad area
-                                $levelExists = OlympiadAreaPhaseLevelGrade::whereHas('olympiadAreaPhase', function ($query) use ($olympiadArea) {
-                                    $query->where('olympiad_area_id', $olympiadArea->id);
-                                })->whereHas('levelGrade', function ($query) use ($level) {
-                                    $query->where('level_id', $level->id);
-                                })->exists();
+                                // Check if this level is configured for this olympiad area
+                                $levelExists = LevelGrade::where('olympiad_area_id', $olympiadArea->id)
+                                    ->where('level_id', $level->id)
+                                    ->exists();
 
                                 if (!$levelExists) {
                                     $errors[] = "Level '" . trim($levelValue) . "' is not configured for area '$areaName' in this olympiad";
