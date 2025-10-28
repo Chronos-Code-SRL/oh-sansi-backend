@@ -1713,6 +1713,182 @@
                 }
             }
         },
+        "/api/olympiads/{id}/activate": {
+            "put": {
+                "tags": [
+                    "Olympiads"
+                ],
+                "summary": "Activate an olympiad and update status of related olympiads",
+                "description": "Sets the specified olympiad as 'Activa' and automatically updates the status of other olympiads based on their date ranges relative to the selected olympiad. Olympiads with dates before the selected range become 'Terminada', those after become 'En planificación' (if not already), and the selected olympiad becomes 'Activa'.",
+                "operationId": "2cceb5dcc3c064df3eb6ed2ac2750869",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID of the olympiad to activate",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Olympiad activated and related olympiads updated successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Olympiad activated and related olympiads updated successfully"
+                                        },
+                                        "activated_olympiad": {
+                                            "description": "The olympiad that was activated",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "name": {
+                                                    "type": "string",
+                                                    "example": "OHSansi 2025"
+                                                },
+                                                "status": {
+                                                    "type": "string",
+                                                    "example": "Activa"
+                                                },
+                                                "start_date": {
+                                                    "type": "string",
+                                                    "format": "date",
+                                                    "example": "2025-01-15"
+                                                },
+                                                "end_date": {
+                                                    "type": "string",
+                                                    "format": "date",
+                                                    "example": "2025-06-15"
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "updated_olympiads": {
+                                            "description": "Summary of olympiads that were updated",
+                                            "properties": {
+                                                "terminated": {
+                                                    "description": "Olympiads set to 'Terminada' (dates before selected range)",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 2
+                                                            },
+                                                            "name": {
+                                                                "type": "string",
+                                                                "example": "OHSansi 2024"
+                                                            },
+                                                            "previous_status": {
+                                                                "type": "string",
+                                                                "example": "Activa"
+                                                            },
+                                                            "new_status": {
+                                                                "type": "string",
+                                                                "example": "Terminada"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "planned": {
+                                                    "description": "Olympiads set to 'En planificación' (dates after selected range)",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 3
+                                                            },
+                                                            "name": {
+                                                                "type": "string",
+                                                                "example": "OHSansi 2026"
+                                                            },
+                                                            "previous_status": {
+                                                                "type": "string",
+                                                                "example": "Activa"
+                                                            },
+                                                            "new_status": {
+                                                                "type": "string",
+                                                                "example": "En planificación"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "status": {
+                                            "type": "integer",
+                                            "example": 200
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Olympiad not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Olympiad not found"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "No olympiad found with ID: 1"
+                                        },
+                                        "status": {
+                                            "type": "integer",
+                                            "example": 404
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server error during olympiad activation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Database error"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "A database error occurred while updating olympiad statuses. Please try again."
+                                        },
+                                        "status": {
+                                            "type": "integer",
+                                            "example": 500
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/phases": {
             "get": {
                 "tags": [
