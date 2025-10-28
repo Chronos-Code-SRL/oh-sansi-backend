@@ -35,7 +35,7 @@ class UserAreaController extends Controller
             ->join('olympiad_areas as oa', 'oa.area_id', '=', 'a.id')
             ->where('ua.user_id', $user->id)
             ->where('oa.olympiad_id', $activeOlympiad->id)
-            ->select('a.id', 'a.name')
+            ->select('a.id', 'a.name', 'oa.olympiad_id')
             ->get();
 
         // if no areas found for the user
@@ -52,6 +52,7 @@ class UserAreaController extends Controller
         $data = [
             'id_user' => $user->id,
             'olympiad' => $activeOlympiad->name,
+            'olympiad_id' => $activeOlympiad->id,
             'areas' => $areas,
             'status' => 200
         ];
