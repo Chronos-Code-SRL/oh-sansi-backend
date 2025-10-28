@@ -278,7 +278,7 @@ class OlympiadController extends Controller
     public function show(string $id)
     {
         $olympiad = Olympiad::find($id);
-        $olympiad->updateStatus();
+        // $olympiad->updateStatus();
 
         if (!$olympiad) {
             $data = [
@@ -2142,90 +2142,31 @@ class OlympiadController extends Controller
             DB::beginTransaction();
 
             try {
-                $updatedOlympiads = [
-                    'terminated' => [],
-                    'planned' => []
-                ];
+                
+                $updated = Olympiad::where('id', '!=', $id)
+                ->where('status', '!=', 'Terminada')
+                ->update(['status' => 'Terminada']);
 
-                // Get all olympiads except the selected one
-                $allOlympiads = Olympiad::where('id', '!=', $id)->get();
-
-                foreach ($allOlympiads as $olympiad) {
-                    $previousStatus = $olympiad->status;
-                    $newStatus = null;
-
-                    // Check if olympiad dates are BEFORE the selected olympiad's date range
-                    if ($olympiad->end_date < $selectedOlympiad->start_date) {
-                        // This olympiad ends before the selected one starts -> Set to 'Terminada'
-                        if ($olympiad->status !== 'Terminada') {
-                            $olympiad->status = 'Terminada';
-                            $newStatus = 'Terminada';
-                        }
-                    }
-                    // Check if olympiad dates are AFTER the selected olympiad's date range
-                    elseif ($olympiad->start_date > $selectedOlympiad->end_date) {
-                        // This olympiad starts after the selected one ends -> Set to 'En planificación'
-                        if ($olympiad->status !== 'En planificación') {
-                            $olympiad->status = 'En planificación';
-                            $newStatus = 'En planificación';
-                        }
-                    }
-
-                    // Save changes if status was updated
-                    if ($newStatus && $olympiad->save()) {
-                        $olympiadData = [
-                            'id' => $olympiad->id,
-                            'name' => $olympiad->name,
-                            'previous_status' => $previousStatus,
-                            'new_status' => $newStatus,
-                            'start_date' => $olympiad->start_date,
-                            'end_date' => $olympiad->end_date
-                        ];
-
-                        if ($newStatus === 'Terminada') {
-                            $updatedOlympiads['terminated'][] = $olympiadData;
-                        } else {
-                            $updatedOlympiads['planned'][] = $olympiadData;
-                        }
-                    }
-                }
-
-                // Set the selected olympiad as 'Activa'
-                $previousSelectedStatus = $selectedOlympiad->status;
+                $previousStatus = $selectedOlympiad->status;
                 $selectedOlympiad->status = 'Activa';
-
-                if (!$selectedOlympiad->save()) {
-                    DB::rollBack();
-                    return response()->json([
-                        'message' => 'Failed to activate selected olympiad',
-                        'error' => 'Database error occurred while updating the selected olympiad status.',
-                        'status' => 500
-                    ], 500);
-                }
+                $selectedOlympiad->save();
 
                 DB::commit();
 
-                // Prepare response data
-                $response = [
-                    'message' => 'Olympiad activated and related olympiads updated successfully',
+                return response()->json([
+                    'message' => 'Olympiad successfully activated. The others were marked as completed.',
                     'activated_olympiad' => [
                         'id' => $selectedOlympiad->id,
                         'name' => $selectedOlympiad->name,
-                        'previous_status' => $previousSelectedStatus,
-                        'new_status' => 'Activa',
-                        'start_date' => $selectedOlympiad->start_date,
-                        'end_date' => $selectedOlympiad->end_date
+                        'previous_status' => $previousStatus,
+                        'new_status' => 'Activa'
                     ],
-                    'updated_olympiads' => $updatedOlympiads,
                     'summary' => [
-                        'total_terminated' => count($updatedOlympiads['terminated']),
-                        'total_planned' => count($updatedOlympiads['planned']),
-                        'total_updated' => count($updatedOlympiads['terminated']) + count($updatedOlympiads['planned'])
+                        'total_terminated' => $updated,
+                        'total_updated' => $updated + 1
                     ],
                     'status' => 200
-                ];
-
-                return response()->json($response, 200);
+                ], 200);
 
             } catch (\Exception $e) {
                 DB::rollBack();
