@@ -39,6 +39,8 @@ class ContestantController extends Controller
             ->where('olympiad_areas.olympiad_id', $olympiad_id)
             ->where('olympiad_areas.area_id', $area_id)
             ->where('olympiad_area_phases.phase_id', $phase_id)
+            ->whereColumn('olympiad_area_phases.olympiad_area_id', 'olympiad_areas.id') // ✅ Filtro crucial
+            ->distinct()
             ->get();
 
         if ($contestants->isEmpty()) {
