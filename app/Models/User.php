@@ -80,6 +80,6 @@ class User extends Authenticatable
 
     public function areas()
     {
-        return $this->belongsToMany(Area::class, 'user_areas');
+        return $this->belongsToMany(Area::class, 'user_area_olympiads');
     }
 }
