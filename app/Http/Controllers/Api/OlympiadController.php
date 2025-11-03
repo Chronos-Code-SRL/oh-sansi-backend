@@ -2194,4 +2194,22 @@ class OlympiadController extends Controller
             ], 500);
         }
     }
+
+    public function activeOrPlannedOlympics()
+    {
+        $olympiads = Olympiad::whereIn('status', ['Activa', 'En planificación'])->get();
+
+        if($olympiads->isEmpty()){
+            return response()->json([
+                'message' => 'There are no active or planned Olympics.',
+                'status' => 404
+            ], 404);
+        }
+
+        return response()->json([
+            'message' => 'Olympiads retrieved successfully.', 
+            'data' => $olympiads,
+            'status' => 200
+        ], 200);
+    }
 }

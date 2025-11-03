@@ -30,6 +30,7 @@ Route::post('/olympiads', [OlympiadController::class, 'store']);
 Route::put('/olympiads/{id}', [OlympiadController::class, 'update']);
 Route::put('/olympiads/{id}/activate', [OlympiadController::class, 'activateOlympiad']);
 Route::delete('/olympiads/{id}', [OlympiadController::class, 'destroy']);
+Route::get('/olympiads/status/active-or-planning', [OlympiadController::class, 'activeOrPlannedOlympics']);
 
 // <--- CRUD Olympiad-Areas --->
 Route::post('/olympiads/{id}/areas', [OlympiadController::class, 'assignAreas']);
