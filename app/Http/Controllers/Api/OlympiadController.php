@@ -116,6 +116,14 @@ class OlympiadController extends Controller
      *                 description="Default score cut that will be automatically assigned when creating level-grades"
      *             ),
      *             @OA\Property(
+     *                 property="default_max_score",
+     *                 type="integer",
+     *                 minimum=0,
+     *                 maximum=100,
+     *                 example=100,
+     *                 description="Default max score that will be automatically assigned when creating level-grades (optional)"
+     *             ),
+     *             @OA\Property(
      *                 property="status",
      *                 type="string",
      *                 enum={"En planificación", "Activa", "Terminada"},
@@ -150,6 +158,7 @@ class OlympiadController extends Controller
      *                 @OA\Property(property="end_date", type="string", format="date", example="2025-06-15"),
      *                 @OA\Property(property="number_of_phases", type="integer", example=3),
      *                 @OA\Property(property="default_score_cut", type="integer", example=75),
+     *                 @OA\Property(property="default_max_score", type="integer", example=100),
      *                 @OA\Property(property="status", type="string", example="En planificación"),
      *                 @OA\Property(
      *                     property="areas",
@@ -210,7 +219,8 @@ class OlympiadController extends Controller
             'start_date' => 'required|date',
             'end_date' => 'required|date|after:start_date',
             'number_of_phases' => 'required|integer|min:1',
-            'default_score_cut' => 'required|integer|min:0',
+            'default_score_cut' => 'required|integer|min:0|max:100',
+            'default_max_score' => 'nullable|integer|min:0|max:100',
             'status' => 'in:En planificación,Activa,Terminada',
             'areas' => 'required|array|min:1',
             'areas.*' => 'required|string|max:25|exists:areas,name',
@@ -232,6 +242,7 @@ class OlympiadController extends Controller
             'end_date' => $request->end_date,
             'number_of_phases' => $request->number_of_phases,
             'default_score_cut' => $request->default_score_cut ?? 0,
+            'default_max_score' => $request->default_max_score,
             'status' => $request->status ?? 'En planificación',
         ]);
 
@@ -349,6 +360,8 @@ class OlympiadController extends Controller
             // ],
             'start_date' => 'required|date',
             'end_date' => 'required|date|after:start_date',
+            'default_score_cut' => 'nullable|integer|min:0|max:100',
+            'default_max_score' => 'nullable|integer|min:0|max:100',
             'status' => 'in:En planificación,Activa,Terminada',
         ]);
 
@@ -365,6 +378,8 @@ class OlympiadController extends Controller
         // $olympiad->edition = $request->edition;
         $olympiad->start_date = $request->start_date;
         $olympiad->end_date = $request->end_date;
+        $olympiad->default_score_cut = $request->default_score_cut ?? $olympiad->default_score_cut;
+        $olympiad->default_max_score = $request->default_max_score ?? $olympiad->default_max_score;
         $olympiad->status = $request->status ?? $olympiad->status;
 
         $olympiad->save();
@@ -968,9 +983,9 @@ class OlympiadController extends Controller
                 ], 500);
             }
 
-            // Auto-assign default score cuts to all phases for this area if olympiad has default_score_cut
+            // Auto-assign default score cuts and max scores to all phases for this area if olympiad has defaults
             $defaultScoreCutAssignments = [];
-            if ($olympiad->default_score_cut !== null) {
+            if ($olympiad->default_score_cut !== null || $olympiad->default_max_score !== null) {
                 try {
                     // Get all phases for this olympiad
                     $phases = $olympiad->phases;
@@ -983,31 +998,45 @@ class OlympiadController extends Controller
                                 'phase_id' => $phase->id
                             ]);
 
-                            // Assign default score cut to all newly created level-grades for this phase
+                            // Assign default score cut and max score to all newly created level-grades for this phase
                             $scoreCutsCreated = 0;
                             foreach ($createdLevelGrades as $levelGrade) {
+                                $defaultData = [];
+                                if ($olympiad->default_score_cut !== null) {
+                                    $defaultData['score_cut'] = $olympiad->default_score_cut;
+                                }
+                                if ($olympiad->default_max_score !== null) {
+                                    $defaultData['max_score'] = $olympiad->default_max_score;
+                                }
+
                                 $scoreCutRecord = OlympiadAreaPhaseLevelGrade::firstOrCreate([
                                     'olympiad_area_phase_id' => $olympiadAreaPhase->id,
                                     'level_grade_id' => $levelGrade->id
-                                ], [
-                                    'score_cut' => $olympiad->default_score_cut
-                                ]);
+                                ], $defaultData);
 
                                 if ($scoreCutRecord->wasRecentlyCreated) {
                                     $scoreCutsCreated++;
                                 }
                             }
 
-                            $defaultScoreCutAssignments[] = [
+                            $phaseAssignment = [
                                 'phase_name' => $phase->name,
                                 'phase_id' => $phase->id,
-                                'score_cuts_created' => $scoreCutsCreated,
-                                'default_score_cut' => $olympiad->default_score_cut
+                                'score_cuts_created' => $scoreCutsCreated
                             ];
+
+                            if ($olympiad->default_score_cut !== null) {
+                                $phaseAssignment['default_score_cut'] = $olympiad->default_score_cut;
+                            }
+                            if ($olympiad->default_max_score !== null) {
+                                $phaseAssignment['default_max_score'] = $olympiad->default_max_score;
+                            }
+
+                            $defaultScoreCutAssignments[] = $phaseAssignment;
                         }
                     }
                 } catch (\Exception $e) {
-                    Log::warning('Failed to assign default score cuts: ' . $e->getMessage(), [
+                    Log::warning('Failed to assign default score cuts and max scores: ' . $e->getMessage(), [
                         'olympiad_id' => $olympiad->id,
                         'area_id' => $areaId,
                         'level_id' => $level->id
@@ -1024,13 +1053,21 @@ class OlympiadController extends Controller
                 'status' => 201
             ];
 
-            // Add default score cut info if applicable
+            // Add default score cut and max score info if applicable
             if (!empty($defaultScoreCutAssignments)) {
-                $response['default_score_cut_assignments'] = [
-                    'olympiad_default_score_cut' => $olympiad->default_score_cut,
+                $responseData = [
                     'phases' => $defaultScoreCutAssignments,
                     'total_phases_processed' => count($defaultScoreCutAssignments)
                 ];
+
+                if ($olympiad->default_score_cut !== null) {
+                    $responseData['olympiad_default_score_cut'] = $olympiad->default_score_cut;
+                }
+                if ($olympiad->default_max_score !== null) {
+                    $responseData['olympiad_default_max_score'] = $olympiad->default_max_score;
+                }
+
+                $response['default_assignments'] = $responseData;
             }
 
             return response()->json($response, 201);
@@ -1662,7 +1699,7 @@ class OlympiadController extends Controller
             $validator = Validator::make($request->all(), [
                 'phase_id' => 'required|integer|exists:phases,id',
                 'level_id' => 'required|integer|exists:levels,id',
-                'score_cut' => 'required|numeric|min:0|max:100'
+                'score_cut' => 'required|numeric'
             ]);
 
             if ($validator->fails()) {
@@ -1856,6 +1893,306 @@ class OlympiadController extends Controller
     }
 
     /**
+     * @OA\Post(
+     *     path="/api/olympiads/{olympiadId}/areas/{areaId}/max-scores",
+     *     summary="Assign max score to all grades of a level for a specific phase",
+     *     description="Assigns the same max score (maximum achievable score) to ALL grades within a specific level for a given phase in an olympiad area. This simplified approach applies the max score to every grade in the level at once, making it much easier to manage maximum scores by educational level rather than individual grades.",
+     *     tags={"Max scores"},
+     *     @OA\Parameter(
+     *         name="olympiadId",
+     *         in="path",
+     *         required=true,
+     *         description="ID of the olympiad",
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     @OA\Parameter(
+     *         name="areaId",
+     *         in="path",
+     *         required=true,
+     *         description="ID of the area within the olympiad",
+     *         @OA\Schema(type="integer", example=2)
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         description="Phase, level and max score configuration",
+     *         @OA\JsonContent(
+     *             required={"phase_id", "level_id", "max_score"},
+     *             @OA\Property(
+     *                 property="phase_id",
+     *                 type="integer",
+     *                 example=1,
+     *                 description="ID of the phase where the max score will be applied"
+     *             ),
+     *             @OA\Property(
+     *                 property="level_id",
+     *                 type="integer",
+     *                 example=3,
+     *                 description="ID of the level. Max score will be applied to ALL grades within this level."
+     *             ),
+     *             @OA\Property(
+     *                 property="max_score",
+     *                 type="number",
+     *                 format="float",
+     *                 minimum=0,
+     *                 maximum=100,
+     *                 example=100,
+     *                 description="Maximum score achievable in this phase (0-100)"
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Max scores assigned successfully to all grades in the level",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Max scores assigned successfully"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 description="The olympiad area phase with its max score assignments",
+     *                 @OA\Property(property="id", type="integer", example=15),
+     *                 @OA\Property(
+     *                     property="phase",
+     *                     type="object",
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="name", type="string", example="Fase 1")
+     *                 ),
+     *                 @OA\Property(
+     *                     property="olympiad_area_phase_level_grades",
+     *                     type="array",
+     *                     description="All level-grade relationships with their assigned max scores",
+     *                     @OA\Items(
+     *                         type="object",
+     *                         @OA\Property(property="id", type="integer", example=21),
+     *                         @OA\Property(property="max_score", type="number", format="float", example=100),
+     *                         @OA\Property(
+     *                             property="level_grade",
+     *                             type="object",
+     *                             @OA\Property(property="id", type="integer", example=12),
+     *                             @OA\Property(property="level_id", type="integer", example=3),
+     *                             @OA\Property(property="grade_id", type="integer", example=9)
+     *                         )
+     *                     )
+     *                 )
+     *             ),
+     *             @OA\Property(property="level_name", type="string", example="Booster"),
+     *             @OA\Property(property="level_id", type="integer", example=3),
+     *             @OA\Property(property="max_score", type="number", format="float", example=100),
+     *             @OA\Property(
+     *                 property="affected_grades_count",
+     *                 type="integer",
+     *                 example=4,
+     *                 description="Number of grades affected by this max score assignment"
+     *             ),
+     *             @OA\Property(property="created_count", type="integer", example=2, description="Number of new max score records created"),
+     *             @OA\Property(property="updated_count", type="integer", example=2, description="Number of existing max score records updated"),
+     *             @OA\Property(property="status", type="integer", example=200)
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Validation failed"),
+     *             @OA\Property(
+     *                 property="errors",
+     *                 type="object",
+     *                 description="Detailed validation errors"
+     *             ),
+     *             @OA\Property(property="status", type="integer", example=422)
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Resource not found",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Level not found"),
+     *             @OA\Property(property="error", type="string", example="The level 'Booster' (ID: 3) has no grade associations in the area 'Matemáticas' for olympiad 'Olimpiada 2025'. Please assign grades to this level first."),
+     *             @OA\Property(property="status", type="integer", example=404)
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Server error during max score assignment",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Database error"),
+     *             @OA\Property(property="error", type="string", example="A database error occurred while assigning max scores. Please try again."),
+     *             @OA\Property(property="status", type="integer", example=500)
+     *         )
+     *     )
+     * )
+     */
+    public function assignMaxScores(Request $request, $olympiadId, $areaId)
+    {
+        try {
+            // Input validation
+            $validator = Validator::make($request->all(), [
+                'phase_id' => 'required|integer|exists:phases,id',
+                'level_id' => 'required|integer|exists:levels,id',
+                'max_score' => 'required|numeric'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors(),
+                    'status' => 422
+                ], 422);
+            }
+
+            // Verify olympiad exists
+            $olympiad = Olympiad::find($olympiadId);
+            if (!$olympiad) {
+                return response()->json([
+                    'message' => 'Olympiad not found',
+                    'error' => "No olympiad found with ID: {$olympiadId}",
+                    'status' => 404
+                ], 404);
+            }
+
+            // Verify area exists
+            $area = Area::find($areaId);
+            if (!$area) {
+                return response()->json([
+                    'message' => 'Area not found',
+                    'error' => "No area found with ID: {$areaId}",
+                    'status' => 404
+                ], 404);
+            }
+
+            // Verify level exists
+            $level = Level::find($request->level_id);
+            if (!$level) {
+                return response()->json([
+                    'message' => 'Level not found',
+                    'error' => "No level found with ID: {$request->level_id}",
+                    'status' => 404
+                ], 404);
+            }
+
+            // Verify olympiad-area relationship exists
+            $olympiadArea = OlympiadArea::where('olympiad_id', $olympiadId)
+                ->where('area_id', $areaId)
+                ->first();
+
+            if (!$olympiadArea) {
+                return response()->json([
+                    'message' => 'Olympiad-Area relationship not found',
+                    'error' => "The area '{$area->name}' is not assigned to olympiad '{$olympiad->name}'. Please assign the area to the olympiad first.",
+                    'status' => 404
+                ], 404);
+            }
+
+            // Find all level-grades for this level in this olympiad area
+            $levelGrades = LevelGrade::where('olympiad_area_id', $olympiadArea->id)
+                ->where('level_id', $request->level_id)
+                ->with(['level', 'grade'])
+                ->get();
+
+            if ($levelGrades->isEmpty()) {
+                return response()->json([
+                    'message' => 'Level not found in area',
+                    'error' => "The level '{$level->name}' (ID: {$level->id}) has no grade associations in the area '{$area->name}' for olympiad '{$olympiad->name}'. Please assign grades to this level first.",
+                    'status' => 404
+                ], 404);
+            }
+
+            // Get or create OlympiadAreaPhase
+            $olympiadAreaPhase = OlympiadAreaPhase::firstOrCreate([
+                'olympiad_area_id' => $olympiadArea->id,
+                'phase_id' => $request->phase_id
+            ]);
+
+            if (!$olympiadAreaPhase) {
+                return response()->json([
+                    'message' => 'Failed to create olympiad area phase',
+                    'error' => 'Could not create or find the olympiad area phase relationship.',
+                    'status' => 500
+                ], 500);
+            }
+
+            // Begin transaction to ensure data consistency
+            DB::beginTransaction();
+
+            try {
+                $createdCount = 0;
+                $updatedCount = 0;
+
+                // Assign max score to all level-grades for this level in this phase
+                foreach ($levelGrades as $levelGrade) {
+                    $maxScoreRecord = OlympiadAreaPhaseLevelGrade::updateOrCreate([
+                        'olympiad_area_phase_id' => $olympiadAreaPhase->id,
+                        'level_grade_id' => $levelGrade->id
+                    ], [
+                        'max_score' => $request->max_score
+                    ]);
+
+                    if ($maxScoreRecord->wasRecentlyCreated) {
+                        $createdCount++;
+                    } else {
+                        $updatedCount++;
+                    }
+                }
+
+                DB::commit();
+
+                // Load the updated data for response
+                $olympiadAreaPhase->load([
+                    'phase',
+                    'olympiadAreaPhaseLevelGrades.levelGrade'
+                ]);
+
+                return response()->json([
+                    'message' => 'Max scores assigned successfully',
+                    'data' => $olympiadAreaPhase,
+                    'level_name' => $level->name,
+                    'level_id' => $level->id,
+                    'max_score' => $request->max_score,
+                    'affected_grades_count' => count($levelGrades),
+                    'created_count' => $createdCount,
+                    'updated_count' => $updatedCount,
+                    'status' => 200
+                ], 200);
+
+            } catch (\Exception $e) {
+                DB::rollBack();
+                throw $e;
+            }
+
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'Resource not found',
+                'error' => 'The requested resource could not be found.',
+                'status' => 404
+            ], 404);
+        } catch (\Illuminate\Database\QueryException $e) {
+            Log::error('Database error in assignMaxScores: ' . $e->getMessage(), [
+                'olympiad_id' => $olympiadId,
+                'area_id' => $areaId,
+                'level_id' => $request->level_id ?? null,
+                'phase_id' => $request->phase_id ?? null
+            ]);
+            return response()->json([
+                'message' => 'Database error',
+                'error' => 'A database error occurred while assigning max scores. Please try again.',
+                'status' => 500
+            ], 500);
+        } catch (\Exception $e) {
+            Log::error('Unexpected error in assignMaxScores: ' . $e->getMessage(), [
+                'olympiad_id' => $olympiadId,
+                'area_id' => $areaId,
+                'level_id' => $request->level_id ?? null,
+                'phase_id' => $request->phase_id ?? null,
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json([
+                'message' => 'Internal server error',
+                'error' => 'An unexpected error occurred while assigning max scores. Please try again later.',
+                'status' => 500
+            ], 500);
+        }
+    }
+
+    /**
      * @OA\Get(
      *     path="/api/olympiads/{olympiadId}/areas/{areaId}/score-cuts",
      *     summary="Get all score cuts for an olympiad area",
@@ -1966,7 +2303,7 @@ class OlympiadController extends Controller
             if (!$olympiadArea) {
                 return response()->json([
                     'message' => 'Olympiad-Area relationship not found',
-                    'error' => "The area with ID {$areaId} is not associated with olympiad ID {$olympiadId}. Please verify the area is assigned to this olympiad.",
+                    'error' => "The area {$area->name} is not assigned to olympiad {$olympiad->name}. Verify the area is assigned to this olympiad.",
                     'status' => 404
                 ], 404);
             }
@@ -2031,6 +2368,187 @@ class OlympiadController extends Controller
             return response()->json([
                 'message' => 'Internal server error',
                 'error' => 'An unexpected error occurred while retrieving score cuts. Please try again later.',
+                'status' => 500
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/olympiads/{olympiadId}/areas/{areaId}/max-scores",
+     *     summary="Get all max scores for an olympiad area",
+     *     description="Retrieves all phases of the specified olympiad area, along with their associated level-grades and max scores.",
+     *     tags={"Max scores"},
+     *     @OA\Parameter(
+     *         name="olympiadId",
+     *         in="path",
+     *         required=true,
+     *         description="ID of the olympiad",
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     @OA\Parameter(
+     *         name="areaId",
+     *         in="path",
+     *         required=true,
+     *         description="ID of the olympiad area",
+     *         @OA\Schema(type="integer", example=2)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="List of max scores retrieved successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     type="object",
+     *                     @OA\Property(property="id", type="integer", example=15),
+     *                     @OA\Property(property="phase", type="object",
+     *                         @OA\Property(property="id", type="integer", example=3),
+     *                         @OA\Property(property="name", type="string", example="Final Phase")
+     *                     ),
+     *                     @OA\Property(
+     *                         property="olympiad_area_phase_level_grades",
+     *                         type="array",
+     *                         @OA\Items(
+     *                             @OA\Property(property="id", type="integer", example=22),
+     *                             @OA\Property(property="max_score", type="number", format="float", example=100.0),
+     *                             @OA\Property(
+     *                                 property="olympiad_area_level_grade",
+     *                                 type="object",
+     *                                 @OA\Property(
+     *                                     property="level_grade",
+     *                                     type="object",
+     *                                     @OA\Property(property="id", type="integer", example=12),
+     *                                     @OA\Property(property="level_id", type="integer", example=5),
+     *                                     @OA\Property(property="grade_id", type="integer", example=9)
+     *                                 )
+     *                             )
+     *                         )
+     *                     )
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Olympiad area not found"
+     *     )
+     * )
+     */
+    public function getMaxScores($olympiadId, $areaId)
+    {
+        try {
+            // Validate input parameters
+            if (!is_numeric($olympiadId) || $olympiadId <= 0) {
+                return response()->json([
+                    'message' => 'Invalid olympiad ID',
+                    'error' => 'Olympiad ID must be a positive integer',
+                    'status' => 400
+                ], 400);
+            }
+
+            if (!is_numeric($areaId) || $areaId <= 0) {
+                return response()->json([
+                    'message' => 'Invalid area ID',
+                    'error' => 'Area ID must be a positive integer',
+                    'status' => 400
+                ], 400);
+            }
+
+            // Verify olympiad exists
+            $olympiad = Olympiad::find($olympiadId);
+            if (!$olympiad) {
+                return response()->json([
+                    'message' => 'Olympiad not found',
+                    'error' => "No olympiad found with ID: {$olympiadId}",
+                    'status' => 404
+                ], 404);
+            }
+
+            // Verify area exists
+            $area = Area::find($areaId);
+            if (!$area) {
+                return response()->json([
+                    'message' => 'Area not found',
+                    'error' => "No area found with ID: {$areaId}",
+                    'status' => 404
+                ], 404);
+            }
+
+            // Verify olympiad-area relationship exists
+            $olympiadArea = OlympiadArea::where('olympiad_id', $olympiadId)
+                ->where('area_id', $areaId)
+                ->first();
+
+            if (!$olympiadArea) {
+                return response()->json([
+                    'message' => 'Olympiad-Area relationship not found',
+                    'error' => "The area '{$area->name}' is not assigned to olympiad '{$olympiad->name}'. Verify the area is assigned to this olympiad.",
+                    'status' => 404
+                ], 404);
+            }
+
+            // Get all phases for this olympiad area with their max scores
+            $data = OlympiadAreaPhase::where('olympiad_area_id', $olympiadArea->id)
+                ->with([
+                    'phase',
+                    'olympiadAreaPhaseLevelGrades.levelGrade.level',
+                    'olympiadAreaPhaseLevelGrades.levelGrade.grade'
+                ])
+                ->get();
+
+            if ($data->isEmpty()) {
+                return response()->json([
+                    'message' => 'No max scores found',
+                    'error' => "No max scores have been configured for the area '{$area->name}' in olympiad '{$olympiad->name}'.",
+                    'data' => [],
+                    'status' => 200
+                ], 200);
+            }
+
+            // Add context information to the response
+            $responseData = [
+                'data' => $data,
+                'olympiad' => [
+                    'id' => $olympiad->id,
+                    'name' => $olympiad->name
+                ],
+                'area' => [
+                    'id' => $area->id,
+                    'name' => $area->name
+                ],
+                'total_phases' => $data->count(),
+                'status' => 200
+            ];
+
+            return response()->json($responseData, 200);
+
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'Resource not found',
+                'error' => 'One of the requested resources could not be found. Please verify the olympiad and area IDs.',
+                'status' => 404
+            ], 404);
+        } catch (\Illuminate\Database\QueryException $e) {
+            Log::error('Database error in getScoreCuts: ' . $e->getMessage(), [
+                'olympiad_id' => $olympiadId,
+                'area_id' => $areaId
+            ]);
+            return response()->json([
+                'message' => 'Database error',
+                'error' => 'A database error occurred while retrieving max scores. Please try again.',
+                'status' => 500
+            ], 500);
+        } catch (\Exception $e) {
+            Log::error('Unexpected error in getScoreCuts: ' . $e->getMessage(), [
+                'olympiad_id' => $olympiadId,
+                'area_id' => $areaId,
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json([
+                'message' => 'Internal server error',
+                'error' => 'An unexpected error occurred while retrieving max scores. Please try again later.',
                 'status' => 500
             ], 500);
         }
@@ -2142,7 +2660,7 @@ class OlympiadController extends Controller
             DB::beginTransaction();
 
             try {
-                
+
                 $updated = Olympiad::where('id', '!=', $id)
                 ->where('status', '!=', 'Terminada')
                 ->update(['status' => 'Terminada']);

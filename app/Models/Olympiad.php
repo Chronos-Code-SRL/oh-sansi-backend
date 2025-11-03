@@ -17,6 +17,7 @@ class Olympiad extends Model
         'end_date',
         'number_of_phases',
         'default_score_cut',
+        'default_max_score',
         'status',
     ];
 
@@ -90,7 +91,7 @@ class Olympiad extends Model
         if ($today >= $this->start_date and $today <= $this->end_date) {
             $newStatus = 'Activa';
         }
-        
+
         if ($today > $this->end_date) {
             $newStatus = 'Terminada';
         }
