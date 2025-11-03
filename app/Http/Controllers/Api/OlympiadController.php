@@ -2212,4 +2212,55 @@ class OlympiadController extends Controller
             'status' => 200
         ], 200);
     }
+
+    public function getUserOlympiads(Request $request){
+        $user = $request->user();
+
+        $userOlympics = DB::table('users as u')
+            ->join('user_area_olympiads as uao', 'u.id', '=', 'uao.user_id')
+            ->join('olympiads as o', 'uao.olympiad_id', '=', 'o.id')
+            ->join('areas as a', 'uao.area_id', '=', 'a.id')
+            ->where('u.id', $user->id)
+            ->select(
+                'o.id as olympiad_id',
+                'o.name as olympiad_name',
+                'o.default_score_cut',
+                'o.start_date',
+                'o.end_date',
+                'o.number_of_phases',
+                'o.status',
+                'a.id as area_id',
+                'a.name as area_name'
+            )
+            ->orderBy('o.id')
+            ->get();
+
+        if ($userOlympics->isEmpty()) {
+            return response()->json([
+                'message' => 'The user is not associated with any olympiads.',
+                'status' => 404
+            ], 404);
+        }
+
+        $grouped = $userOlympics->groupBy('olympiad_id')->map(function ($items) {
+        $olympiad = $items->first();
+            return [
+                'id' => $olympiad->olympiad_id,
+                'name' => $olympiad->olympiad_name,
+                'default_score_cut' => $olympiad->default_score_cut,
+                'start_date' => $olympiad->start_date,
+                'end_date' => $olympiad->end_date,
+                'number_of_phases' => $olympiad->number_of_phases,
+                'status' => $olympiad->status,
+                'areas' => $items->map(function ($area) {
+                    return [
+                        'id' => $area->area_id,
+                        'name' => $area->area_name
+                    ];
+                })->unique('id')->values()
+            ];
+        })->values();
+
+        return response()->json($grouped, 200);
+    }
 }
