@@ -97,8 +97,11 @@ Route::middleware(['auth:sanctum', 'evaluator'])->group(function(){
 
 });
 
-//get user areas evaluator or academic manager
-Route::get('/user/areas', [UserAreaController::class, 'getUserAreas'])->middleware(['auth:sanctum', 'evaluator_or_academic']);
+// Areas and Olympics for a logged-in user
+Route::middleware(['auth:sanctum', 'evaluator_or_academic'])->group(function () {
+    Route::get('/user/olympiads', [OlympiadController::class, 'getUserOlympiads']);
+    Route::get('/user/areas/{olympiad_id}', [UserAreaController::class, 'getUserAreas']);
+});
 
 // academic responsible routes
 //Route::middleware(['auth:sanctum', 'academic_responsible'])->group(function(){
