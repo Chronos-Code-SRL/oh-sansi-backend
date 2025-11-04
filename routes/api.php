@@ -73,6 +73,10 @@ Route::delete('/grades/{id}', [GradeController::class, 'destroy']);
 Route::post('/olympiads/{olympiadId}/areas/{areaId}/score-cuts', [OlympiadController::class, 'assignScoreCuts']);
 Route::get('/olympiads/{olympiadId}/areas/{areaId}/score-cuts', [OlympiadController::class, 'getScoreCuts']);
 
+// <--- CRUD Olympiad-Area-Phase-Level-Grades (Max Scores) --->
+Route::post('/olympiads/{olympiadId}/areas/{areaId}/max-scores', [OlympiadController::class, 'assignMaxScores']);
+Route::get('/olympiads/{olympiadId}/areas/{areaId}/max-scores', [OlympiadController::class, 'getMaxScores']);
+
 // login
 Route::post('/login', [AuthController::class, 'login']);
 
