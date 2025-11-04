@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Hash;
 use App\Http\Controllers\Controller;
 use \stdClass;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 
 class AuthController extends Controller
 {
@@ -49,8 +50,10 @@ class AuthController extends Controller
 
         $userExists = User::where('ci', $request->ci)->first();
         if ($userExists) {
+            $this->syncUserAreasOlympiad($userExists, $request->areas_id, $request->olympiad_id);
+
             $data = [
-                'message' => 'User already exists',
+                'message' => 'User updated successfully',
                 'user' => $userExists,
             ];
             return response()->json($data, 200);
@@ -212,5 +215,17 @@ class AuthController extends Controller
         }
 
         return strtoupper($password) . $ci;
+    }
+
+    private function syncUserAreasOlympiad($user, $areas_id, $olympiad_id){
+        $enrollmentsToInsert = [];
+        foreach ($areas_id as $area_id) {
+            $enrollmentsToInsert[] = [
+                'user_id' => $user->id,
+                'area_id' => $area_id,
+                'olympiad_id' => $olympiad_id,
+            ];
+        }
+        DB::table('user_area_olympiads')->insertOrIgnore($enrollmentsToInsert);
     }
 }
