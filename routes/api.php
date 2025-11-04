@@ -107,6 +107,8 @@ Route::get('/user/areas', [UserAreaController::class, 'getUserAreas'])->middlewa
 //Route::middleware(['auth:sanctum', 'academic_responsible'])->group(function(){
     // Competitor registration routes
     Route::post('/competitors/upload-csv', [CompetitorRegistrationController::class, 'uploadCsv']);
+    // Download a CSV template containing only headers (no data rows)
+    Route::get('/competitors/download-template', [CompetitorRegistrationController::class, 'downloadTemplateCsv']);
     Route::get('/competitors/download-error-csv/{filename}', [CompetitorRegistrationController::class, 'downloadErrorCsv']);
 //});
 
