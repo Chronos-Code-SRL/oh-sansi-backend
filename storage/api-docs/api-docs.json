@@ -522,6 +522,13 @@
                                         "minimum": 0,
                                         "example": 75
                                     },
+                                    "default_max_score": {
+                                        "description": "Default max score that will be automatically assigned when creating level-grades (optional)",
+                                        "type": "integer",
+                                        "maximum": 100,
+                                        "minimum": 0,
+                                        "example": 100
+                                    },
                                     "status": {
                                         "description": "Status of the olympiad (optional, defaults to 'En planificación')",
                                         "type": "string",
@@ -590,6 +597,10 @@
                                                 "default_score_cut": {
                                                     "type": "integer",
                                                     "example": 75
+                                                },
+                                                "default_max_score": {
+                                                    "type": "integer",
+                                                    "example": 100
                                                 },
                                                 "status": {
                                                     "type": "string",
@@ -1713,6 +1724,365 @@
                 }
             }
         },
+        "/api/olympiads/{olympiadId}/areas/{areaId}/max-scores": {
+            "get": {
+                "tags": [
+                    "Max scores"
+                ],
+                "summary": "Get all max scores for an olympiad area",
+                "description": "Retrieves all phases of the specified olympiad area, along with their associated level-grades and max scores.",
+                "operationId": "88870c9ccbaf931d3dd9fa286fef78f7",
+                "parameters": [
+                    {
+                        "name": "olympiadId",
+                        "in": "path",
+                        "description": "ID of the olympiad",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "areaId",
+                        "in": "path",
+                        "description": "ID of the olympiad area",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 2
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of max scores retrieved successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 15
+                                                    },
+                                                    "phase": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 3
+                                                            },
+                                                            "name": {
+                                                                "type": "string",
+                                                                "example": "Final Phase"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    },
+                                                    "olympiad_area_phase_level_grades": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "properties": {
+                                                                "id": {
+                                                                    "type": "integer",
+                                                                    "example": 22
+                                                                },
+                                                                "max_score": {
+                                                                    "type": "number",
+                                                                    "format": "float",
+                                                                    "example": 100
+                                                                },
+                                                                "olympiad_area_level_grade": {
+                                                                    "properties": {
+                                                                        "level_grade": {
+                                                                            "properties": {
+                                                                                "id": {
+                                                                                    "type": "integer",
+                                                                                    "example": 12
+                                                                                },
+                                                                                "level_id": {
+                                                                                    "type": "integer",
+                                                                                    "example": 5
+                                                                                },
+                                                                                "grade_id": {
+                                                                                    "type": "integer",
+                                                                                    "example": 9
+                                                                                }
+                                                                            },
+                                                                            "type": "object"
+                                                                        }
+                                                                    },
+                                                                    "type": "object"
+                                                                }
+                                                            },
+                                                            "type": "object"
+                                                        }
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Olympiad area not found"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Max scores"
+                ],
+                "summary": "Assign max score to all grades of a level for a specific phase",
+                "description": "Assigns the same max score (maximum achievable score) to ALL grades within a specific level for a given phase in an olympiad area. This simplified approach applies the max score to every grade in the level at once, making it much easier to manage maximum scores by educational level rather than individual grades.",
+                "operationId": "45459a62959987735e4fb356d3628699",
+                "parameters": [
+                    {
+                        "name": "olympiadId",
+                        "in": "path",
+                        "description": "ID of the olympiad",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "areaId",
+                        "in": "path",
+                        "description": "ID of the area within the olympiad",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 2
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "Phase, level and max score configuration",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "phase_id",
+                                    "level_id",
+                                    "max_score"
+                                ],
+                                "properties": {
+                                    "phase_id": {
+                                        "description": "ID of the phase where the max score will be applied",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "level_id": {
+                                        "description": "ID of the level. Max score will be applied to ALL grades within this level.",
+                                        "type": "integer",
+                                        "example": 3
+                                    },
+                                    "max_score": {
+                                        "description": "Maximum score achievable in this phase (0-100)",
+                                        "type": "number",
+                                        "format": "float",
+                                        "maximum": 100,
+                                        "minimum": 0,
+                                        "example": 100
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Max scores assigned successfully to all grades in the level",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Max scores assigned successfully"
+                                        },
+                                        "data": {
+                                            "description": "The olympiad area phase with its max score assignments",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 15
+                                                },
+                                                "phase": {
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "integer",
+                                                            "example": 1
+                                                        },
+                                                        "name": {
+                                                            "type": "string",
+                                                            "example": "Fase 1"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "olympiad_area_phase_level_grades": {
+                                                    "description": "All level-grade relationships with their assigned max scores",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 21
+                                                            },
+                                                            "max_score": {
+                                                                "type": "number",
+                                                                "format": "float",
+                                                                "example": 100
+                                                            },
+                                                            "level_grade": {
+                                                                "properties": {
+                                                                    "id": {
+                                                                        "type": "integer",
+                                                                        "example": 12
+                                                                    },
+                                                                    "level_id": {
+                                                                        "type": "integer",
+                                                                        "example": 3
+                                                                    },
+                                                                    "grade_id": {
+                                                                        "type": "integer",
+                                                                        "example": 9
+                                                                    }
+                                                                },
+                                                                "type": "object"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "level_name": {
+                                            "type": "string",
+                                            "example": "Booster"
+                                        },
+                                        "level_id": {
+                                            "type": "integer",
+                                            "example": 3
+                                        },
+                                        "max_score": {
+                                            "type": "number",
+                                            "format": "float",
+                                            "example": 100
+                                        },
+                                        "affected_grades_count": {
+                                            "description": "Number of grades affected by this max score assignment",
+                                            "type": "integer",
+                                            "example": 4
+                                        },
+                                        "created_count": {
+                                            "description": "Number of new max score records created",
+                                            "type": "integer",
+                                            "example": 2
+                                        },
+                                        "updated_count": {
+                                            "description": "Number of existing max score records updated",
+                                            "type": "integer",
+                                            "example": 2
+                                        },
+                                        "status": {
+                                            "type": "integer",
+                                            "example": 200
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Validation failed"
+                                        },
+                                        "errors": {
+                                            "description": "Detailed validation errors",
+                                            "type": "object"
+                                        },
+                                        "status": {
+                                            "type": "integer",
+                                            "example": 422
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Resource not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Level not found"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "The level 'Booster' (ID: 3) has no grade associations in the area 'Matemáticas' for olympiad 'Olimpiada 2025'. Please assign grades to this level first."
+                                        },
+                                        "status": {
+                                            "type": "integer",
+                                            "example": 404
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server error during max score assignment",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Database error"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "A database error occurred while assigning max scores. Please try again."
+                                        },
+                                        "status": {
+                                            "type": "integer",
+                                            "example": 500
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/olympiads/{id}/activate": {
             "put": {
                 "tags": [
@@ -2336,6 +2706,10 @@
         {
             "name": "Score cuts",
             "description": "Score cuts"
+        },
+        {
+            "name": "Max scores",
+            "description": "Max scores"
         }
     ]
 }

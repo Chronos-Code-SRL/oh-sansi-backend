@@ -13,7 +13,8 @@ class OlympiadAreaPhaseLevelGrade extends Model
         'olympiad_area_phase_id',
         //'olympiad_area_level_grade_id',
         'level_grade_id',
-        'score_cut'
+        'score_cut',
+        'max_score'
     ];
 
     public function olympiadAreaPhase()
