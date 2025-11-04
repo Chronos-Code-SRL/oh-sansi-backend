@@ -2781,4 +2781,82 @@ class OlympiadController extends Controller
 
         return response()->json($grouped, 200);
     }
+
+    /**
+     * @OA\Get(
+     *     path="/api/olympiads/{id}/areas/{areaId}/levels",
+     *     summary="Get levels for a specific olympiad and area",
+     *     description="Retrieve all unique levels associated with a given olympiad and area.",
+     *     tags={"Olympiads"},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="Olympiad ID",
+     *         @OA\Schema(type="string", example="1")
+     *     ),
+     *     @OA\Parameter(
+     *         name="areaId",
+     *         in="path",
+     *         required=true,
+     *         description="Area ID",
+     *         @OA\Schema(type="string", example="3")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Levels retrieved successfully",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="message", type="string", example="Levels retrieved successfully."),
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     type="object",
+     *                     @OA\Property(property="id", type="integer", example=2),
+     *                     @OA\Property(property="name", type="string", example="Intermediate")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="No levels found for the specified olympiad and area",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="message", type="string", example="No levels found for the specified olympiad and area."),
+     *             @OA\Property(property="status", type="integer", example=404)
+     *         )
+     *     )
+     * )
+     */
+
+    public function getLevels(string $id, string $areaId){
+        $levels = DB::table('olympiads as o')
+        ->join('olympiad_areas as oa', 'oa.olympiad_id', '=', 'o.id')
+        ->join('level_grades as lg', 'lg.olympiad_area_id', '=', 'oa.id')
+        ->join('areas as a', 'oa.area_id', '=', 'a.id')
+        ->join('levels as l', 'lg.level_id', '=', 'l.id')
+        ->where('a.id', $areaId)
+        ->where('o.id', $id)
+        ->select('l.id', 'l.name')
+        ->distinct()
+        ->get();
+        
+        if ($levels->isEmpty()) {
+            return response()->json([
+                'message' => 'No levels found for the specified olympiad and area.',
+                'status' => 404
+            ], 404);
+            
+        }
+
+        return response()->json(
+            [
+                'message' => 'Levels retrieved successfully.',
+                'data' => $levels,
+                'status' => 200
+            ], 200);
+    }
 }

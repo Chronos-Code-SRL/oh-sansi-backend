@@ -35,6 +35,7 @@ Route::get('/olympiads/status/active-or-planning', [OlympiadController::class, '
 // <--- CRUD Olympiad-Areas --->
 Route::post('/olympiads/{id}/areas', [OlympiadController::class, 'assignAreas']);
 Route::get('/olympiads/{id}/areas', [OlympiadController::class, 'getAreas']);
+Route::get('/olympiads/{id}/area/{areaId}', [OlympiadController::class, 'getLevels']);
 
 // <--- CRUD Olympiad-Phases --->
 Route::get('/olympiads/{id}/phases', [OlympiadController::class, 'getPhases']);
