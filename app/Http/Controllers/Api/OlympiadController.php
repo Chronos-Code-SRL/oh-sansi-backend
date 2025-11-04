@@ -219,8 +219,8 @@ class OlympiadController extends Controller
             'start_date' => 'required|date',
             'end_date' => 'required|date|after:start_date',
             'number_of_phases' => 'required|integer|min:1',
-            'default_score_cut' => 'required|integer|min:0|max:100',
-            'default_max_score' => 'nullable|integer|min:0|max:100',
+            'default_score_cut' => 'nullable|integer|default:51',
+            'default_max_score' => 'nullable|integer|default:100',
             'status' => 'in:En planificación,Activa,Terminada',
             'areas' => 'required|array|min:1',
             'areas.*' => 'required|string|max:25|exists:areas,name',
@@ -241,8 +241,8 @@ class OlympiadController extends Controller
             'start_date' => $request->start_date,
             'end_date' => $request->end_date,
             'number_of_phases' => $request->number_of_phases,
-            'default_score_cut' => $request->default_score_cut ?? 0,
-            'default_max_score' => $request->default_max_score,
+            'default_score_cut' => $request->default_score_cut ?? 51,
+            'default_max_score' => $request->default_max_score ?? 100,
             'status' => $request->status ?? 'En planificación',
         ]);
 
