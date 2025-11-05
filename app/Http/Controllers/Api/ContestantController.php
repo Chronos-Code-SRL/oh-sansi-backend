@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\DB;
 
 class ContestantController extends Controller
 {
-    public function showContestant(string $phase_id, string $olympiad_id, string $area_id): JsonResponse
+    public function showContestant(string $phase_id, string $olympiad_id, string $area_id, string $level_id): JsonResponse
     {
 
         $contestants = Evaluation::query()
@@ -39,7 +39,8 @@ class ContestantController extends Controller
             ->where('olympiad_areas.olympiad_id', $olympiad_id)
             ->where('olympiad_areas.area_id', $area_id)
             ->where('olympiad_area_phases.phase_id', $phase_id)
-            ->whereColumn('olympiad_area_phases.olympiad_area_id', 'olympiad_areas.id') // ✅ Filtro crucial
+            ->where('levels.id', $level_id)
+            ->whereColumn('olympiad_area_phases.olympiad_area_id', 'olympiad_areas.id')
             ->distinct()
             ->get();
 

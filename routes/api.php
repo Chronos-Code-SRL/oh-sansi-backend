@@ -131,7 +131,7 @@ Route::patch('/evaluations/{id}',[EvaluationController::class, 'updatePartialEva
 Route::get('/evaluations/check-updates/',[EvaluationController::class, 'checksUpdates']);
 
 // <--- Get Contestants --->
-Route::get('/contestants/{phase_id}/{olympiad_id}/{area_id}', [ContestantController::class, 'showContestant']);
+Route::get('/contestants/{phase_id}/{olympiad_id}/{area_id}/{level_id}', [ContestantController::class, 'showContestant']);
 Route::get('/contestants', [ContestantController::class, 'showContestantsOlympiad']);
 
 // <--- CRUD Level --->
