@@ -998,10 +998,13 @@ class OlympiadController extends Controller
                                 'phase_id' => $phase->id
                             ]);
 
-                            // Assign default score cut and max score to all newly created level-grades for this phase
+                            // Assign default score cut, max score and status to all newly created level-grades for this phase
                             $scoreCutsCreated = 0;
                             foreach ($createdLevelGrades as $levelGrade) {
-                                $defaultData = [];
+                                $defaultData = [
+                                    'status' => 'Sin empezar' // Default status for all new level-grades
+                                ];
+
                                 if ($olympiad->default_score_cut !== null) {
                                     $defaultData['score_cut'] = $olympiad->default_score_cut;
                                 }
@@ -2549,6 +2552,508 @@ class OlympiadController extends Controller
             return response()->json([
                 'message' => 'Internal server error',
                 'error' => 'An unexpected error occurred while retrieving max scores. Please try again later.',
+                'status' => 500
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Put(
+     *     path="/api/olympiads/{olympiadId}/areas/{areaId}/status",
+     *     summary="Assign status to all grades of a level for a specific phase",
+     *     description="Assigns the same status to ALL grades within a specific level for a given phase in an olympiad area. This allows you to change the phase status from 'Sin empezar' to 'Activa' or 'Terminada' for all grades in a level at once.",
+     *     tags={"Phase Status"},
+     *     @OA\Parameter(
+     *         name="olympiadId",
+     *         in="path",
+     *         required=true,
+     *         description="ID of the olympiad",
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     @OA\Parameter(
+     *         name="areaId",
+     *         in="path",
+     *         required=true,
+     *         description="ID of the area within the olympiad",
+     *         @OA\Schema(type="integer", example=2)
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         description="Phase, level and status configuration",
+     *         @OA\JsonContent(
+     *             required={"phase_id", "level_id", "status"},
+     *             @OA\Property(
+     *                 property="phase_id",
+     *                 type="integer",
+     *                 example=1,
+     *                 description="ID of the phase where the status will be applied"
+     *             ),
+     *             @OA\Property(
+     *                 property="level_id",
+     *                 type="integer",
+     *                 example=3,
+     *                 description="ID of the level. Status will be applied to ALL grades within this level."
+     *             ),
+     *             @OA\Property(
+     *                 property="status",
+     *                 type="string",
+     *                 enum={"Sin empezar", "Activa", "Terminada"},
+     *                 example="Activa",
+     *                 description="Status to assign to the phase for this level"
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Status assigned successfully to all grades in the level",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Status assigned successfully"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 description="The olympiad area phase with its status assignments",
+     *                 @OA\Property(property="id", type="integer", example=15),
+     *                 @OA\Property(
+     *                     property="phase",
+     *                     type="object",
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="name", type="string", example="Fase 1")
+     *                 ),
+     *                 @OA\Property(
+     *                     property="olympiad_area_phase_level_grades",
+     *                     type="array",
+     *                     description="All level-grade relationships with their assigned status",
+     *                     @OA\Items(
+     *                         type="object",
+     *                         @OA\Property(property="id", type="integer", example=21),
+     *                         @OA\Property(property="status", type="string", example="Activa"),
+     *                         @OA\Property(
+     *                             property="level_grade",
+     *                             type="object",
+     *                             @OA\Property(property="id", type="integer", example=12),
+     *                             @OA\Property(property="level_id", type="integer", example=3),
+     *                             @OA\Property(property="grade_id", type="integer", example=9)
+     *                         )
+     *                     )
+     *                 )
+     *             ),
+     *             @OA\Property(property="level_name", type="string", example="Booster"),
+     *             @OA\Property(property="level_id", type="integer", example=3),
+     *             @OA\Property(property="status", type="string", example="Activa"),
+     *             @OA\Property(
+     *                 property="affected_grades_count",
+     *                 type="integer",
+     *                 example=4,
+     *                 description="Number of grades affected by this status assignment"
+     *             ),
+     *             @OA\Property(property="updated_count", type="integer", example=4, description="Number of records updated with the new status")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Validation failed"),
+     *             @OA\Property(
+     *                 property="errors",
+     *                 type="object",
+     *                 description="Detailed validation errors"
+     *             ),
+     *             @OA\Property(property="status", type="integer", example=422)
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Resource not found",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Level not found"),
+     *             @OA\Property(property="error", type="string", example="The level 'Booster' (ID: 3) has no grade associations in the area 'Matemáticas' for olympiad 'Olimpiada 2025'. Please assign grades to this level first."),
+     *             @OA\Property(property="status", type="integer", example=404)
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Server error during status assignment",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Database error"),
+     *             @OA\Property(property="error", type="string", example="A database error occurred while assigning status. Please try again."),
+     *             @OA\Property(property="status", type="integer", example=500)
+     *         )
+     *     )
+     * )
+     */
+    public function assignStatus(Request $request, $olympiadId, $areaId)
+    {
+        try {
+            // Input validation
+            $validator = Validator::make($request->all(), [
+                'phase_id' => 'required|integer|exists:phases,id',
+                'level_id' => 'required|integer|exists:levels,id',
+                'status' => 'required|string|in:Sin empezar,Activa,Terminada'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors(),
+                    'status' => 422
+                ], 422);
+            }
+
+            // Verify olympiad exists
+            $olympiad = Olympiad::find($olympiadId);
+            if (!$olympiad) {
+                return response()->json([
+                    'message' => 'Olympiad not found',
+                    'error' => "No olympiad found with ID: {$olympiadId}",
+                    'status' => 404
+                ], 404);
+            }
+
+            // Verify area exists
+            $area = Area::find($areaId);
+            if (!$area) {
+                return response()->json([
+                    'message' => 'Area not found',
+                    'error' => "No area found with ID: {$areaId}",
+                    'status' => 404
+                ], 404);
+            }
+
+            // Verify level exists
+            $level = Level::find($request->level_id);
+            if (!$level) {
+                return response()->json([
+                    'message' => 'Level not found',
+                    'error' => "No level found with ID: {$request->level_id}",
+                    'status' => 404
+                ], 404);
+            }
+
+            // Verify olympiad-area relationship exists
+            $olympiadArea = OlympiadArea::where('olympiad_id', $olympiadId)
+                ->where('area_id', $areaId)
+                ->first();
+
+            if (!$olympiadArea) {
+                return response()->json([
+                    'message' => 'Olympiad-Area relationship not found',
+                    'error' => "The area '{$area->name}' is not assigned to olympiad '{$olympiad->name}'. Please assign the area to the olympiad first.",
+                    'status' => 404
+                ], 404);
+            }
+
+            // Find all level-grades for this level in this olympiad area
+            $levelGrades = LevelGrade::where('olympiad_area_id', $olympiadArea->id)
+                ->where('level_id', $request->level_id)
+                ->with(['level', 'grade'])
+                ->get();
+
+            if ($levelGrades->isEmpty()) {
+                return response()->json([
+                    'message' => 'Level not found in area',
+                    'error' => "The level '{$level->name}' (ID: {$level->id}) has no grade associations in the area '{$area->name}' for olympiad '{$olympiad->name}'. Please assign grades to this level first.",
+                    'status' => 404
+                ], 404);
+            }
+
+            // Get or create OlympiadAreaPhase
+            $olympiadAreaPhase = OlympiadAreaPhase::firstOrCreate([
+                'olympiad_area_id' => $olympiadArea->id,
+                'phase_id' => $request->phase_id
+            ]);
+
+            if (!$olympiadAreaPhase) {
+                return response()->json([
+                    'message' => 'Failed to create olympiad area phase',
+                    'error' => 'Could not create or find the olympiad area phase relationship.',
+                    'status' => 500
+                ], 500);
+            }
+
+            // Begin transaction to ensure data consistency
+            DB::beginTransaction();
+
+            try {
+                $updatedCount = 0;
+
+                // Assign status to all level-grades for this level in this phase
+                foreach ($levelGrades as $levelGrade) {
+                    $statusRecord = OlympiadAreaPhaseLevelGrade::updateOrCreate([
+                        'olympiad_area_phase_id' => $olympiadAreaPhase->id,
+                        'level_grade_id' => $levelGrade->id
+                    ], [
+                        'status' => $request->status
+                    ]);
+
+                    if ($statusRecord->wasRecentlyCreated || $statusRecord->wasChanged()) {
+                        $updatedCount++;
+                    }
+                }
+
+                DB::commit();
+
+                // Load the updated data for response
+                $olympiadAreaPhase->load([
+                    'phase',
+                    'olympiadAreaPhaseLevelGrades.levelGrade'
+                ]);
+
+                return response()->json([
+                    'message' => 'Status assigned successfully',
+                    'data' => $olympiadAreaPhase,
+                    'level_name' => $level->name,
+                    'level_id' => $level->id,
+                    'status' => $request->status,
+                    'affected_grades_count' => count($levelGrades),
+                    'updated_count' => $updatedCount,
+                    'status' => 200
+                ], 200);
+
+            } catch (\Exception $e) {
+                DB::rollBack();
+                throw $e;
+            }
+
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'Resource not found',
+                'error' => 'The requested resource could not be found.',
+                'status' => 404
+            ], 404);
+        } catch (\Illuminate\Database\QueryException $e) {
+            Log::error('Database error in assignStatus: ' . $e->getMessage(), [
+                'olympiad_id' => $olympiadId,
+                'area_id' => $areaId,
+                'level_id' => $request->level_id ?? null,
+                'phase_id' => $request->phase_id ?? null
+            ]);
+            return response()->json([
+                'message' => 'Database error',
+                'error' => 'A database error occurred while assigning status. Please try again.',
+                'status' => 500
+            ], 500);
+        } catch (\Exception $e) {
+            Log::error('Unexpected error in assignStatus: ' . $e->getMessage(), [
+                'olympiad_id' => $olympiadId,
+                'area_id' => $areaId,
+                'level_id' => $request->level_id ?? null,
+                'phase_id' => $request->phase_id ?? null,
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json([
+                'message' => 'Internal server error',
+                'error' => 'An unexpected error occurred while assigning status. Please try again later.',
+                'status' => 500
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/olympiads/{olympiadId}/areas/{areaId}/status",
+     *     summary="Get all phase statuses for an olympiad area",
+     *     description="Retrieves all phases of the specified olympiad area, along with their associated level-grades and phase statuses.",
+     *     tags={"Phase Status"},
+     *     @OA\Parameter(
+     *         name="olympiadId",
+     *         in="path",
+     *         required=true,
+     *         description="ID of the olympiad",
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     @OA\Parameter(
+     *         name="areaId",
+     *         in="path",
+     *         required=true,
+     *         description="ID of the olympiad area",
+     *         @OA\Schema(type="integer", example=2)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="List of phase statuses retrieved successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     type="object",
+     *                     @OA\Property(property="id", type="integer", example=15),
+     *                     @OA\Property(property="phase", type="object",
+     *                         @OA\Property(property="id", type="integer", example=3),
+     *                         @OA\Property(property="name", type="string", example="Final Phase")
+     *                     ),
+     *                     @OA\Property(
+     *                         property="olympiad_area_phase_level_grades",
+     *                         type="array",
+     *                         @OA\Items(
+     *                             @OA\Property(property="id", type="integer", example=22),
+     *                             @OA\Property(property="status", type="string", example="Activa"),
+     *                             @OA\Property(
+     *                                 property="olympiad_area_level_grade",
+     *                                 type="object",
+     *                                 @OA\Property(
+     *                                     property="level_grade",
+     *                                     type="object",
+     *                                     @OA\Property(property="id", type="integer", example=12),
+     *                                     @OA\Property(property="level_id", type="integer", example=5),
+     *                                     @OA\Property(property="grade_id", type="integer", example=9)
+     *                                 )
+     *                             )
+     *                         )
+     *                     )
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Olympiad area not found"
+     *     )
+     * )
+     */
+    public function getStatuses($olympiadId, $areaId)
+    {
+        try {
+            // Validate input parameters
+            if (!is_numeric($olympiadId) || $olympiadId <= 0) {
+                return response()->json([
+                    'message' => 'Invalid olympiad ID',
+                    'error' => 'Olympiad ID must be a positive integer',
+                    'status' => 400
+                ], 400);
+            }
+
+            if (!is_numeric($areaId) || $areaId <= 0) {
+                return response()->json([
+                    'message' => 'Invalid area ID',
+                    'error' => 'Area ID must be a positive integer',
+                    'status' => 400
+                ], 400);
+            }
+
+            // Verify olympiad exists
+            $olympiad = Olympiad::find($olympiadId);
+            if (!$olympiad) {
+                return response()->json([
+                    'message' => 'Olympiad not found',
+                    'error' => "No olympiad found with ID: {$olympiadId}",
+                    'status' => 404
+                ], 404);
+            }
+
+            // Verify area exists
+            $area = Area::find($areaId);
+            if (!$area) {
+                return response()->json([
+                    'message' => 'Area not found',
+                    'error' => "No area found with ID: {$areaId}",
+                    'status' => 404
+                ], 404);
+            }
+
+            // Verify olympiad-area relationship exists
+            $olympiadArea = OlympiadArea::where('olympiad_id', $olympiadId)
+                ->where('area_id', $areaId)
+                ->first();
+
+            if (!$olympiadArea) {
+                return response()->json([
+                    'message' => 'Olympiad-Area relationship not found',
+                    'error' => "The area '{$area->name}' is not assigned to olympiad '{$olympiad->name}'. Please assign the area to the olympiad first.",
+                    'status' => 404
+                ], 404);
+            }
+
+            // Get all phases for this olympiad area with their statuses
+            $olympiadAreaPhases = OlympiadAreaPhase::where('olympiad_area_id', $olympiadArea->id)
+                ->with([
+                    'phase',
+                    'olympiadAreaPhaseLevelGrades' => function($query) {
+                        $query->with('levelGrade');
+                    }
+                ])
+                ->get();
+
+            if ($olympiadAreaPhases->isEmpty()) {
+                return response()->json([
+                    'message' => 'No phases found',
+                    'error' => "No phases found for area '{$area->name}' in olympiad '{$olympiad->name}'. Please create phases first.",
+                    'status' => 404
+                ], 404);
+            }
+
+            // Group statuses by phase and level for better organization
+            $phasesWithStatuses = $olympiadAreaPhases->map(function($phase) {
+                $levelGrades = $phase->olympiadAreaPhaseLevelGrades->groupBy(function($item) {
+                    return $item->levelGrade->level_id ?? 'unknown';
+                });
+
+                return [
+                    'id' => $phase->id,
+                    'phase' => $phase->phase,
+                    'levels' => $levelGrades->map(function($grades, $levelId) {
+                        $firstGrade = $grades->first();
+                        $level = $firstGrade ? $firstGrade->levelGrade->level ?? null : null;
+
+                        return [
+                            'level_id' => $levelId,
+                            'level_name' => $level ? $level->name : 'Unknown',
+                            'status' => $grades->first()->status ?? 'Sin empezar',
+                            'grades_count' => $grades->count(),
+                            'grades' => $grades->map(function($grade) {
+                                return [
+                                    'id' => $grade->id,
+                                    'status' => $grade->status,
+                                    'level_grade_id' => $grade->level_grade_id,
+                                    'grade_name' => $grade->levelGrade->grade->name ?? 'Unknown'
+                                ];
+                            })
+                        ];
+                    })->values()
+                ];
+            });
+
+            return response()->json([
+                'message' => 'Phase statuses retrieved successfully',
+                'olympiad' => [
+                    'id' => $olympiad->id,
+                    'name' => $olympiad->name
+                ],
+                'area' => [
+                    'id' => $area->id,
+                    'name' => $area->name
+                ],
+                'data' => $phasesWithStatuses,
+                'total_phases' => $phasesWithStatuses->count(),
+                'status' => 200
+            ], 200);
+
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'Resource not found',
+                'error' => 'The requested olympiad or area could not be found.',
+                'status' => 404
+            ], 404);
+        } catch (\Illuminate\Database\QueryException $e) {
+            Log::error('Database error in getStatuses: ' . $e->getMessage(), [
+                'olympiad_id' => $olympiadId,
+                'area_id' => $areaId
+            ]);
+            return response()->json([
+                'message' => 'Database error',
+                'error' => 'A database error occurred while retrieving statuses. Please try again.',
+                'status' => 500
+            ], 500);
+        } catch (\Exception $e) {
+            Log::error('Unexpected error in getStatuses: ' . $e->getMessage(), [
+                'olympiad_id' => $olympiadId,
+                'area_id' => $areaId,
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json([
+                'message' => 'Internal server error',
+                'error' => 'An unexpected error occurred while retrieving statuses. Please try again later.',
                 'status' => 500
             ], 500);
         }

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
 use App\Models\Contestant;
@@ -29,7 +30,7 @@ class CompetitorRegistrationController extends Controller
     public function uploadCsv(Request $request): JsonResponse
     {
         // Debug: Log what we're receiving
-        \Log::info('Upload CSV Request', [
+        Log::info('Upload CSV Request', [
             'has_files' => $request->hasFile('files'),
             'files_count' => $request->file('files') ? count($request->file('files')) : 0,
             'all_files' => $request->allFiles(),
@@ -711,7 +712,7 @@ class CompetitorRegistrationController extends Controller
     /**
      * Download error CSV file
      */
-    public function downloadErrorCsv(string $filename): \Symfony\Component\HttpFoundation\StreamedResponse
+    public function downloadErrorCsv(string $filename): \Symfony\Component\HttpFoundation\BinaryFileResponse
     {
         $filePath = 'error-csvs/' . $filename;
 
@@ -719,7 +720,50 @@ class CompetitorRegistrationController extends Controller
             abort(404, 'Error file not found');
         }
 
-        return Storage::disk('public')->download($filePath);
+        // Use response()->download with the absolute path on the local disk to avoid
+        // static analyzer warnings about Storage::download and to work reliably
+        // when serving files from the local 'public' disk.
+        $absolutePath = Storage::disk('public')->path($filePath);
+        $downloadName = basename($filePath);
+
+        if (!file_exists($absolutePath)) {
+            abort(404, 'Error file not found on disk');
+        }
+
+        return response()->download($absolutePath, $downloadName);
+    }
+
+    /**
+     * Download a CSV template with only the required headers (no data rows)
+     */
+    public function downloadTemplateCsv(): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $headers = [
+            'N.', 'CI', 'NOMBRE', 'APELLIDO', 'GENERO', 'DEPARTAMENTO',
+            'COLEGIO', 'CELULAR', 'E-MAIL', 'AREA', 'GRADO', 'NIVEL',
+            'NUMERO TUTOR', 'NOMBRE TUTOR'
+        ];
+
+        $filename = 'competitors-template.csv';
+
+        $callback = function() use ($headers) {
+            // Add UTF-8 BOM for Excel compatibility
+            echo "\xEF\xBB\xBF";
+
+            // Quote each header field and join with commas
+            $quoted = array_map(function($field) {
+                return '"' . str_replace('"', '""', $field) . '"';
+            }, $headers);
+
+            echo implode(',', $quoted) . "\n";
+        };
+
+        $responseHeaders = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ];
+
+        return response()->stream($callback, 200, $responseHeaders);
     }
 
     /**

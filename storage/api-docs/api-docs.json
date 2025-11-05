@@ -2083,6 +2083,355 @@
                 }
             }
         },
+        "/api/olympiads/{olympiadId}/areas/{areaId}/status": {
+            "get": {
+                "tags": [
+                    "Phase Status"
+                ],
+                "summary": "Get all phase statuses for an olympiad area",
+                "description": "Retrieves all phases of the specified olympiad area, along with their associated level-grades and phase statuses.",
+                "operationId": "e40dc8807127684fe4631fead128cfea",
+                "parameters": [
+                    {
+                        "name": "olympiadId",
+                        "in": "path",
+                        "description": "ID of the olympiad",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "areaId",
+                        "in": "path",
+                        "description": "ID of the olympiad area",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 2
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of phase statuses retrieved successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 15
+                                                    },
+                                                    "phase": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 3
+                                                            },
+                                                            "name": {
+                                                                "type": "string",
+                                                                "example": "Final Phase"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    },
+                                                    "olympiad_area_phase_level_grades": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "properties": {
+                                                                "id": {
+                                                                    "type": "integer",
+                                                                    "example": 22
+                                                                },
+                                                                "status": {
+                                                                    "type": "string",
+                                                                    "example": "Activa"
+                                                                },
+                                                                "olympiad_area_level_grade": {
+                                                                    "properties": {
+                                                                        "level_grade": {
+                                                                            "properties": {
+                                                                                "id": {
+                                                                                    "type": "integer",
+                                                                                    "example": 12
+                                                                                },
+                                                                                "level_id": {
+                                                                                    "type": "integer",
+                                                                                    "example": 5
+                                                                                },
+                                                                                "grade_id": {
+                                                                                    "type": "integer",
+                                                                                    "example": 9
+                                                                                }
+                                                                            },
+                                                                            "type": "object"
+                                                                        }
+                                                                    },
+                                                                    "type": "object"
+                                                                }
+                                                            },
+                                                            "type": "object"
+                                                        }
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Olympiad area not found"
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "Phase Status"
+                ],
+                "summary": "Assign status to all grades of a level for a specific phase",
+                "description": "Assigns the same status to ALL grades within a specific level for a given phase in an olympiad area. This allows you to change the phase status from 'Sin empezar' to 'Activa' or 'Terminada' for all grades in a level at once.",
+                "operationId": "f142cab664359c384956e756a8be24f4",
+                "parameters": [
+                    {
+                        "name": "olympiadId",
+                        "in": "path",
+                        "description": "ID of the olympiad",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "areaId",
+                        "in": "path",
+                        "description": "ID of the area within the olympiad",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 2
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "Phase, level and status configuration",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "phase_id",
+                                    "level_id",
+                                    "status"
+                                ],
+                                "properties": {
+                                    "phase_id": {
+                                        "description": "ID of the phase where the status will be applied",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "level_id": {
+                                        "description": "ID of the level. Status will be applied to ALL grades within this level.",
+                                        "type": "integer",
+                                        "example": 3
+                                    },
+                                    "status": {
+                                        "description": "Status to assign to the phase for this level",
+                                        "type": "string",
+                                        "enum": [
+                                            "Sin empezar",
+                                            "Activa",
+                                            "Terminada"
+                                        ],
+                                        "example": "Activa"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Status assigned successfully to all grades in the level",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Status assigned successfully"
+                                        },
+                                        "data": {
+                                            "description": "The olympiad area phase with its status assignments",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 15
+                                                },
+                                                "phase": {
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "integer",
+                                                            "example": 1
+                                                        },
+                                                        "name": {
+                                                            "type": "string",
+                                                            "example": "Fase 1"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "olympiad_area_phase_level_grades": {
+                                                    "description": "All level-grade relationships with their assigned status",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 21
+                                                            },
+                                                            "status": {
+                                                                "type": "string",
+                                                                "example": "Activa"
+                                                            },
+                                                            "level_grade": {
+                                                                "properties": {
+                                                                    "id": {
+                                                                        "type": "integer",
+                                                                        "example": 12
+                                                                    },
+                                                                    "level_id": {
+                                                                        "type": "integer",
+                                                                        "example": 3
+                                                                    },
+                                                                    "grade_id": {
+                                                                        "type": "integer",
+                                                                        "example": 9
+                                                                    }
+                                                                },
+                                                                "type": "object"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "level_name": {
+                                            "type": "string",
+                                            "example": "Booster"
+                                        },
+                                        "level_id": {
+                                            "type": "integer",
+                                            "example": 3
+                                        },
+                                        "status": {
+                                            "type": "string",
+                                            "example": "Activa"
+                                        },
+                                        "affected_grades_count": {
+                                            "description": "Number of grades affected by this status assignment",
+                                            "type": "integer",
+                                            "example": 4
+                                        },
+                                        "updated_count": {
+                                            "description": "Number of records updated with the new status",
+                                            "type": "integer",
+                                            "example": 4
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Validation failed"
+                                        },
+                                        "errors": {
+                                            "description": "Detailed validation errors",
+                                            "type": "object"
+                                        },
+                                        "status": {
+                                            "type": "integer",
+                                            "example": 422
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Resource not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Level not found"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "The level 'Booster' (ID: 3) has no grade associations in the area 'Matemáticas' for olympiad 'Olimpiada 2025'. Please assign grades to this level first."
+                                        },
+                                        "status": {
+                                            "type": "integer",
+                                            "example": 404
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server error during status assignment",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Database error"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "A database error occurred while assigning status. Please try again."
+                                        },
+                                        "status": {
+                                            "type": "integer",
+                                            "example": 500
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/olympiads/{id}/activate": {
             "put": {
                 "tags": [
@@ -2800,6 +3149,10 @@
         {
             "name": "Max scores",
             "description": "Max scores"
+        },
+        {
+            "name": "Phase Status",
+            "description": "Phase Status"
         }
     ]
 }

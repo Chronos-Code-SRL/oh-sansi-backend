@@ -79,6 +79,10 @@ Route::get('/olympiads/{olympiadId}/areas/{areaId}/score-cuts', [OlympiadControl
 Route::post('/olympiads/{olympiadId}/areas/{areaId}/max-scores', [OlympiadController::class, 'assignMaxScores']);
 Route::get('/olympiads/{olympiadId}/areas/{areaId}/max-scores', [OlympiadController::class, 'getMaxScores']);
 
+// <--- CRUD Olympiad-Area-Phase-Level-Grades (Phase Status) --->
+Route::put('/olympiads/{olympiadId}/areas/{areaId}/status', [OlympiadController::class, 'assignStatus']);
+Route::get('/olympiads/{olympiadId}/areas/{areaId}/status', [OlympiadController::class, 'getStatuses']);
+
 // login
 Route::post('/login', [AuthController::class, 'login']);
 
@@ -112,6 +116,8 @@ Route::middleware(['auth:sanctum', 'evaluator_or_academic'])->group(function () 
 //Route::middleware(['auth:sanctum', 'academic_responsible'])->group(function(){
     // Competitor registration routes
     Route::post('/competitors/upload-csv', [CompetitorRegistrationController::class, 'uploadCsv']);
+    // Download a CSV template containing only headers (no data rows)
+    Route::get('/competitors/download-template', [CompetitorRegistrationController::class, 'downloadTemplateCsv']);
     Route::get('/competitors/download-error-csv/{filename}', [CompetitorRegistrationController::class, 'downloadErrorCsv']);
 //});
 
