@@ -11,52 +11,33 @@ use Illuminate\Http\JsonResponse;
 
 class UserAreaController extends Controller
 {
-    public function getUserAreas(Request $request): JsonResponse
+    public function getUserAreas(Request $request, $olympiad_id): JsonResponse
     {
         $user = $request->user();
 
         // Search olympiad active
-        $activeOlympiad = DB::table('olympiads')
-            ->where('olympiads.status', 'Activa')
-            ->first();
-
-        if (!$activeOlympiad) {
-            $data = [
-                'message' => 'There are no active Olympiads at the moment.',
-                'status' => 404
-            ];
-
-            return response()->json($data, 404);
-        }
-
-        // Get the user areas in the active olympiad
-        $areas = DB::table('areas as a')
-            ->join('user_areas as ua', 'ua.area_id', '=', 'a.id')
-            ->join('olympiad_areas as oa', 'oa.area_id', '=', 'a.id')
-            ->where('ua.user_id', $user->id)
-            ->where('oa.olympiad_id', $activeOlympiad->id)
-            ->select('a.id', 'a.name', 'oa.olympiad_id')
+        $userAreaOlympiad = DB::table('users as u')
+            ->join('user_area_olympiads as uao', 'uao.user_id', '=', 'u.id')
+            ->join('areas as a', 'uao.area_id', '=', 'a.id')
+            ->join('olympiads as o', 'uao.olympiad_id', '=', 'o.id')
+            ->where('o.id', $olympiad_id)
+            ->select('a.id', 'a.name')
+            ->distinct()
             ->get();
 
-        // if no areas found for the user
-        if ($areas->isEmpty()) {
-
+        if ($userAreaOlympiad->isEmpty()) {
             $data = [
-                'message' => 'No registered areas were found for this user in the active Olympiad.',
+                'message' => 'User is not registered in any area for this olympiad.',
                 'status' => 404
             ];
 
             return response()->json($data, 404);
         }
 
-        $data = [
-            'id_user' => $user->id,
-            'olympiad' => $activeOlympiad->name,
-            'olympiad_id' => $activeOlympiad->id,
-            'areas' => $areas,
+        return response()->json([
+            'message' => 'User areas retrieved successfully.',
+            'data' => $userAreaOlympiad,
             'status' => 200
-        ];
-
-        return response()->json($data, 200);
+        ], 200);
     }
 }

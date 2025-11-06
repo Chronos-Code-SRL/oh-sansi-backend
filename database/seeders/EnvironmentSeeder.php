@@ -59,7 +59,7 @@ class EnvironmentSeeder extends Seeder
         $user->genre = 'femenino';
         $user->roles_id = 1;
         $user->save();
-        $user->areas()->attach([1, 2, 3, 4, 5, 6, 7, 8]); 
+        // $user->areas()->attach([1, 2, 3, 4, 5, 6, 7, 8]); 
         $this->command->info('Grades, Areas and user admin created successfully.');
     }
 }

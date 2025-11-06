@@ -43,6 +43,6 @@ class Area extends Model
 
     public function users()
     {
-        return $this->belongsToMany(User::class, 'user_areas');
+        return $this->belongsToMany(User::class, 'user_area_olympiads');
     }
 }

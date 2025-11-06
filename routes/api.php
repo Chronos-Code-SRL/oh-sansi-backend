@@ -30,10 +30,12 @@ Route::post('/olympiads', [OlympiadController::class, 'store']);
 Route::put('/olympiads/{id}', [OlympiadController::class, 'update']);
 Route::put('/olympiads/{id}/activate', [OlympiadController::class, 'activateOlympiad']);
 Route::delete('/olympiads/{id}', [OlympiadController::class, 'destroy']);
+Route::get('/olympiads/status/active-or-planning', [OlympiadController::class, 'activeOrPlannedOlympics']);
 
 // <--- CRUD Olympiad-Areas --->
 Route::post('/olympiads/{id}/areas', [OlympiadController::class, 'assignAreas']);
 Route::get('/olympiads/{id}/areas', [OlympiadController::class, 'getAreas']);
+Route::get('/olympiads/{id}/area/{areaId}', [OlympiadController::class, 'getLevels']);
 
 // <--- CRUD Olympiad-Phases --->
 Route::get('/olympiads/{id}/phases', [OlympiadController::class, 'getPhases']);
@@ -104,8 +106,11 @@ Route::middleware(['auth:sanctum', 'evaluator'])->group(function(){
 
 });
 
-//get user areas evaluator or academic manager
-Route::get('/user/areas', [UserAreaController::class, 'getUserAreas'])->middleware(['auth:sanctum', 'evaluator_or_academic']);
+// Areas and Olympics for a logged-in user
+Route::middleware(['auth:sanctum', 'evaluator_or_academic'])->group(function () {
+    Route::get('/user/olympiads', [OlympiadController::class, 'getUserOlympiads']);
+    Route::get('/user/areas/{olympiad_id}', [UserAreaController::class, 'getUserAreas']);
+});
 
 // academic responsible routes
 //Route::middleware(['auth:sanctum', 'academic_responsible'])->group(function(){
@@ -132,7 +137,7 @@ Route::patch('/evaluations/{id}',[EvaluationController::class, 'updatePartialEva
 Route::get('/evaluations/check-updates/',[EvaluationController::class, 'checksUpdates']);
 
 // <--- Get Contestants --->
-Route::get('/contestants/{phase_id}/{olympiad_id}/{area_id}', [ContestantController::class, 'showContestant']);
+Route::get('/contestants/{phase_id}/{olympiad_id}/{area_id}/{level_id}', [ContestantController::class, 'showContestant']);
 Route::get('/contestants', [ContestantController::class, 'showContestantsOlympiad']);
 
 // <--- CRUD Level --->

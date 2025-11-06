@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Hash;
 use App\Http\Controllers\Controller;
 use \stdClass;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 
 class AuthController extends Controller
 {
@@ -46,19 +47,35 @@ class AuthController extends Controller
      */
     public function register(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'first_name' => 'required|string|min:2|max:50',
-            'last_name' => 'required|string|min:2|max:50',
-            'email' => 'required|email|unique:users,email',
-            'ci' => 'required|min:6|max:12|unique:users,ci',
-            'phone_number' => 'required|min:7|max:15',
-            'genre' => 'required|in:masculino,femenino',
-            'roles_id' => 'required|exists:roles,id',
-            'areas_id' => 'required|array',
-            'prefesion' => 'nullable|string|max:100'
-        ],
-            ['email.unique' => 'El correo electrónico ya está en uso.',
-            'ci.unique' => 'El carnet de identidad ya está registrado.',
+
+        $userExists = User::where('ci', $request->ci)->first();
+        if ($userExists) {
+            $this->syncUserAreasOlympiad($userExists, $request->areas_id, $request->olympiad_id);
+
+            $data = [
+                'message' => 'User updated successfully',
+                'user' => $userExists,
+            ];
+            return response()->json($data, 200);
+        }
+
+        $validator = Validator::make(
+            $request->all(),
+            [
+                'first_name' => 'required|string|min:2|max:50',
+                'last_name' => 'required|string|min:2|max:50',
+                'email' => 'required|email|unique:users,email',
+                'ci' => 'required|min:6|max:12|unique:users,ci',
+                'phone_number' => 'required|min:7|max:15',
+                'genre' => 'required|in:masculino,femenino',
+                'roles_id' => 'required|exists:roles,id',
+                'areas_id' => 'required|array',
+                'profesion' => 'nullable|string|max:100',
+                'olympiad_id' => 'required|exists:olympiads,id',
+            ],
+            [
+                'email.unique' => 'El correo electrónico ya está en uso.',
+                'ci.unique' => 'El carnet de identidad ya está registrado.',
             ]
         );
 
@@ -92,8 +109,12 @@ class AuthController extends Controller
                 'status' => 500
             ];
             return response()->json($data, 500);
-        }else{
-            $user->areas()->attach($request->areas_id);
+        } else {
+            $attachData = [];
+            foreach ($request->areas_id as $area_id) {
+                $attachData[$area_id] = ['olympiad_id' => $request->olympiad_id];
+            }
+            $user->areas()->attach($attachData);
         }
 
         $token = $user->createToken('auth_token')->plainTextToken;
@@ -107,7 +128,7 @@ class AuthController extends Controller
         return response()->json($data, 201);
     }
 
-        /**
+    /**
      * @OA\Post(
      *     path="/api/login",
      *     summary="Iniciar sesión",
@@ -167,16 +188,17 @@ class AuthController extends Controller
         return response()->json(['message' => 'Logged out successfully']);
     }
 
-    public function generate_password($name, $ci){
+    public function generate_password($name, $ci)
+    {
         $full_name = trim($name);
         $array_names = [];
         $name = "";
         $password = "";
 
-        for ($i=0; $i < strlen($full_name); $i++) { 
+        for ($i = 0; $i < strlen($full_name); $i++) {
             if ($full_name[$i] != ' ') {
                 $name .= $full_name[$i];
-            }else{
+            } else {
                 if ($name != "") {
                     array_push($array_names, $name);
                     $name = "";
@@ -188,10 +210,22 @@ class AuthController extends Controller
             array_push($array_names, $name);
         }
 
-        for ($i=0; $i < sizeof($array_names); $i++) { 
+        for ($i = 0; $i < sizeof($array_names); $i++) {
             $password .= $array_names[$i][0];
         }
-        
+
         return strtoupper($password) . $ci;
+    }
+
+    private function syncUserAreasOlympiad($user, $areas_id, $olympiad_id){
+        $enrollmentsToInsert = [];
+        foreach ($areas_id as $area_id) {
+            $enrollmentsToInsert[] = [
+                'user_id' => $user->id,
+                'area_id' => $area_id,
+                'olympiad_id' => $olympiad_id,
+            ];
+        }
+        DB::table('user_area_olympiads')->insertOrIgnore($enrollmentsToInsert);
     }
 }
