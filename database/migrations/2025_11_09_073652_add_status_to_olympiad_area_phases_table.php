@@ -11,8 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('olympiad_area_phase_level_grades', function (Blueprint $table) {
-            $table->enum('status', ['Sin empezar', 'Activa', 'Terminada'])->default('Sin empezar')->after('max_score');
+        Schema::table('olympiad_area_phases', function (Blueprint $table) {
+            $table->enum('status', ['Sin empezar', 'Activa', 'Terminada'])->default('Sin empezar')->after('phase_id');
         });
     }
 
@@ -21,7 +21,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('olympiad_area_phase_level_grades', function (Blueprint $table) {
+        Schema::table('olympiad_area_phases', function (Blueprint $table) {
             $table->dropColumn('status');
         });
     }

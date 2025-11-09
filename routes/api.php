@@ -59,6 +59,10 @@ Route::post('/phases', [PhaseController::class, 'store']);
 Route::put('/phases/{id}', [PhaseController::class, 'update']);
 Route::delete('/phases/{id}', [PhaseController::class, 'destroy']);
 
+// <--- CRUD Olympiad-Area-Phases (Status) --->
+Route::get('/olympiads/{olympiadId}/areas/{areaId}/phase-status', [PhaseController::class, 'getPhaseStatus']);
+Route::put('/olympiads/{olympiadId}/areas/{areaId}/phase-status', [PhaseController::class, 'updatePhaseStatus']);
+
 // <--- CRUD Olympiad-Area-Level-Grades --->
 Route::post('/olympiads/{olympiadId}/areas/{areaId}/level-grades', [OlympiadController::class, 'assignLevelGradesToArea']);
 Route::get('/olympiads/{olympiadId}/areas/{areaId}/level-grades', [OlympiadController::class, 'getLevelGradesFromArea']);
@@ -78,10 +82,6 @@ Route::get('/olympiads/{olympiadId}/areas/{areaId}/score-cuts', [OlympiadControl
 // <--- CRUD Olympiad-Area-Phase-Level-Grades (Max Scores) --->
 Route::post('/olympiads/{olympiadId}/areas/{areaId}/max-scores', [OlympiadController::class, 'assignMaxScores']);
 Route::get('/olympiads/{olympiadId}/areas/{areaId}/max-scores', [OlympiadController::class, 'getMaxScores']);
-
-// <--- CRUD Olympiad-Area-Phase-Level-Grades (Phase Status) --->
-Route::put('/olympiads/{olympiadId}/areas/{areaId}/status', [OlympiadController::class, 'assignStatus']);
-Route::get('/olympiads/{olympiadId}/areas/{areaId}/status', [OlympiadController::class, 'getStatuses']);
 
 // login
 Route::post('/login', [AuthController::class, 'login']);

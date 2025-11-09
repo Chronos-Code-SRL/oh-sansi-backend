@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
 use App\Models\Phase;
+use App\Models\OlympiadArea;
+use App\Models\OlympiadAreaPhase;
 
 /**
  * @OA\Tag(
@@ -266,6 +268,168 @@ class PhaseController extends Controller
         $data = [
             'message' => 'Phase deleted successfully',
             'status' => 200
+        ];
+
+        return response()->json($data, 200);
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/olympiads/{olympiadId}/areas/{areaId}/phase-status",
+     *     summary="Get the status of all phases for an olympiad area",
+     *     tags={"Phases"},
+     *     @OA\Parameter(
+     *         name="olympiadId",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Parameter(
+     *         name="areaId",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Phase statuses retrieved successfully",
+     *     )
+     * )
+     */
+    public function getPhaseStatus(string $olympiadId, string $areaId)
+    {
+        // Verificar que existe la relación olympiad_area
+        $olympiadArea = OlympiadArea::where('olympiad_id', $olympiadId)
+            ->where('area_id', $areaId)
+            ->first();
+
+        if (!$olympiadArea) {
+            $data = [
+                'message' => 'Olympiad area relationship not found',
+                'status' => 404
+            ];
+            return response()->json($data, 404);
+        }
+
+        // Obtener todas las fases con su estado para esta olympiad_area
+        $phaseStatuses = OlympiadAreaPhase::where('olympiad_area_id', $olympiadArea->id)
+            ->with('phase')
+            ->get()
+            ->map(function ($olympiadAreaPhase) {
+                return [
+                    'phase_id' => $olympiadAreaPhase->phase_id,
+                    'phase_name' => $olympiadAreaPhase->phase->name,
+                    'phase_order' => $olympiadAreaPhase->phase->order,
+                    'status' => $olympiadAreaPhase->status
+                ];
+            });
+
+        $data = [
+            'olympiad_id' => $olympiadId,
+            'area_id' => $areaId,
+            'phase_statuses' => $phaseStatuses,
+            'status' => 200
+        ];
+
+        return response()->json($data, 200);
+    }
+
+    /**
+     * @OA\Put(
+     *     path="/api/olympiads/{olympiadId}/areas/{areaId}/phase-status",
+     *     summary="Update the status of a specific phase for an olympiad area",
+     *     tags={"Phases"},
+     *     @OA\Parameter(
+     *         name="olympiadId",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Parameter(
+     *         name="areaId",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"phase_id","status"},
+     *             @OA\Property(property="phase_id", type="integer", example=1),
+     *             @OA\Property(property="status", type="string", enum={"Sin empezar", "Activa", "Terminada"}, example="Activa")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Phase status updated successfully"
+     *     )
+     * )
+     */
+    public function updatePhaseStatus(Request $request, string $olympiadId, string $areaId)
+    {
+        // Validación de datos
+        $validator = Validator::make($request->all(), [
+            'phase_id' => 'required|integer|exists:phases,id',
+            'status' => 'required|string|in:Sin empezar,Activa,Terminada'
+        ]);
+
+        if ($validator->fails()) {
+            $data = [
+                'message' => 'Error in data validation',
+                'error' => $validator->errors(),
+                'status' => 400
+            ];
+            return response()->json($data, 400);
+        }
+
+        // Verificar que existe la relación olympiad_area
+        $olympiadArea = OlympiadArea::where('olympiad_id', $olympiadId)
+            ->where('area_id', $areaId)
+            ->first();
+
+        if (!$olympiadArea) {
+            $data = [
+                'message' => 'Olympiad area relationship not found',
+                'status' => 404
+            ];
+            return response()->json($data, 404);
+        }
+
+        // Buscar la relación olympiad_area_phase específica
+        $olympiadAreaPhase = OlympiadAreaPhase::where('olympiad_area_id', $olympiadArea->id)
+            ->where('phase_id', $request->phase_id)
+            ->first();
+
+        if (!$olympiadAreaPhase) {
+            $data = [
+                'message' => 'Phase not found for this olympiad area',
+                'status' => 404
+            ];
+            return response()->json($data, 404);
+        }
+
+        // Actualizar el estado
+        $olympiadAreaPhase->status = $request->status;
+
+        if (!$olympiadAreaPhase->save()) {
+            $data = [
+                'message' => 'Error updating phase status',
+                'status' => 500
+            ];
+            return response()->json($data, 500);
+        }
+
+        // Cargar la información de la fase para la respuesta
+        $olympiadAreaPhase->load('phase');
+
+        $data = [
+            'message' => 'Phase status updated successfully',
+            'olympiad_id' => $olympiadId,
+            'area_id' => $areaId,
+            'phase_id' => $olympiadAreaPhase->phase_id,
+            'phase_name' => $olympiadAreaPhase->phase->name,
+            'status' => $olympiadAreaPhase->status,
+            'status_code' => 200
         ];
 
         return response()->json($data, 200);

@@ -9,7 +9,7 @@ class OlympiadAreaPhase extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['olympiad_area_id', 'phase_id', 'score_cut'];
+    protected $fillable = ['olympiad_area_id', 'phase_id', 'score_cut', 'status'];
 
     public function olympiadArea()
     {
