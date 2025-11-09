@@ -287,7 +287,7 @@ class TheOrigin extends Seeder
                             ], [
                                 'score_cut' => 51,
                                 'max_score' => 100,
-                                'status' => 'Sin empezar',
+                                // 'status' => 'Sin empezar',
                             ]);
                         }
                     }

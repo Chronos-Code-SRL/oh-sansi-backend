@@ -2713,4 +2713,133 @@ class OlympiadController extends Controller
             ], 500);
         }
     }
+
+    public function getUserOlympiads(Request $request){
+        $user = $request->user();
+
+        $userOlympics = DB::table('users as u')
+            ->join('user_area_olympiads as uao', 'u.id', '=', 'uao.user_id')
+            ->join('olympiads as o', 'uao.olympiad_id', '=', 'o.id')
+            ->join('areas as a', 'uao.area_id', '=', 'a.id')
+            ->where('u.id', $user->id)
+            ->select(
+                'o.id as olympiad_id',
+                'o.name as olympiad_name',
+                'o.default_score_cut',
+                'o.start_date',
+                'o.end_date',
+                'o.number_of_phases',
+                'o.status',
+                'a.id as area_id',
+                'a.name as area_name'
+            )
+            ->orderBy('o.id')
+            ->get();
+
+        if ($userOlympics->isEmpty()) {
+            return response()->json([
+                'message' => 'The user is not associated with any olympiads.',
+                'status' => 404
+            ], 404);
+        }
+
+        $grouped = $userOlympics->groupBy('olympiad_id')->map(function ($items) {
+        $olympiad = $items->first();
+            return [
+                'id' => $olympiad->olympiad_id,
+                'name' => $olympiad->olympiad_name,
+                'default_score_cut' => $olympiad->default_score_cut,
+                'start_date' => $olympiad->start_date,
+                'end_date' => $olympiad->end_date,
+                'number_of_phases' => $olympiad->number_of_phases,
+                'status' => $olympiad->status,
+                'areas' => $items->map(function ($area) {
+                    return [
+                        'id' => $area->area_id,
+                        'name' => $area->area_name
+                    ];
+                })->unique('id')->values()
+            ];
+        })->values();
+
+        return response()->json($grouped, 200);
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/olympiads/{id}/areas/{areaId}/levels",
+     *     summary="Get levels for a specific olympiad and area",
+     *     description="Retrieve all unique levels associated with a given olympiad and area.",
+     *     tags={"Olympiads"},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="Olympiad ID",
+     *         @OA\Schema(type="string", example="1")
+     *     ),
+     *     @OA\Parameter(
+     *         name="areaId",
+     *         in="path",
+     *         required=true,
+     *         description="Area ID",
+     *         @OA\Schema(type="string", example="3")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Levels retrieved successfully",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="message", type="string", example="Levels retrieved successfully."),
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     type="object",
+     *                     @OA\Property(property="id", type="integer", example=2),
+     *                     @OA\Property(property="name", type="string", example="Intermediate")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="No levels found for the specified olympiad and area",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="message", type="string", example="No levels found for the specified olympiad and area."),
+     *             @OA\Property(property="status", type="integer", example=404)
+     *         )
+     *     )
+     * )
+     */
+
+    public function getLevels(string $id, string $areaId){
+        $levels = DB::table('olympiads as o')
+            ->join('olympiad_areas as oa', 'oa.olympiad_id', '=', 'o.id')
+            ->join('level_grades as lg', 'lg.olympiad_area_id', '=', 'oa.id')
+            ->join('areas as a', 'oa.area_id', '=', 'a.id')
+            ->join('levels as l', 'lg.level_id', '=', 'l.id')
+            ->where('a.id', $areaId)
+            ->where('o.id', $id)
+            ->select('l.id', 'l.name')
+            ->distinct()
+            ->get();
+            
+        if ($levels->isEmpty()) {
+            return response()->json([
+                'message' => 'No levels found for the specified olympiad and area.',
+                'status' => 404
+            ], 404);
+            
+        }
+
+        return response()->json(
+            [
+                'message' => 'Levels retrieved successfully.',
+                'data' => $levels,
+                'status' => 200
+            ], 200);
+    }
 }
