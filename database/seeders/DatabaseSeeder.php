@@ -56,7 +56,8 @@ class DatabaseSeeder extends Seeder
             AreaSeeder::class,
             LevelSeeder::class,
             GradeSeeder::class,
-            OlympiadWithAreasSeeder::class
+            OlympiadWithAreasSeeder::class,
+            \Database\Seeders\RankedContestantsSeeder::class,
         ]);
 
         $user = new User();

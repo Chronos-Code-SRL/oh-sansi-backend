@@ -86,10 +86,10 @@ class RankedContestantsSeeder extends Seeder
         }
 
         $cases = [
-            ['first_name' => 'Ana', 'last_name' => 'Clasificada', 'score' => $scoreCut + 5, 'description' => null],
-            ['first_name' => 'Juan', 'last_name' => 'Desclasificado', 'score' => max(0, $scoreCut - 5), 'description' => null],
-            ['first_name' => 'Lucia', 'last_name' => 'SinNota', 'score' => null, 'description' => null],
-            ['first_name' => 'Pedro', 'last_name' => 'Observado', 'score' => 80, 'description' => 'Observación especial: irregularidad'],
+            ['first_name' => 'Ana', 'last_name' => 'Di Maria', 'score' => $scoreCut + 5, 'description' => null],
+            ['first_name' => 'Juan', 'last_name' => 'Pendragon Simpson', 'score' => max(0, $scoreCut - 5), 'description' => null],
+            ['first_name' => 'Lucia', 'last_name' => 'Terceros Nobel', 'score' => null, 'description' => null],
+            ['first_name' => 'Pedro', 'last_name' => 'Pica Piedra', 'score' => 80, 'description' => 'Observación especial: irregularidad'],
         ];
 
         foreach ($cases as $c) {
@@ -102,9 +102,9 @@ class RankedContestantsSeeder extends Seeder
                 // use short gender code to match schema (e.g. 'M' or 'F')
                 'gender' => 'M',
                 'ci_document' => $ci,
-                'school_name' => 'Colegio Test',
-                'department' => 'TestDept',
-                'tutor_name' => 'Tutor Test',
+                'school_name' => 'Harvard',
+                'department' => 'Santa Cruz',
+                'tutor_name' => 'Daniel Traviezo',
                 'tutor_number' => '00000000'
             ]);
 
