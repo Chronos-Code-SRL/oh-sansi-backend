@@ -202,25 +202,15 @@ class ContestantController extends Controller
             $score = $item->score;
             $desc = trim((string)($item->description ?? ''));
 
-            // Prefer specific score_cut, fallback to olympiad default, otherwise null
-            $scoreCut = null;
-            if (!is_null($item->score_cut)) {
-                $scoreCut = $item->score_cut;
-            } elseif (!is_null($item->olympiad_default_score_cut)) {
-                $scoreCut = $item->olympiad_default_score_cut;
-            }
+            // Determine applied score cut (threshold): prefer specific score_cut, then olympiad default, then fallback 51
+            $scoreCut = $item->score_cut ?? $item->olympiad_default_score_cut ?? 51;
 
             // Determine estado
             if (is_null($score) || $desc !== '') {
                 $estado = 'Descalificado';
             } else {
-                if (is_null($scoreCut)) {
-                    // If no score cut is configured, treat as Desclasificado by default when score exists
-                    $estado = 'Desclasificado';
-                } else {
-                    // compare numerically
-                    $estado = ((float)$score >= (float)$scoreCut) ? 'Clasificado' : 'Desclasificado';
-                }
+                // compare numerically using the applied threshold
+                $estado = ((float)$score >= (float)$scoreCut) ? 'Clasificado' : 'Desclasificado';
             }
 
             return [
