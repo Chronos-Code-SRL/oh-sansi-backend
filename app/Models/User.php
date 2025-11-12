@@ -82,4 +82,9 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(Area::class, 'user_area_olympiads');
     }
+
+    public function roles()
+    {
+        return $this->belongsToMany(Roles::class, 'user_roles', 'user_id', 'role_id');
+    }
 }

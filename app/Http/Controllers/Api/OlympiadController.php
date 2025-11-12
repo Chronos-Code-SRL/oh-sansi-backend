@@ -2718,7 +2718,8 @@ class OlympiadController extends Controller
         $user = $request->user();
 
         $userOlympics = DB::table('users as u')
-            ->join('user_area_olympiads as uao', 'u.id', '=', 'uao.user_id')
+            ->join('user_roles as ur', 'u.id', '=', 'ur.user_id')
+            ->join('user_area_olympiads as uao', 'ur.id', '=', 'uao.user_role_id')
             ->join('olympiads as o', 'uao.olympiad_id', '=', 'o.id')
             ->join('areas as a', 'uao.area_id', '=', 'a.id')
             ->where('u.id', $user->id)

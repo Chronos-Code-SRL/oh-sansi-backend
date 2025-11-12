@@ -88,6 +88,7 @@ Route::post('/login', [AuthController::class, 'login']);
 
 //POST register evaluator or responsible academic
 Route::post('/register', [AuthController::class, 'register']);
+Route::get('/search-user/olympiad/{olympiadId}/ci/{ci}/role/{roleId}', [AuthController::class, 'searchUser']);
 
 //admin routes
 Route::middleware(['auth:sanctum', 'admin'])->group(function(){

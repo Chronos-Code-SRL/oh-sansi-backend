@@ -15,12 +15,23 @@ class UserAreaController extends Controller
     {
         $user = $request->user();
 
+        $userRole = DB::table('user_roles')
+            ->where('user_id', $user->id)
+            ->first();
+
+        if (!$userRole) {
+            return response()->json([
+                'message' => 'User does not have any assigned role.',
+                'status' => 404
+            ], 404);
+        }
+
         // Search olympiad active
-        $userAreaOlympiad = DB::table('users as u')
-            ->join('user_area_olympiads as uao', 'uao.user_id', '=', 'u.id')
+        $userAreaOlympiad = DB::table('user_area_olympiads as uao')
             ->join('areas as a', 'uao.area_id', '=', 'a.id')
             ->join('olympiads as o', 'uao.olympiad_id', '=', 'o.id')
-            ->where('o.id', $olympiad_id)
+            ->where('uao.user_role_id', $userRole->id)
+            ->where('uao.olympiad_id', $olympiad_id)
             ->select('a.id', 'a.name')
             ->distinct()
             ->get();
