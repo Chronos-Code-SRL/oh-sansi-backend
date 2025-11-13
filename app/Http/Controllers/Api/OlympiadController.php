@@ -2843,4 +2843,62 @@ class OlympiadController extends Controller
                 'status' => 200
             ], 200);
     }
+
+    /**
+     * @OA\Get(
+     *     path="/api/olympiads/active-or-planned",
+     *     summary="To obtain active or planned Olympics",
+     *     description="Return all Olympics whose status is 'Active' or 'In planning'.",
+     *     tags={"Olympiads"},
+     *     
+     *     @OA\Response(
+     *         response=200,
+     *         description="Olympiads retrieved successfully",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="message", type="string", example="Olympiads retrieved successfully."),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     type="object",
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="name", type="string", example="Olimpiada Nacional de Matemáticas"),
+     *                     @OA\Property(property="status", type="string", example="Activa"),
+     *                     @OA\Property(property="start_date", type="string", format="date", example="2025-04-01"),
+     *                     @OA\Property(property="end_date", type="string", format="date", example="2025-04-15")
+     *                 )
+     *             ),
+     *             @OA\Property(property="status", type="integer", example=200)
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=404,
+     *         description="There are no active or planned Olympics",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="message", type="string", example="There are no active or planned Olympics."),
+     *             @OA\Property(property="status", type="integer", example=404)
+     *         )
+     *     )
+     * )
+     */
+    public function activeOrPlannedOlympics()
+    {
+        $olympiads = Olympiad::whereIn('status', ['Activa', 'En planificación'])->get();
+
+        if($olympiads->isEmpty()){
+            return response()->json([
+                'message' => 'There are no active or planned Olympics.',
+                'status' => 404
+            ], 404);
+        }
+
+        return response()->json([
+            'message' => 'Olympiads retrieved successfully.', 
+            'data' => $olympiads,
+            'status' => 200
+        ], 200);
+    }
 }
