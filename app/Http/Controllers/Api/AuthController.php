@@ -48,34 +48,30 @@ class AuthController extends Controller
     public function register(Request $request)
     {
 
-        $userExists = User::where('ci', $request->ci)->first();
-        if ($userExists) {
-            $this->syncUserAreasOlympiad($userExists, $request->areas_id, $request->olympiad_id);
+        // $userExists = User::where('ci', $request->ci)->first();
+        // if ($userExists) {
+        //     $this->syncUserAreasOlympiad($userExists, $request->areas_id, $request->olympiad_id);
 
-            $data = [
-                'message' => 'User updated successfully',
-                'user' => $userExists,
-            ];
-            return response()->json($data, 200);
-        }
+        //     $data = [
+        //         'message' => 'User updated successfully',
+        //         'user' => $userExists,
+        //     ];
+        //     return response()->json($data, 200);
+        // }
 
         $validator = Validator::make(
             $request->all(),
             [
                 'first_name' => 'required|string|min:2|max:50',
                 'last_name' => 'required|string|min:2|max:50',
-                'email' => 'required|email|unique:users,email',
-                'ci' => 'required|min:6|max:12|unique:users,ci',
+                'email' => 'required|email',
+                'ci' => 'required|min:6|max:12',
                 'phone_number' => 'required|min:7|max:15',
                 'genre' => 'required|in:masculino,femenino',
                 'roles_id' => 'required|exists:roles,id',
                 'areas_id' => 'required|array',
                 'profesion' => 'nullable|string|max:100',
                 'olympiad_id' => 'required|exists:olympiads,id',
-            ],
-            [
-                'email.unique' => 'El correo electrónico ya está en uso.',
-                'ci.unique' => 'El carnet de identidad ya está registrado.',
             ]
         );
 
@@ -86,6 +82,34 @@ class AuthController extends Controller
                 'status' => 400
             ];
             return response()->json($data, 400);
+        }
+
+        // search user by ci
+        $user = User::where('ci', $request->ci)->first();
+        if ($user) {
+            $userRole = DB::table('user_roles')
+                ->where('user_id', $user->id)
+                ->where('role_id', $request->roles_id)
+                ->first();
+
+            if (!$userRole) {
+                $userRoleId = DB::table('user_roles')->insertGetId([
+                    'user_id' => $user->id,
+                    'role_id' => $request->roles_id,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            } else {
+                $userRoleId = $userRole->id;
+            }
+
+            $this->syncUserAreasOlympiad($userRoleId, $request->areas_id, $request->olympiad_id);
+
+            return response()->json([
+                'status' => 200,
+                'message' => 'Usuario actualizado o inscrito en nuevas áreas.',
+                'user' => $user,
+            ]);
         }
 
         $full_name = $request->first_name . ' ' . $request->last_name;
@@ -99,7 +123,7 @@ class AuthController extends Controller
             'ci' => $request->ci,
             'phone_number' => $request->phone_number,
             'genre' => $request->genre,
-            'roles_id' => $request->roles_id,
+            // 'roles_id' => $request->roles_id,
             'profesion' => $request->roles_id == 2 ? $request->profesion : null,
         ]);
 
@@ -109,13 +133,17 @@ class AuthController extends Controller
                 'status' => 500
             ];
             return response()->json($data, 500);
-        } else {
-            $attachData = [];
-            foreach ($request->areas_id as $area_id) {
-                $attachData[$area_id] = ['olympiad_id' => $request->olympiad_id];
-            }
-            $user->areas()->attach($attachData);
         }
+
+        $userRoleId = DB::table('user_roles')->insertGetId([
+            'user_id' => $user->id,
+            'role_id' => $request->roles_id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+
+        $this->syncUserAreasOlympiad($userRoleId, $request->areas_id, $request->olympiad_id);
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
@@ -161,6 +189,10 @@ class AuthController extends Controller
 
         $user = User::where('email', $request['email'])->firstOrFail();
 
+        $roleId = $user->roles()->pluck('user_roles.role_id')->first();
+
+        $user->roles_id = $roleId;
+    
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json(['token' => $token, 'token_type' => 'Bearer', 'user' => $user], 200);
@@ -217,15 +249,77 @@ class AuthController extends Controller
         return strtoupper($password) . $ci;
     }
 
-    private function syncUserAreasOlympiad($user, $areas_id, $olympiad_id){
-        $enrollmentsToInsert = [];
-        foreach ($areas_id as $area_id) {
-            $enrollmentsToInsert[] = [
-                'user_id' => $user->id,
-                'area_id' => $area_id,
+    private function syncUserAreasOlympiad($userRoleId, $areas_id, $olympiad_id)
+    {
+        $existingAreas = DB::table('user_area_olympiads')
+            ->where('user_role_id', $userRoleId)
+            ->where('olympiad_id', $olympiad_id)
+            ->pluck('area_id')
+            ->toArray();
+
+        // Calcular nuevas áreas a insertar
+        $newAreas = array_diff($areas_id, $existingAreas);
+
+        // Insertar solo las nuevas
+        foreach ($newAreas as $areaId) {
+            DB::table('user_area_olympiads')->insert([
+                'user_role_id' => $userRoleId,
+                'area_id' => $areaId,
                 'olympiad_id' => $olympiad_id,
-            ];
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
         }
-        DB::table('user_area_olympiads')->insertOrIgnore($enrollmentsToInsert);
+    }
+
+    public function searchUser(string $olympiadId, string $ci, string $roleId)
+    {
+        // search user by ci
+        $user = User::where('ci', $ci)->first();
+
+        if (!$user) {
+            return response()->json([
+                'message' => 'Unregistered user',
+                'status' => 404
+            ], 404);
+        }
+
+        // search user by role
+        $userRole = DB::table('user_roles')
+            ->where('user_id', $user->id)
+            ->where('role_id', $roleId)
+            ->first();
+
+        if (!$userRole) {
+            return response()->json([
+                'message' => 'User found but role not assigned',
+                'status' => 404,
+                'user' => $user
+            ], 404);
+        }
+
+        // if not found, return unregistered user with role
+        $areas = DB::table('user_area_olympiads')
+            ->join('areas', 'user_area_olympiads.area_id', '=', 'areas.id')
+            ->where('user_area_olympiads.user_role_id', $userRole->id)
+            ->where('user_area_olympiads.olympiad_id', $olympiadId)
+            ->select('areas.id', 'areas.name')
+            ->get();
+
+        if ($areas->count() > 0) {
+            return response()->json([
+                'status' => 200,
+                'message' => 'User registered in the selected olympiad',
+                'user' => $user,
+                'areas' => $areas
+            ]);
+        } else {
+            return response()->json([
+                'status' => 200,
+                'message' => 'User registered, but not in the selected olympiad.',
+                'user' => $user,
+                'areas' => []
+            ]);
+        }
     }
 }

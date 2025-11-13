@@ -112,7 +112,7 @@ class TheOrigin extends Seeder
         }
 
         // Create Admin User
-        $adminUser = [
+        $adminUser = User::firstOrCreate([
             'first_name' => 'Root',
             'last_name' => 'Admin',
             'email' => 'admin@gmail.com',
@@ -120,13 +120,16 @@ class TheOrigin extends Seeder
             'ci' => '12345678A',
             'phone_number' => '71780589',
             'genre' => 'femenino',
-            'roles_id' => 1
-        ];
+            // 'roles_id' => 1
+        ]);
 
-        User::firstOrCreate($adminUser);
+        $adminRole = DB::table('user_roles')->updateOrInsert([
+            'user_id' => $adminUser->id,
+            'role_id' => 1,
+        ]);
 
         //Create Responsible Academic User
-        $academicUser = [
+        $academicUser = User::firstOrCreate([
             'first_name' => 'Beomgyu',
             'last_name' => 'Choi',
             'email' => 'beomgyu@gmail.com',
@@ -134,25 +137,33 @@ class TheOrigin extends Seeder
             'ci' => '44444444',
             'phone_number' => '12345678',
             'genre' => 'masculino',
-            'roles_id' => 2,
+            // 'roles_id' => 2,
             'profesion' => 'INGENIERO EN CIVIL',
-        ];
+        ]);
 
-        User::firstOrCreate($academicUser);
+        $academicUserRole = DB::table('user_roles')->updateOrInsert([
+            'user_id' => $academicUser->id,
+            'role_id' => 2,
+        ]);
+
+        $academicUserRoleId = DB::table('user_roles')
+            ->where('user_id', $academicUser->id)
+            ->where('role_id', 2)
+            ->value('id');
 
         $academicAreas = ['1', '2', '3', '4', '5', '6', '7', '8'];
         $OlympiadId = 1;
 
         foreach ($academicAreas as $areaId) {
             DB::table('user_area_olympiads')->updateOrInsert([
-                'user_id' => 2,
+                'user_role_id' => $academicUserRoleId,
                 'area_id' => $areaId,
                 'olympiad_id' => $OlympiadId,
             ]);
         }
 
         //Create Evaluator User
-        $evaluatorUser = [
+        $evaluatorUser = User::firstOrCreate([
             'first_name' => 'Soobin',
             'last_name' => 'Choi',
             'email' => 'soobin@gmail.com',
@@ -160,17 +171,25 @@ class TheOrigin extends Seeder
             'ci' => '55555555',
             'phone_number' => '12345678',
             'genre' => 'masculino',
-            'roles_id' => 3,
+            // 'role_id' => 3,
             'profesion' => 'INGENIERO EN INFORMATICA',
-        ];
+        ]);
 
-        User::firstOrCreate($evaluatorUser);
+        $evaluatorUserRole = DB::table('user_roles')->updateOrInsert([
+            'user_id' => $evaluatorUser->id,
+            'role_id' => 3,
+        ]);
+
+        $evaluatorUserRoleId = DB::table('user_roles')
+            ->where('user_id', $evaluatorUser->id)
+            ->where('role_id', 3)
+            ->value('id');
 
         $evaluatorAreas = ['1', '2', '3', '4', '5', '6', '7', '8'];
 
         foreach ($evaluatorAreas as $areaId) {
             DB::table('user_area_olympiads')->updateOrInsert([
-                'user_id' => 3,
+                'user_role_id' => $evaluatorUserRoleId,
                 'area_id' => $areaId,
                 'olympiad_id' => $OlympiadId,
             ]);
