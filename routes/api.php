@@ -83,6 +83,9 @@ Route::get('/olympiads/{olympiadId}/areas/{areaId}/score-cuts', [OlympiadControl
 Route::post('/olympiads/{olympiadId}/areas/{areaId}/max-scores', [OlympiadController::class, 'assignMaxScores']);
 Route::get('/olympiads/{olympiadId}/areas/{areaId}/max-scores', [OlympiadController::class, 'getMaxScores']);
 
+// <--- Get Specific Phase Scores by Level --->
+Route::get('/olympiads/{olympiadId}/areas/{areaId}/phases/{phaseId}/level/{levelId}/scores', [OlympiadController::class, 'getPhaseScoresByLevel']);
+
 // login
 Route::post('/login', [AuthController::class, 'login']);
 
