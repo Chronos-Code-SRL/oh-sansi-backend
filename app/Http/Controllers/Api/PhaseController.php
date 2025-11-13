@@ -5,11 +5,15 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 use App\Models\Phase;
 use App\Models\OlympiadArea;
 use App\Models\OlympiadAreaPhase;
+use App\Models\Evaluation;
+use App\Models\OlympiadAreaPhaseLevelGrade;
+use App\Models\LevelGrade;
 
 /**
  * @OA\Tag(
@@ -419,6 +423,11 @@ class PhaseController extends Controller
             return response()->json($data, 500);
         }
 
+        // Si la fase se marca como "Terminada", procesar clasificaciones
+        if ($request->status === 'Terminada') {
+            $this->processPhaseClassifications($olympiadAreaPhase, $olympiadArea);
+        }
+
         // Cargar la información de la fase para la respuesta
         $olympiadAreaPhase->load('phase');
 
@@ -433,5 +442,160 @@ class PhaseController extends Controller
         ];
 
         return response()->json($data, 200);
+    }
+
+    /**
+     * Process automatic classification when a phase is marked as "Terminada"
+     */
+    private function processPhaseClassifications($olympiadAreaPhase, $olympiadArea)
+    {
+        // Obtener todas las evaluaciones de esta fase
+        $evaluations = Evaluation::where('olympiad_area_phase_id', $olympiadAreaPhase->id)
+            ->whereNotNull('score')
+            ->get();
+
+        // Verificar si es la fase final
+        $isFinalPhase = $this->isFinalPhase($olympiadAreaPhase, $olympiadArea);
+
+        // Obtener la siguiente fase si no es la final
+        $nextOlympiadAreaPhase = null;
+        if (!$isFinalPhase) {
+            $nextOlympiadAreaPhase = $this->getNextPhase($olympiadAreaPhase, $olympiadArea);
+        }
+
+        foreach ($evaluations as $evaluation) {
+            // Obtener score_cut para esta evaluación específica
+            $scoreCut = $this->getScoreCut($olympiadAreaPhase, $evaluation);
+
+            if ($scoreCut !== null) {
+                // Clasificar basado en score_cut
+                if ($evaluation->score >= $scoreCut) {
+                    $evaluation->classification_status = 'clasificado';
+
+                    // Si no es la fase final y el competidor clasifica, crear registro para siguiente fase
+                    if (!$isFinalPhase && $nextOlympiadAreaPhase) {
+                        $this->createNextPhaseEvaluation($evaluation, $nextOlympiadAreaPhase);
+                    }
+                } else {
+                    $evaluation->classification_status = 'desclasificado';
+                }
+            }
+        }
+
+        // Si es la fase final, asignar medallas
+        if ($isFinalPhase) {
+            $this->assignMedals($evaluations);
+        }
+
+        // Guardar todas las evaluaciones
+        foreach ($evaluations as $evaluation) {
+            $evaluation->save();
+        }
+    }
+
+    /**
+     * Get the score cut for a specific evaluation
+     */
+    private function getScoreCut($olympiadAreaPhase, $evaluation)
+    {
+        // Usar consulta SQL directa basada en la tabla contestant_level_grades
+        $scoreCut = DB::table('evaluations as e')
+            ->join('registrations as r', 'e.registration_id', '=', 'r.id')
+            ->join('contestant_level_grades as clg', 'r.contestant_id', '=', 'clg.contestant_id')
+            ->join('olympiad_area_phase_level_grades as oaplg', 'clg.level_grade_id', '=', 'oaplg.level_grade_id')
+            ->where('e.id', $evaluation->id)
+            ->value('oaplg.score_cut');
+
+        return $scoreCut;
+    }
+
+    /**
+     * Check if the current phase is the final phase for this olympiad area
+     */
+    private function isFinalPhase($currentOlympiadAreaPhase, $olympiadArea)
+    {
+        $maxOrder = OlympiadAreaPhase::where('olympiad_area_id', $olympiadArea->id)
+            ->join('phases', 'olympiad_area_phases.phase_id', '=', 'phases.id')
+            ->max('phases.order');
+
+        $currentPhase = $currentOlympiadAreaPhase->load('phase');
+
+        return $currentPhase->phase->order == $maxOrder;
+    }
+
+    /**
+     * Assign medals for the final phase
+     */
+    private function assignMedals($evaluations)
+    {
+        // Ordenar por puntuación descendente (solo clasificados)
+        $classifiedEvaluations = $evaluations
+            ->where('classification_status', 'clasificado')
+            ->sortByDesc('score')
+            ->values();
+
+        foreach ($classifiedEvaluations as $index => $evaluation) {
+            switch ($index) {
+                case 0:
+                    $evaluation->classification_place = 'Oro';
+                    break;
+                case 1:
+                    $evaluation->classification_place = 'Plata';
+                    break;
+                case 2:
+                    $evaluation->classification_place = 'Bronce';
+                    break;
+                default:
+                    $evaluation->classification_place = 'Mención honorífica';
+                    break;
+            }
+        }
+    }
+
+    /**
+     * Get the next phase for this olympiad area
+     */
+    private function getNextPhase($currentOlympiadAreaPhase, $olympiadArea)
+    {
+        $currentPhase = $currentOlympiadAreaPhase->load('phase');
+        $nextPhaseOrder = $currentPhase->phase->order + 1;
+
+        // Buscar la siguiente fase en orden
+        $nextPhase = Phase::where('order', $nextPhaseOrder)->first();
+
+        if (!$nextPhase) {
+            return null;
+        }
+
+        // Buscar el OlympiadAreaPhase correspondiente para la siguiente fase
+        $nextOlympiadAreaPhase = OlympiadAreaPhase::where('olympiad_area_id', $olympiadArea->id)
+            ->where('phase_id', $nextPhase->id)
+            ->first();
+
+        return $nextOlympiadAreaPhase;
+    }
+
+    /**
+     * Create evaluation record for next phase when competitor qualifies
+     */
+    private function createNextPhaseEvaluation($currentEvaluation, $nextOlympiadAreaPhase)
+    {
+        // Verificar si ya existe un registro para este competidor en la siguiente fase
+        $existingEvaluation = Evaluation::where('registration_id', $currentEvaluation->registration_id)
+            ->where('olympiad_area_phase_id', $nextOlympiadAreaPhase->id)
+            ->first();
+
+        // Solo crear si no existe
+        if (!$existingEvaluation) {
+            Evaluation::create([
+                'registration_id' => $currentEvaluation->registration_id,
+                'olympiad_area_phase_id' => $nextOlympiadAreaPhase->id,
+                'score' => null,
+                'description' => null,
+                'status' => false,
+                'classification_status' => null,
+                'classification_place' => null
+            ]);
+        }
     }
 }
