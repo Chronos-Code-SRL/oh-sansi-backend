@@ -139,6 +139,7 @@ Route::get('/evaluations/check-updates/',[EvaluationController::class, 'checksUp
 
 // <--- Get Contestants --->
 Route::get('/contestants/{phase_id}/{olympiad_id}/{area_id}/{level_id}', [ContestantController::class, 'showContestant']);
+Route::get('/contestants/ranked/{phase_id}/{olympiad_id}/{area_id}/{level_id}', [ContestantController::class, 'getRankedContestants']);
 Route::get('/contestants', [ContestantController::class, 'showContestantsOlympiad']);
 
 // <--- CRUD Level --->

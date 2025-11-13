@@ -139,4 +139,99 @@ class ContestantController extends Controller
 
         return response()->json($result, 200);
     }
+
+    /**
+     * Get ranked contestants for a specific phase/olympiad/area/level
+     * Estado rules:
+     *  - "Clasificado": score >= score_cut (or olympiad default)
+     *  - "Desclasificado": score < score_cut
+     *  - "Descalificado": score is null OR has a special observation (description not empty)
+     */
+    public function getRankedContestants(string $phase_id, string $olympiad_id, string $area_id, string $level_id): JsonResponse
+    {
+        $contestants = Evaluation::query()
+            ->select(
+                'evaluations.id AS evaluation_id',
+                'contestants.id AS contestant_id',
+                'contestants.first_name',
+                'contestants.last_name',
+                'contestants.gender',
+                'contestants.ci_document',
+                'contestants.school_name',
+                'contestants.department',
+                'evaluations.score',
+                'evaluations.description',
+                'evaluations.status',
+                'grades.name AS grade_name',
+                'levels.name AS level_name',
+                'olympiad_area_phase_level_grades.score_cut AS score_cut',
+                'olympiads.default_score_cut AS olympiad_default_score_cut'
+            )
+            ->join('registrations', 'evaluations.registration_id', '=', 'registrations.id')
+            ->join('contestants', 'registrations.contestant_id', '=', 'contestants.id')
+            ->leftJoin('contestant_level_grades', 'contestants.id', '=', 'contestant_level_grades.contestant_id')
+            ->leftJoin('level_grades', 'contestant_level_grades.level_grade_id', '=', 'level_grades.id')
+            ->leftJoin('grades', 'level_grades.grade_id', '=', 'grades.id')
+            ->leftJoin('levels', 'level_grades.level_id', '=', 'levels.id')
+            ->join('olympiad_area_phases', 'evaluations.olympiad_area_phase_id', '=', 'olympiad_area_phases.id')
+            ->join('olympiad_areas', 'registrations.olympiad_area_id', '=', 'olympiad_areas.id')
+            ->leftJoin('olympiads', 'olympiad_areas.olympiad_id', '=', 'olympiads.id')
+            // join score cuts matching both the olympiad_area_phase and the contestant's level_grade
+            ->leftJoin('olympiad_area_phase_level_grades', function ($join) {
+                $join->on('olympiad_area_phase_level_grades.olympiad_area_phase_id', '=', 'olympiad_area_phases.id')
+                    ->on('olympiad_area_phase_level_grades.level_grade_id', '=', 'contestant_level_grades.level_grade_id');
+            })
+            ->where('olympiad_areas.olympiad_id', $olympiad_id)
+            ->where('olympiad_areas.area_id', $area_id)
+            ->where('olympiad_area_phases.phase_id', $phase_id)
+            ->where('levels.id', $level_id)
+            ->whereColumn('olympiad_area_phases.olympiad_area_id', 'olympiad_areas.id')
+            ->distinct()
+            ->get();
+
+        if ($contestants->isEmpty()) {
+            $data = [
+                'message' => 'Error in recovering competitors',
+                'status' => 404
+            ];
+
+            return response()->json($data, 404);
+        }
+
+        $result = $contestants->map(function ($item) {
+            $score = $item->score;
+            $desc = trim((string)($item->description ?? ''));
+
+            // Determine applied score cut (threshold): prefer specific score_cut, then olympiad default, then fallback 51
+            $scoreCut = $item->score_cut ?? $item->olympiad_default_score_cut ?? 51;
+
+            // Determine estado
+            if (is_null($score) || $desc !== '') {
+                $estado = 'Descalificado';
+            } else {
+                // compare numerically using the applied threshold
+                $estado = ((float)$score >= (float)$scoreCut) ? 'Clasificado' : 'Desclasificado';
+            }
+
+            return [
+                'contestant_id' => $item->contestant_id,
+                'evaluation_id' => $item->evaluation_id,
+                'first_name' => $item->first_name,
+                'last_name' => $item->last_name,
+                'gender' => $item->gender,
+                'ci_document' => $item->ci_document,
+                'school_name' => $item->school_name,
+                'department' => $item->department,
+                'grade_name' => $item->grade_name,
+                'level_name' => $item->level_name,
+                'score' => $item->score,
+                'score_cut' => $scoreCut,
+                'description' => $item->description,
+                'estado' => $estado,
+                'status' => (bool)$item->status,
+            ];
+        });
+
+        return response()->json($result);
+    }
 }

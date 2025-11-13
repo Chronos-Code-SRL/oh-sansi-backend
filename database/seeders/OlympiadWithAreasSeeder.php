@@ -21,6 +21,8 @@ class OlympiadWithAreasSeeder extends Seeder
         ], [
             'start_date' => now()->toDateString(),
             'end_date' => now()->addMonth()->toDateString(),
+            'default_score_cut' => 51,
+            'default_max_score' => 100,
         ]);
 
         // Map all existing areas to this olympiad
@@ -41,6 +43,8 @@ class OlympiadWithAreasSeeder extends Seeder
         ], [
             'start_date' => now()->toDateString(),
             'end_date' => now()->addMonths(2)->toDateString(),
+            'default_score_cut' => 51,
+            'default_max_score' => 100,
         ]);
 
         // Map only first 4 areas to this olympiad
