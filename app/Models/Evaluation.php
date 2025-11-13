@@ -14,7 +14,9 @@ class Evaluation extends Model
         'description',
         'registration_id',
         'olympiad_area_phase_id',
-        'status'
+        'status',
+        'classification_status',
+        'classification_place'
     ];
 
     /**
