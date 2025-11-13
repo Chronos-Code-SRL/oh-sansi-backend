@@ -2826,13 +2826,13 @@ class OlympiadController extends Controller
             ->select('l.id', 'l.name')
             ->distinct()
             ->get();
-            
+
         if ($levels->isEmpty()) {
             return response()->json([
                 'message' => 'No levels found for the specified olympiad and area.',
                 'status' => 404
             ], 404);
-            
+
         }
 
         return response()->json(
@@ -2841,5 +2841,111 @@ class OlympiadController extends Controller
                 'data' => $levels,
                 'status' => 200
             ], 200);
+    }
+
+    /**
+     * Get score cut and max score for a specific olympiad area phase level
+     */
+    public function getPhaseScoresByLevel($olympiadId, $areaId, $phaseId, $levelId)
+    {
+        try {
+            // Validar parámetros
+            if (!is_numeric($olympiadId) || $olympiadId <= 0) {
+                return response()->json([
+                    'message' => 'Invalid olympiad ID',
+                    'error' => 'Olympiad ID must be a positive integer',
+                    'status' => 400
+                ], 400);
+            }
+
+            if (!is_numeric($areaId) || $areaId <= 0) {
+                return response()->json([
+                    'message' => 'Invalid area ID',
+                    'error' => 'Area ID must be a positive integer',
+                    'status' => 400
+                ], 400);
+            }
+
+            if (!is_numeric($phaseId) || $phaseId <= 0) {
+                return response()->json([
+                    'message' => 'Invalid phase ID',
+                    'error' => 'Phase ID must be a positive integer',
+                    'status' => 400
+                ], 400);
+            }
+
+            if (!is_numeric($levelId) || $levelId <= 0) {
+                return response()->json([
+                    'message' => 'Invalid level ID',
+                    'error' => 'Level ID must be a positive integer',
+                    'status' => 400
+                ], 400);
+            }
+
+            // Usar consulta SQL simplificada que devuelve solo un resultado por nivel
+            $result = DB::selectOne("
+                SELECT oaplg.score_cut, oaplg.max_score
+                FROM olympiad_area_phase_level_grades oaplg
+                JOIN level_grades lg ON oaplg.level_grade_id = lg.id
+                WHERE oaplg.olympiad_area_phase_id = (
+                    SELECT id FROM olympiad_area_phases
+                    WHERE phase_id = ? AND olympiad_area_id = (
+                        SELECT id FROM olympiad_areas
+                        WHERE olympiad_id = ? AND area_id = ?
+                    )
+                )
+                AND oaplg.level_grade_id IN (
+                    SELECT id FROM level_grades
+                    WHERE level_id = ? AND olympiad_area_id = (
+                        SELECT id FROM olympiad_areas
+                        WHERE olympiad_id = ? AND area_id = ?
+                    )
+                )
+                LIMIT 1
+            ", [$phaseId, $olympiadId, $areaId, $levelId, $olympiadId, $areaId]);
+
+            if (!$result) {
+                return response()->json([
+                    'message' => 'No scores found for the specified criteria',
+                    'error' => "No scores configured for olympiad {$olympiadId}, area {$areaId}, phase {$phaseId}, level {$levelId}",
+                    'status' => 404
+                ], 404);
+            }
+
+            return response()->json([
+                'score_cut' => $result->score_cut,
+                'max_score' => $result->max_score,
+                'olympiad_id' => (int)$olympiadId,
+                'area_id' => (int)$areaId,
+                'phase_id' => (int)$phaseId,
+                'level_id' => (int)$levelId,
+                'status' => 200
+            ], 200);
+
+        } catch (\Illuminate\Database\QueryException $e) {
+            Log::error('Database error in getPhaseScoresByLevel: ' . $e->getMessage(), [
+                'olympiad_id' => $olympiadId,
+                'area_id' => $areaId,
+                'phase_id' => $phaseId,
+                'level_id' => $levelId
+            ]);
+            return response()->json([
+                'message' => 'Database error occurred',
+                'error' => 'Failed to retrieve scores',
+                'status' => 500
+            ], 500);
+        } catch (\Exception $e) {
+            Log::error('Unexpected error in getPhaseScoresByLevel: ' . $e->getMessage(), [
+                'olympiad_id' => $olympiadId,
+                'area_id' => $areaId,
+                'phase_id' => $phaseId,
+                'level_id' => $levelId
+            ]);
+            return response()->json([
+                'message' => 'An unexpected error occurred',
+                'error' => 'Internal server error',
+                'status' => 500
+            ], 500);
+        }
     }
 }
