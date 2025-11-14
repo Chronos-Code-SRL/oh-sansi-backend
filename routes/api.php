@@ -62,6 +62,7 @@ Route::delete('/phases/{id}', [PhaseController::class, 'destroy']);
 // <--- CRUD Olympiad-Area-Phases (Status) --->
 Route::get('/olympiads/{olympiadId}/areas/{areaId}/phase-status', [PhaseController::class, 'getPhaseStatus']);
 Route::put('/olympiads/{olympiadId}/areas/{areaId}/phase-status', [PhaseController::class, 'updatePhaseStatus']);
+Route::put('/olympiads/{olympiadId}/areas/{areaId}/phases/{phaseId}/endorse', [PhaseController::class, 'endorsePhase']);
 
 // <--- CRUD Olympiad-Area-Level-Grades --->
 Route::post('/olympiads/{olympiadId}/areas/{areaId}/level-grades', [OlympiadController::class, 'assignLevelGradesToArea']);

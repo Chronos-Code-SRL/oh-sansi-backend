@@ -445,6 +445,124 @@ class PhaseController extends Controller
     }
 
     /**
+     * @OA\Put(
+     *     path="/api/olympiads/{olympiadId}/areas/{areaId}/phases/{phaseId}/endorse",
+     *     summary="Endorse a phase - mark as completed and activate next phase if exists",
+     *     tags={"Phases"},
+     *     @OA\Parameter(
+     *         name="olympiadId",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Parameter(
+     *         name="areaId",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Parameter(
+     *         name="phaseId",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Phase endorsed successfully"
+     *     )
+     * )
+     */
+    public function endorsePhase(string $olympiadId, string $areaId, string $phaseId)
+    {
+        // Verificar que existe la relación olympiad_area
+        $olympiadArea = OlympiadArea::where('olympiad_id', $olympiadId)
+            ->where('area_id', $areaId)
+            ->first();
+
+        if (!$olympiadArea) {
+            return response()->json([
+                'message' => 'Olympiad area relationship not found',
+                'status' => 404
+            ], 404);
+        }
+
+        // Verificar que la fase existe para esta olympiad area
+        $currentOlympiadAreaPhase = OlympiadAreaPhase::where('olympiad_area_id', $olympiadArea->id)
+            ->where('phase_id', $phaseId)
+            ->first();
+
+        if (!$currentOlympiadAreaPhase) {
+            return response()->json([
+                'message' => 'Phase not found for this olympiad area',
+                'status' => 404
+            ], 404);
+        }
+
+        // Verificar que la fase no esté ya terminada
+        if ($currentOlympiadAreaPhase->status === 'Terminada') {
+            return response()->json([
+                'message' => 'Phase is already completed',
+                'status' => 400
+            ], 400);
+        }
+
+        // Marcar la fase actual como "Terminada" usando updatePhaseStatus
+        $updateRequest = new Request([
+            'phase_id' => $phaseId,
+            'status' => 'Terminada'
+        ]);
+
+        $updateResponse = $this->updatePhaseStatus($updateRequest, $olympiadId, $areaId);
+        
+        // Verificar si la actualización fue exitosa
+        if ($updateResponse->getStatusCode() !== 200) {
+            return $updateResponse;
+        }
+
+        $responseData = [
+            'message' => 'Phase endorsed successfully',
+            'current_phase' => [
+                'phase_id' => $phaseId,
+                'status' => 'Terminada'
+            ],
+            'olympiad_id' => $olympiadId,
+            'area_id' => $areaId,
+            'status' => 200
+        ];
+
+        // Verificar si no es la fase final y activar la siguiente
+        if (!$this->isFinalPhase($currentOlympiadAreaPhase, $olympiadArea)) {
+            $nextOlympiadAreaPhase = $this->getNextPhase($currentOlympiadAreaPhase, $olympiadArea);
+            
+            if ($nextOlympiadAreaPhase) {
+                // Activar la siguiente fase
+                $nextUpdateRequest = new Request([
+                    'phase_id' => $nextOlympiadAreaPhase->phase_id,
+                    'status' => 'Activa'
+                ]);
+
+                $nextUpdateResponse = $this->updatePhaseStatus($nextUpdateRequest, $olympiadId, $areaId);
+                
+                if ($nextUpdateResponse->getStatusCode() === 200) {
+                    $nextOlympiadAreaPhase->load('phase');
+                    $responseData['next_phase'] = [
+                        'phase_id' => $nextOlympiadAreaPhase->phase_id,
+                        'phase_name' => $nextOlympiadAreaPhase->phase->name,
+                        'status' => 'Activa'
+                    ];
+                    $responseData['message'] = 'Phase endorsed successfully and next phase activated';
+                }
+            }
+        } else {
+            $responseData['message'] = 'Phase endorsed successfully - final phase completed';
+            $responseData['is_final_phase'] = true;
+        }
+
+        return response()->json($responseData, 200);
+    }
+
+    /**
      * Process automatic classification when a phase is marked as "Terminada"
      */
     private function processPhaseClassifications($olympiadAreaPhase, $olympiadArea)
