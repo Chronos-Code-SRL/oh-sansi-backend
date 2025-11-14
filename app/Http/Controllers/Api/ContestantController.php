@@ -26,7 +26,9 @@ class ContestantController extends Controller
                 'evaluations.description',
                 'evaluations.status',
                 'grades.name AS grade_name',
-                'levels.name AS level_name'
+                'levels.name AS level_name',
+                'evaluations.classification_status',
+                'evaluations.classification_place'
             )
             ->join('registrations', 'evaluations.registration_id', '=', 'registrations.id')
             ->join('contestants', 'registrations.contestant_id', '=', 'contestants.id')
@@ -67,6 +69,8 @@ class ContestantController extends Controller
                 'score' => $item->score,
                 'description' => $item->description,
                 'status' => (bool)$item->status,
+                'classification_status' => $item->classification_status,
+                'classification_place' => $item->classification_place,
             ];
         });
 
@@ -233,5 +237,33 @@ class ContestantController extends Controller
         });
 
         return response()->json($result);
+    }
+
+    public function countsByAreaPhaseLevel(string $olympiad_id, string $area_id, string $phase_id, string $level_id)
+    {
+        $competitorsCount = DB::table('contestants as c')
+            ->join('contestant_level_grades as clg', 'c.id', '=', 'clg.contestant_id')
+            ->join('level_grades as lg', 'clg.level_grade_id', '=', 'lg.id')
+            ->join('registrations as r', 'r.contestant_id', '=', 'c.id')
+            ->join('evaluations as e', 'e.registration_id', '=', 'r.id')
+            ->join('olympiad_area_phases as oap', 'e.olympiad_area_phase_id', '=', 'oap.id') 
+            ->join('olympiad_areas as oa', 'oap.olympiad_area_id', '=', 'oa.id')
+            ->where('oa.olympiad_id', $olympiad_id)
+            ->where('oa.area_id', $area_id)
+            ->where('oap.phase_id', $phase_id)
+            ->where('lg.level_id', $level_id);
+
+        $total = $competitorsCount->count();
+        // echo $total;
+        $classified = (clone $competitorsCount)->where('e.classification_status', 'clasificado')->count();
+        $disclassified = (clone $competitorsCount)->where('e.classification_status', 'desclasificado')->count();
+        $disqualified = (clone $competitorsCount)->where('e.classification_status', 'descalificado')->count();
+
+        return response()->json([
+            'total' => $total,
+            'classified' => $classified,
+            'disclassified' => $disclassified,
+            'disqualified' => $disqualified,
+        ]);
     }
 }
