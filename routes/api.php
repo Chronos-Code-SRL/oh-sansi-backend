@@ -146,6 +146,7 @@ Route::patch('/evaluations/{id}/classification', [EvaluationController::class, '
 Route::get('/contestants/{phase_id}/{olympiad_id}/{area_id}/{level_id}', [ContestantController::class, 'showContestant']);
 Route::get('/contestants/ranked/{phase_id}/{olympiad_id}/{area_id}/{level_id}', [ContestantController::class, 'getRankedContestants']);
 Route::get('/contestants', [ContestantController::class, 'showContestantsOlympiad']);
+Route::get('/contestants/olympiads/{olympiad_id}/areas/{area_id}/phases/{phase_id}/levels/{level_id}', [ContestantController::class, 'countsByAreaPhaseLevel']);
 
 // <--- CRUD Level --->
 Route::get('/levels-olympiad', [App\Http\Controllers\Api\LevelController::class, 'getLevelsOlympiad']);
