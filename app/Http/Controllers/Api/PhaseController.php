@@ -477,7 +477,7 @@ class PhaseController extends Controller
                         $this->createNextPhaseEvaluation($evaluation, $nextOlympiadAreaPhase);
                     }
                 } else {
-                    $evaluation->classification_status = 'desclasificado';
+                    $evaluation->classification_status = 'no_clasificado';
                 }
             }
         }

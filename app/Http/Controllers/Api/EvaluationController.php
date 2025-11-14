@@ -161,7 +161,7 @@ class EvaluationController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'classification_status' => 'required|string|in:clasificado,desclasificado,descalificado',
+            'classification_status' => 'required|string|in:clasificado,no_clasificado,descalificado',
             'classification_place' => 'nullable|string|in:Oro,Plata,Bronce,Mención honorífica',
             'description' => 'string|nullable'
         ]);
@@ -289,7 +289,7 @@ class EvaluationController extends Controller
                 if ($evaluation->score >= $threshold->score_cut) {
                     $evaluation->classification_status = 'clasificado';
                 } else {
-                    $evaluation->classification_status = 'desclasificado';
+                    $evaluation->classification_status = 'no_clasificado';
                 }
             } else {
                 // No threshold was found for that level

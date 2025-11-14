@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('evaluations', function (Blueprint $table) {
-            $table->enum('classification_status', ['clasificado', 'desclasificado', 'descalificado'])
+            $table->enum('classification_status', ['clasificado', 'no_clasificado', 'descalificado'])
                   ->nullable()
                   ->after('status');
             $table->enum('classification_place', ['Oro', 'Plata', 'Bronce', 'Mención honorífica'])
