@@ -256,7 +256,7 @@ class ContestantController extends Controller
         $total = $competitorsCount->count();
         // echo $total;
         $classified = (clone $competitorsCount)->where('e.classification_status', 'clasificado')->count();
-        $disclassified = (clone $competitorsCount)->where('e.classification_status', 'desclasificado')->count();
+        $disclassified = (clone $competitorsCount)->where('e.classification_status', 'no_clasificado')->count();
         $disqualified = (clone $competitorsCount)->where('e.classification_status', 'descalificado')->count();
 
         return response()->json([
