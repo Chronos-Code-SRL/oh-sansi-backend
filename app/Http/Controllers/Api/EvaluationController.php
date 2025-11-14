@@ -11,6 +11,7 @@ use App\Models\OlympiadAreaPhase;
 use App\Models\Phase;
 use Illuminate\Http\JsonResponse;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class EvaluationController extends Controller
 {
@@ -46,6 +47,7 @@ class EvaluationController extends Controller
         if ($request->has('score')) {
             $evaluation->score = $request->score;
             $evaluation->status = true;
+            $this->updateClassificationAutomatic($evaluation);
         }
 
         if ($request->has('description')) {
@@ -85,15 +87,11 @@ class EvaluationController extends Controller
             return [
                 'evaluation_id' => $evaluation->id,
                 'contestant_id' => $contestant->id ?? null,
-                // 'first_name' => $contestant->first_name ?? null,
-                // 'last_name' => $contestant->last_name ?? null,
-                // 'ci_document' => $contestant->ci_document ?? null,
                 'score' => $evaluation->score,
                 'description' => $evaluation->description,
                 'status' => $evaluation->status,
-                // 'level_name' => $contestant->level_name ?? null,
-                // 'grade_name' => $contestant->grade ?? null,
-                // Agregar otros campos necesarios
+                'classification_status' => $evaluation->classification_status,
+                'classification_place' => $evaluation->classification_place,
             ];
         });
 
@@ -267,5 +265,39 @@ class EvaluationController extends Controller
             'classification_status' => $evaluation->classification_status,
             'classification_place' => $evaluation->classification_place,
         ];
+    }
+
+    private function updateClassificationAutomatic(Evaluation $evaluation)
+    {
+        $contestantId = $evaluation->registration->contestant->id;
+
+        $levelGrade = DB::table('contestant_level_grades')
+                ->where('contestant_id', $contestantId)
+                ->join('level_grades', 'contestant_level_grades.level_grade_id', '=', 'level_grades.id')
+                ->select('level_grades.*')
+                ->first();
+
+        $levelGradeId = $levelGrade->id ?? null;
+
+        if ($levelGradeId) {
+            // Find the corresponding threshold
+            $threshold = \App\Models\OlympiadAreaPhaseLevelGrade::where('olympiad_area_phase_id', $evaluation->olympiad_area_phase_id)
+                ->where('level_grade_id', $levelGradeId)
+                ->first();
+
+            if ($threshold) {
+                if ($evaluation->score >= $threshold->score_cut) {
+                    $evaluation->classification_status = 'clasificado';
+                } else {
+                    $evaluation->classification_status = 'desclasificado';
+                }
+            } else {
+                // No threshold was found for that level
+                $evaluation->classification_status = 'descalificado';
+            }
+        } else {
+                // The competitor does not have a registered level
+                $evaluation->classification_status = 'descalificado';
+        }
     }
 }
