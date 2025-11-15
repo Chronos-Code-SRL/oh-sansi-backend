@@ -244,25 +244,40 @@ class ContestantController extends Controller
         $competitorsCount = DB::table('contestants as c')
             ->join('contestant_level_grades as clg', 'c.id', '=', 'clg.contestant_id')
             ->join('level_grades as lg', 'clg.level_grade_id', '=', 'lg.id')
-            ->join('registrations as r', 'r.contestant_id', '=', 'c.id')
-            ->join('evaluations as e', 'e.registration_id', '=', 'r.id')
-            ->join('olympiad_area_phases as oap', 'e.olympiad_area_phase_id', '=', 'oap.id') 
-            ->join('olympiad_areas as oa', 'oap.olympiad_area_id', '=', 'oa.id')
+            ->join('registrations as r', 'c.id', '=', 'r.contestant_id')
+            ->join('olympiad_areas as oa', 'r.olympiad_area_id', '=', 'oa.id')
+            ->join('olympiad_area_phases as oap', 'oa.id', '=', 'oap.olympiad_area_id')
+
             ->where('oa.olympiad_id', $olympiad_id)
             ->where('oa.area_id', $area_id)
             ->where('oap.phase_id', $phase_id)
             ->where('lg.level_id', $level_id);
 
-        $total = $competitorsCount->count();
-        // echo $total;
-        $classified = (clone $competitorsCount)->where('e.classification_status', 'clasificado')->count();
-        $disclassified = (clone $competitorsCount)->where('e.classification_status', 'no_clasificado')->count();
-        $disqualified = (clone $competitorsCount)->where('e.classification_status', 'descalificado')->count();
+        $total = $competitorsCount->count(DB::raw('DISTINCT c.id'));
 
+        $evaluatedQuery = (clone $competitorsCount)
+            ->leftJoin('evaluations as e', 'e.registration_id', '=', 'r.id')
+            ->select(DB::raw('COUNT(DISTINCT c.id)'));
+        
+        $classified = (clone $evaluatedQuery)
+            ->where('e.classification_status', 'clasificado')
+            ->first()->count;
+            
+        $disclassified = (clone $evaluatedQuery)
+            ->where('e.classification_status', 'no_clasificado')
+            ->first()->count;
+            
+        $disqualified = (clone $evaluatedQuery)
+            ->where(function ($query) {
+                $query->where('e.classification_status', 'descalificado') // Es 'descalificado'
+                    ->orWhereNull('e.classification_status');          // O es NULL (aún no evaluado)
+            })
+            ->first()->count;
+            
         return response()->json([
             'total' => $total,
             'classified' => $classified,
-            'disclassified' => $disclassified,
+            'no_classified' => $disclassified,
             'disqualified' => $disqualified,
         ]);
     }
