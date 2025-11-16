@@ -388,7 +388,58 @@ class ContestantController extends Controller
         return response()->json($classifieds, 200);
     }
 
-    public function getAwardWinningContestants(){
+    public function getAwardWinningContestants(string $olympiad_id, string $area_id){
+        $lastPhase = DB::table('olympiad_area_phases as oap')
+            ->join('phases as p', 'oap.phase_id', '=', 'p.id')
+            ->join('olympiad_areas as oa', 'oap.olympiad_area_id', '=', 'oa.id')
+            ->where('oa.olympiad_id', $olympiad_id)
+            ->where('oa.area_id', $area_id)
+            ->where('oap.status', 'Terminada')
+            ->orderBy('p.order', 'desc')
+            ->select('oap.id', 'oap.phase_id', 'p.order')
+            ->first();
         
+        if (!$lastPhase) {
+            return response()->json([
+                'message' => 'No completed phases found for the specified olympiad and area',
+                'status' => 404
+            ], 404);
+        }
+
+        $lastPhaseOAPId = $lastPhase->id;
+        $results = DB::table('contestants as c')
+            ->distinct()
+            ->select(
+                'c.first_name',
+                'c.last_name',
+                'c.department',
+                'l.name as level_name',
+                'a.name as area_name',
+                'e.classification_place'
+            )
+            ->join('contestant_level_grades as clg', 'c.id', '=', 'clg.contestant_id')
+            ->join('level_grades as lg', 'clg.level_grade_id', '=', 'lg.id')
+            ->join('registrations as r', 'r.contestant_id', '=', 'c.id')
+            ->join('evaluations as e', 'e.registration_id', '=', 'r.id')
+            ->join('olympiad_area_phases as oap', 'e.olympiad_area_phase_id', '=', 'oap.id')
+            ->join('olympiad_areas as oa', 'oap.olympiad_area_id', '=', 'oa.id')
+            ->join('levels as l', 'lg.level_id', '=', 'l.id')
+            ->join('areas as a', 'oa.area_id', '=', 'a.id')
+            ->where('oa.olympiad_id', $olympiad_id)
+            ->where('oa.area_id', $area_id)
+            ->where('oap.id', $lastPhaseOAPId) // <-- Aquí usas la última fase
+            ->get();
+
+        if ($results->isEmpty()) {
+            return response()->json([
+                'message' => 'No award-winning contestants found',
+                'status' => 404
+            ], 404);
+        }
+
+        return response()->json([
+            'contestants' => $results,
+            'status' => 200
+        ], 200);
     }
 }
