@@ -330,9 +330,11 @@ class ContestantController extends Controller
             ->where('oa.area_id', $area_id)
             ->where('lg.level_id', $level_id)
             ->select(
+                'c.id AS contestant_id',
                 'c.first_name AS first_name',
                 'c.last_name AS last_name',
                 'c.school_name AS school_name',
+                'c.ci_document AS ci_document',
                 'a.name AS area_name',
                 'l.name AS level_name',
                 'rk.score AS score',
