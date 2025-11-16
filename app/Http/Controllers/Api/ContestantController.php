@@ -58,6 +58,7 @@ class ContestantController extends Controller
         $result = $contestants->map(function ($item) {
             return [
                 'contestant_id' => $item->contestant_id,
+                'evaluation_id' => $item->evaluation_id,
                 'first_name' => $item->first_name,
                 'last_name' => $item->last_name,
                 'gender' => $item->gender,
