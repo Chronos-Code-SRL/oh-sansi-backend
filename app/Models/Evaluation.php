@@ -4,10 +4,20 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
+use OwenIt\Auditing\Auditable;
 
-class Evaluation extends Model
+class Evaluation extends Model implements AuditableContract
 {
-    use HasFactory;
+    use HasFactory, Auditable;
+
+    // Audit only the important fields for calificaciones
+    protected $auditInclude = [
+        'score',
+        'status',
+        'classification_status',
+        'classification_place',
+    ];
 
     protected $fillable = [
         'score',
