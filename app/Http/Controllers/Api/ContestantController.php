@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use App\Models\Evaluation;
 use Illuminate\Support\Facades\DB;
+use App\Models\Contestant;
 
 class ContestantController extends Controller
 {
@@ -351,5 +352,42 @@ class ContestantController extends Controller
             ->get();
         
         return response()->json($results, 200);
+    }
+
+    public function getContestantsClassifieds(string $olympiad_id, string $area_id, string $phase_id, string $level_id)
+    {
+        $classifieds = Contestant::select(
+            'contestants.first_name as first_name',
+            'contestants.last_name as last_name',
+            'contestants.ci_document as ci_document',
+            'contestants.grade as grade',
+            'e.classification_status as classification_status',
+            'e.score as score'
+        )
+        ->join('registrations as r', 'r.contestant_id', '=', 'contestants.id')
+        ->join('evaluations as e', 'e.registration_id', '=', 'r.id')
+        ->join('olympiad_area_phases as oap', 'e.olympiad_area_phase_id', '=', 'oap.id')
+        ->join('olympiad_areas as oa', 'oap.olympiad_area_id', '=', 'oa.id')
+        ->join('contestant_level_grades as clg', 'clg.contestant_id', '=', 'contestants.id')
+        ->join('level_grades as lg', 'lg.id', '=', 'clg.level_grade_id')
+        ->where('oa.olympiad_id', $olympiad_id)
+        ->where('oa.area_id', $area_id)
+        ->where('oap.phase_id', $phase_id)
+        ->where('oap.status', 'Terminada') // ver la fase este terminada/avalada
+        ->where('lg.level_id', $level_id)
+        ->get();
+        
+        if ($classifieds->isEmpty()) {
+            return response()->json([
+                'message' => 'No classified contestants found',
+                'status' => 404
+            ], 404);
+        }
+
+        return response()->json($classifieds, 200);
+    }
+
+    public function getAwardWinningContestants(){
+        
     }
 }
