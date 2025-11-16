@@ -61,7 +61,7 @@ class TheOrigin extends Seeder
             'name' => 'Olimpiadas Verano 2025',
             'start_date' => '2025-11-01',
             'end_date' => '2025-11-28',
-            'number_of_phases' => 5,
+            'number_of_phases' => 2,
             'status' => 'Activa',
             'default_score_cut' => 51,
             'default_max_score' => 100,
