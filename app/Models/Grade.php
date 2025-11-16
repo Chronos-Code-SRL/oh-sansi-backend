@@ -4,11 +4,17 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use App\Models\Traits\Auditable;
+use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
+use OwenIt\Auditing\Auditable;
 
-class Grade extends Model
+class Grade extends Model implements AuditableContract
 {
     use HasFactory, Auditable;
+
+    // Only audit the fillable attributes we care about
+    protected $auditInclude = [
+        'name'
+    ];
 
     protected $fillable = [
         'name'

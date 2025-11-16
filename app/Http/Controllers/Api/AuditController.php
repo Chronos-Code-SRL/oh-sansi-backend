@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Models\Audit;
+use OwenIt\Auditing\Models\Audit as AuditModel;
 use App\Models\Grade;
 
 class AuditController extends Controller
@@ -16,7 +16,7 @@ class AuditController extends Controller
     {
         $perPage = (int) $request->query('per_page', 50);
 
-        $query = Audit::with('user')
+        $query = AuditModel::with('user')
             ->where('auditable_type', Grade::class)
             ->orderBy('created_at', 'desc');
 
