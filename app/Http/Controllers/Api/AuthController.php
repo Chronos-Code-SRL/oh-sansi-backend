@@ -259,6 +259,8 @@ class AuthController extends Controller
 
         // Calcular nuevas áreas a insertar
         $newAreas = array_diff($areas_id, $existingAreas);
+        // elimina areas que no estan en el arreglo
+        $areasToDelete = array_diff($existingAreas, $areas_id);
 
         // Insertar solo las nuevas
         foreach ($newAreas as $areaId) {
@@ -269,6 +271,14 @@ class AuthController extends Controller
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
+        }
+
+        if (!empty($areasToDelete)) {
+            DB::table('user_area_olympiads')
+            ->where('user_role_id', $userRoleId)
+            ->where('olympiad_id', $olympiad_id)
+            ->whereIn('area_id', $areasToDelete)
+            ->delete();
         }
     }
 
