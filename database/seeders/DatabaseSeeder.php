@@ -68,7 +68,7 @@ class DatabaseSeeder extends Seeder
         $user->ci = '12345678';
         $user->phone_number = '+59 71780589';
         $user->genre = 'femenino';
-        $user->roles_id = 1;
+        // $user->roles_id = 1;
         $user->save();
 
         $this->command->info('Grades, Areas and user admin created successfully.');

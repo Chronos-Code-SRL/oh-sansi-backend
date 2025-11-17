@@ -15,6 +15,7 @@ class OlympiadAreaPhaseLevelGrade extends Model
         'level_grade_id',
         'score_cut',
         'max_score',
+        'status',
     ];
 
     public function olympiadAreaPhase()
