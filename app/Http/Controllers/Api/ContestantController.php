@@ -272,7 +272,7 @@ class ContestantController extends Controller
         ]);
     }
 
-    public function getAwardWinningCompetitors(string $olympiad_id, string $area_id, string $level_id)
+    public function getAwardWinningContestants(string $olympiad_id, string $area_id, string $level_id)
     {
         $lastPhaseId = DB::table('olympiad_area_phases AS oap')
             ->join('olympiad_areas AS oa', 'oap.olympiad_area_id', '=', 'oa.id')
@@ -314,6 +314,7 @@ class ContestantController extends Controller
             ->where('lg.level_id', $level_id)  // <-- Nivel filtrado correctamente
             ->select(
                 'c.id AS contestant_id',
+                'e.id AS evaluation_id',
                 'e.score',
                 DB::raw("DENSE_RANK() OVER (ORDER BY e.score DESC) AS ranking_place")
             );
@@ -321,6 +322,7 @@ class ContestantController extends Controller
         $results = DB::table('contestants AS c')
             ->joinSub($rankingQuery, 'rk', 'rk.contestant_id', '=', 'c.id')
             ->join('registrations AS r', 'r.contestant_id', '=', 'c.id')
+            ->join('evaluations AS e', 'e.id', '=', 'rk.evaluation_id')
             ->join('olympiad_areas AS oa', 'r.olympiad_area_id', '=', 'oa.id')
             ->join('areas AS a', 'oa.area_id', '=', 'a.id')
             ->join('contestant_level_grades AS clg', 'clg.contestant_id', '=', 'c.id')
@@ -338,7 +340,7 @@ class ContestantController extends Controller
                 'a.name AS area_name',
                 'l.name AS level_name',
                 'rk.score AS score',
-
+                'e.id AS evaluation_id',
                 DB::raw("
                     CASE 
                         WHEN rk.ranking_place = 1 THEN 'Oro'
