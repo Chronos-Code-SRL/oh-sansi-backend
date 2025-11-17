@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 
 use App\Models\Phase;
@@ -14,26 +15,10 @@ use App\Models\OlympiadAreaPhase;
 use App\Models\Evaluation;
 use App\Models\OlympiadAreaPhaseLevelGrade;
 use App\Models\LevelGrade;
+use App\Models\Level;
 
-/**
- * @OA\Tag(
- *     name="Phases",
- *     description="Endpoints for Phases management"
- * )
- */
 class PhaseController extends Controller
 {
-    /**
-     * @OA\Get(
-     *     path="/api/phases",
-     *     summary="Get list of phases",
-     *     tags={"Phases"},
-     *     @OA\Response(
-     *         response=200,
-     *         description="List of phases retrieved successfully",
-     *     )
-     * )
-     */
     public function index()
     {
         $phases = Phase::all();
@@ -54,27 +39,6 @@ class PhaseController extends Controller
         return response()->json($data, 200);
     }
 
-    /**
-     * @OA\Post(
-     *     path="/api/phases",
-     *     summary="Create a new phase",
-     *     tags={"Phases"},
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"name","description","start_date","end_date"},
-     *             @OA\Property(property="name", type="string", example="Fase Clasificatoria"),
-     *             @OA\Property(property="description", type="string"),
-     *             @OA\Property(property="start_date", type="string", format="date"),
-     *             @OA\Property(property="end_date", type="string", format="date")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=201,
-     *         description="Phase created successfully",
-     *     )
-     * )
-     */
     public function store(Request $request)
     {
         // Data validation
@@ -114,27 +78,6 @@ class PhaseController extends Controller
         return response()->json($data, 201);
     }
 
-    /**
-     * @OA\Get(
-     *     path="/api/phases/{id}",
-     *     summary="Get a phase by ID",
-     *     tags={"Phases"},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Phase found",
-     *     ),
-     *     @OA\Response(
-     *         response=404,
-     *         description="Phase not found",
-     *     )
-     * )
-     */
     public function show(string $id)
     {
         $phase = Phase::find($id);
@@ -155,32 +98,6 @@ class PhaseController extends Controller
         return response()->json($data, 200);
     }
 
-    /**
-     * @OA\Put(
-     *     path="/api/phases/{id}",
-     *     summary="Update a phase by ID",
-     *     tags={"Phases"},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             @OA\Property(property="name", type="string"),
-     *             @OA\Property(property="description", type="string"),
-     *             @OA\Property(property="start_date", type="string", format="date"),
-     *             @OA\Property(property="end_date", type="string", format="date")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Phase updated successfully"
-     *     )
-     * )
-     */
     public function update(Request $request, string $id)
     {
         $phase = Phase::find($id);
@@ -238,23 +155,6 @@ class PhaseController extends Controller
         return response()->json($data, 200);
     }
 
-    /**
-     * @OA\Delete(
-     *     path="/api/phases/{id}",
-     *     summary="Delete a phase by ID",
-     *     tags={"Phases"},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Phase deleted successfully"
-     *     )
-     * )
-     */
     public function destroy(string $id)
     {
         $phase = Phase::find($id);
@@ -277,32 +177,9 @@ class PhaseController extends Controller
         return response()->json($data, 200);
     }
 
-    /**
-     * @OA\Get(
-     *     path="/api/olympiads/{olympiadId}/areas/{areaId}/phase-status",
-     *     summary="Get the status of all phases for an olympiad area",
-     *     tags={"Phases"},
-     *     @OA\Parameter(
-     *         name="olympiadId",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\Parameter(
-     *         name="areaId",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Phase statuses retrieved successfully",
-     *     )
-     * )
-     */
-    public function getPhaseStatus(string $olympiadId, string $areaId)
+    public function getPhaseStatus(string $olympiadId, string $areaId, string $levelId)
     {
-        // Verificar que existe la relación olympiad_area
+        // Verify that the olympiad_area relationship exists
         $olympiadArea = OlympiadArea::where('olympiad_id', $olympiadId)
             ->where('area_id', $areaId)
             ->first();
@@ -315,22 +192,38 @@ class PhaseController extends Controller
             return response()->json($data, 404);
         }
 
-        // Obtener todas las fases con su estado para esta olympiad_area
-        $phaseStatuses = OlympiadAreaPhase::where('olympiad_area_id', $olympiadArea->id)
-            ->with('phase')
+        // Verify that the level_grade exists for this level and olympiad_area
+        $levelGrade = LevelGrade::where('olympiad_area_id', $olympiadArea->id)
+            ->where('level_id', $levelId)
+            ->first();
+
+        if (!$levelGrade) {
+            $data = [
+                'message' => 'Level not found for this olympiad area',
+                'status' => 404
+            ];
+            return response()->json($data, 404);
+        }
+
+        // Get all phases with their status for this specific level
+        $phaseStatuses = OlympiadAreaPhaseLevelGrade::where('level_grade_id', $levelGrade->id)
+            ->with(['olympiadAreaPhase.phase'])
             ->get()
-            ->map(function ($olympiadAreaPhase) {
+            ->map(function ($oaplg) {
                 return [
-                    'phase_id' => $olympiadAreaPhase->phase_id,
-                    'phase_name' => $olympiadAreaPhase->phase->name,
-                    'phase_order' => $olympiadAreaPhase->phase->order,
-                    'status' => $olympiadAreaPhase->status
+                    'phase_id' => $oaplg->olympiadAreaPhase->phase_id,
+                    'phase_name' => $oaplg->olympiadAreaPhase->phase->name,
+                    'phase_order' => $oaplg->olympiadAreaPhase->phase->order,
+                    'status' => $oaplg->status
                 ];
-            });
+            })
+            ->sortBy('phase_order')
+            ->values();
 
         $data = [
             'olympiad_id' => $olympiadId,
             'area_id' => $areaId,
+            'level_id' => $levelId,
             'phase_statuses' => $phaseStatuses,
             'status' => 200
         ];
@@ -338,40 +231,9 @@ class PhaseController extends Controller
         return response()->json($data, 200);
     }
 
-    /**
-     * @OA\Put(
-     *     path="/api/olympiads/{olympiadId}/areas/{areaId}/phase-status",
-     *     summary="Update the status of a specific phase for an olympiad area",
-     *     tags={"Phases"},
-     *     @OA\Parameter(
-     *         name="olympiadId",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\Parameter(
-     *         name="areaId",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"phase_id","status"},
-     *             @OA\Property(property="phase_id", type="integer", example=1),
-     *             @OA\Property(property="status", type="string", enum={"Sin empezar", "Activa", "Terminada"}, example="Activa")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Phase status updated successfully"
-     *     )
-     * )
-     */
-    public function updatePhaseStatus(Request $request, string $olympiadId, string $areaId)
+    public function updatePhaseStatus(Request $request, string $olympiadId, string $areaId, string $levelId)
     {
-        // Validación de datos
+        // Data validation
         $validator = Validator::make($request->all(), [
             'phase_id' => 'required|integer|exists:phases,id',
             'status' => 'required|string|in:Sin empezar,Activa,Terminada'
@@ -386,7 +248,7 @@ class PhaseController extends Controller
             return response()->json($data, 400);
         }
 
-        // Verificar que existe la relación olympiad_area
+        // Verify that the olympiad_area relationship exists
         $olympiadArea = OlympiadArea::where('olympiad_id', $olympiadId)
             ->where('area_id', $areaId)
             ->first();
@@ -399,7 +261,20 @@ class PhaseController extends Controller
             return response()->json($data, 404);
         }
 
-        // Buscar la relación olympiad_area_phase específica
+        // Verify that the level_grade exists for this level and olympiad_area
+        $levelGrade = LevelGrade::where('olympiad_area_id', $olympiadArea->id)
+            ->where('level_id', $levelId)
+            ->first();
+
+        if (!$levelGrade) {
+            $data = [
+                'message' => 'Level not found for this olympiad area',
+                'status' => 404
+            ];
+            return response()->json($data, 404);
+        }
+
+        // Find the specific olympiad_area_phase relationship
         $olympiadAreaPhase = OlympiadAreaPhase::where('olympiad_area_id', $olympiadArea->id)
             ->where('phase_id', $request->phase_id)
             ->first();
@@ -412,10 +287,23 @@ class PhaseController extends Controller
             return response()->json($data, 404);
         }
 
-        // Actualizar el estado
-        $olympiadAreaPhase->status = $request->status;
+        // Find the specific record for this level
+        $olympiadAreaPhaseLevelGrade = OlympiadAreaPhaseLevelGrade::where('olympiad_area_phase_id', $olympiadAreaPhase->id)
+            ->where('level_grade_id', $levelGrade->id)
+            ->first();
 
-        if (!$olympiadAreaPhase->save()) {
+        if (!$olympiadAreaPhaseLevelGrade) {
+            $data = [
+                'message' => 'Phase level grade configuration not found',
+                'status' => 404
+            ];
+            return response()->json($data, 404);
+        }
+
+        // Update the status
+        $olympiadAreaPhaseLevelGrade->status = $request->status;
+
+        if (!$olympiadAreaPhaseLevelGrade->save()) {
             $data = [
                 'message' => 'Error updating phase status',
                 'status' => 500
@@ -423,59 +311,31 @@ class PhaseController extends Controller
             return response()->json($data, 500);
         }
 
-        // Si la fase se marca como "Terminada", procesar clasificaciones
+        // If the phase is marked as "Terminada", process classifications
         if ($request->status === 'Terminada') {
-            $this->processPhaseClassifications($olympiadAreaPhase, $olympiadArea);
+            $this->processPhaseClassifications($olympiadAreaPhaseLevelGrade, $levelGrade);
         }
 
-        // Cargar la información de la fase para la respuesta
+        // Load the phase information for the response
         $olympiadAreaPhase->load('phase');
 
         $data = [
             'message' => 'Phase status updated successfully',
             'olympiad_id' => $olympiadId,
             'area_id' => $areaId,
+            'level_id' => $levelId,
             'phase_id' => $olympiadAreaPhase->phase_id,
             'phase_name' => $olympiadAreaPhase->phase->name,
-            'status' => $olympiadAreaPhase->status,
+            'status' => $olympiadAreaPhaseLevelGrade->status,
             'status_code' => 200
         ];
 
         return response()->json($data, 200);
     }
 
-    /**
-     * @OA\Put(
-     *     path="/api/olympiads/{olympiadId}/areas/{areaId}/phases/{phaseId}/endorse",
-     *     summary="Endorse a phase - mark as completed and activate next phase if exists",
-     *     tags={"Phases"},
-     *     @OA\Parameter(
-     *         name="olympiadId",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\Parameter(
-     *         name="areaId",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\Parameter(
-     *         name="phaseId",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Phase endorsed successfully"
-     *     )
-     * )
-     */
-    public function endorsePhase(string $olympiadId, string $areaId, string $phaseId)
+    public function endorsePhase(string $olympiadId, string $areaId, string $levelId, string $phaseId)
     {
-        // Verificar que existe la relación olympiad_area
+        // Verify that the olympiad_area relationship exists
         $olympiadArea = OlympiadArea::where('olympiad_id', $olympiadId)
             ->where('area_id', $areaId)
             ->first();
@@ -487,7 +347,19 @@ class PhaseController extends Controller
             ], 404);
         }
 
-        // Verificar que la fase existe para esta olympiad area
+        // Verify that the level_grade exists for this level and olympiad_area
+        $levelGrade = LevelGrade::where('olympiad_area_id', $olympiadArea->id)
+            ->where('level_id', $levelId)
+            ->first();
+
+        if (!$levelGrade) {
+            return response()->json([
+                'message' => 'Level not found for this olympiad area',
+                'status' => 404
+            ], 404);
+        }
+
+        // Verify that the phase exists for this olympiad area
         $currentOlympiadAreaPhase = OlympiadAreaPhase::where('olympiad_area_id', $olympiadArea->id)
             ->where('phase_id', $phaseId)
             ->first();
@@ -499,23 +371,35 @@ class PhaseController extends Controller
             ], 404);
         }
 
-        // Verificar que la fase no esté ya terminada
-        if ($currentOlympiadAreaPhase->status === 'Terminada') {
+        // Verify the specific status for this level
+        $currentOaplg = OlympiadAreaPhaseLevelGrade::where('olympiad_area_phase_id', $currentOlympiadAreaPhase->id)
+            ->where('level_grade_id', $levelGrade->id)
+            ->first();
+
+        if (!$currentOaplg) {
             return response()->json([
-                'message' => 'Phase is already completed',
+                'message' => 'Phase level grade configuration not found',
+                'status' => 404
+            ], 404);
+        }
+
+        // Verify that the phase is not already completed
+        if ($currentOaplg->status === 'Terminada') {
+            return response()->json([
+                'message' => 'Phase is already completed for this level',
                 'status' => 400
             ], 400);
         }
 
-        // Marcar la fase actual como "Terminada" usando updatePhaseStatus
+        // Mark the current phase as "Terminada" using updatePhaseStatus
         $updateRequest = new Request([
             'phase_id' => $phaseId,
             'status' => 'Terminada'
         ]);
 
-        $updateResponse = $this->updatePhaseStatus($updateRequest, $olympiadId, $areaId);
-        
-        // Verificar si la actualización fue exitosa
+        $updateResponse = $this->updatePhaseStatus($updateRequest, $olympiadId, $areaId, $levelId);
+
+        // Check if the update was successful
         if ($updateResponse->getStatusCode() !== 200) {
             return $updateResponse;
         }
@@ -528,27 +412,28 @@ class PhaseController extends Controller
             ],
             'olympiad_id' => $olympiadId,
             'area_id' => $areaId,
+            'level_id' => $levelId,
             'status' => 200
         ];
 
-        // Verificar si no es la fase final y activar la siguiente
-        if (!$this->isFinalPhase($currentOlympiadAreaPhase, $olympiadArea)) {
-            $nextOlympiadAreaPhase = $this->getNextPhase($currentOlympiadAreaPhase, $olympiadArea);
-            
-            if ($nextOlympiadAreaPhase) {
-                // Activar la siguiente fase
+        // Check if it's not the final phase and activate the next one
+        if (!$this->isFinalPhase($currentOaplg, $levelGrade)) {
+            $nextOaplg = $this->getNextPhase($currentOaplg, $levelGrade);
+
+            if ($nextOaplg) {
+                // Activate the next phase
                 $nextUpdateRequest = new Request([
-                    'phase_id' => $nextOlympiadAreaPhase->phase_id,
+                    'phase_id' => $nextOaplg->olympiadAreaPhase->phase_id,
                     'status' => 'Activa'
                 ]);
 
-                $nextUpdateResponse = $this->updatePhaseStatus($nextUpdateRequest, $olympiadId, $areaId);
-                
+                $nextUpdateResponse = $this->updatePhaseStatus($nextUpdateRequest, $olympiadId, $areaId, $levelId);
+
                 if ($nextUpdateResponse->getStatusCode() === 200) {
-                    $nextOlympiadAreaPhase->load('phase');
+                    $nextOaplg->load('olympiadAreaPhase.phase');
                     $responseData['next_phase'] = [
-                        'phase_id' => $nextOlympiadAreaPhase->phase_id,
-                        'phase_name' => $nextOlympiadAreaPhase->phase->name,
+                        'phase_id' => $nextOaplg->olympiadAreaPhase->phase_id,
+                        'phase_name' => $nextOaplg->olympiadAreaPhase->phase->name,
                         'status' => 'Activa'
                     ];
                     $responseData['message'] = 'Phase endorsed successfully and next phase activated';
@@ -565,34 +450,46 @@ class PhaseController extends Controller
     /**
      * Process automatic classification when a phase is marked as "Terminada"
      */
-    private function processPhaseClassifications($olympiadAreaPhase, $olympiadArea)
+    private function processPhaseClassifications($olympiadAreaPhaseLevelGrade, $levelGrade)
     {
-        // Obtener todas las evaluaciones de esta fase
-        $evaluations = Evaluation::where('olympiad_area_phase_id', $olympiadAreaPhase->id)
+        // Get all evaluations from this phase first (without level filter)
+        $allEvaluations = Evaluation::where('olympiad_area_phase_id', $olympiadAreaPhaseLevelGrade->olympiad_area_phase_id)
             ->whereNotNull('score')
+            ->with('registration.contestant')
             ->get();
 
-        // Verificar si es la fase final
-        $isFinalPhase = $this->isFinalPhase($olympiadAreaPhase, $olympiadArea);
+        // Filter by level using level_id instead of specific level_grade_id
+        $evaluations = $allEvaluations->filter(function ($evaluation) use ($levelGrade) {
+            // Check if the competitor has any level_grade with the same level_id and olympiad_area_id
+            return DB::table('contestant_level_grades as clg')
+                ->join('level_grades as lg', 'clg.level_grade_id', '=', 'lg.id')
+                ->where('clg.contestant_id', $evaluation->registration->contestant_id)
+                ->where('lg.level_id', $levelGrade->level_id)
+                ->where('lg.olympiad_area_id', $levelGrade->olympiad_area_id)
+                ->exists();
+        });
 
-        // Obtener la siguiente fase si no es la final
-        $nextOlympiadAreaPhase = null;
+        // Check if this is the final phase for this level
+        $isFinalPhase = $this->isFinalPhase($olympiadAreaPhaseLevelGrade, $levelGrade);
+
+        // Get the next phase if it's not the final one
+        $nextOaplg = null;
         if (!$isFinalPhase) {
-            $nextOlympiadAreaPhase = $this->getNextPhase($olympiadAreaPhase, $olympiadArea);
+            $nextOaplg = $this->getNextPhase($olympiadAreaPhaseLevelGrade, $levelGrade);
         }
 
         foreach ($evaluations as $evaluation) {
-            // Obtener score_cut para esta evaluación específica
-            $scoreCut = $this->getScoreCut($olympiadAreaPhase, $evaluation);
+            // Get score_cut for this specific evaluation (already level-aware)
+            $scoreCut = $this->getScoreCut($olympiadAreaPhaseLevelGrade, $evaluation);
 
             if ($scoreCut !== null) {
-                // Clasificar basado en score_cut
+                // Classify based on score_cut
                 if ($evaluation->score >= $scoreCut) {
                     $evaluation->classification_status = 'clasificado';
 
-                    // Si no es la fase final y el competidor clasifica, crear registro para siguiente fase
-                    if (!$isFinalPhase && $nextOlympiadAreaPhase) {
-                        $this->createNextPhaseEvaluation($evaluation, $nextOlympiadAreaPhase);
+                    // If it's not the final phase and the competitor qualifies, create record for next phase
+                    if (!$isFinalPhase && $nextOaplg) {
+                        $this->createNextPhaseEvaluation($evaluation, $nextOaplg->olympiadAreaPhase);
                     }
                 } else {
                     $evaluation->classification_status = 'no_clasificado';
@@ -600,12 +497,12 @@ class PhaseController extends Controller
             }
         }
 
-        // Si es la fase final, asignar medallas
+        // If it's the final phase, assign medals by level
         if ($isFinalPhase) {
             $this->assignMedals($evaluations);
         }
 
-        // Guardar todas las evaluaciones
+        // Save all evaluations
         foreach ($evaluations as $evaluation) {
             $evaluation->save();
         }
@@ -614,29 +511,24 @@ class PhaseController extends Controller
     /**
      * Get the score cut for a specific evaluation
      */
-    private function getScoreCut($olympiadAreaPhase, $evaluation)
+    private function getScoreCut($olympiadAreaPhaseLevelGrade, $evaluation)
     {
-        // Usar consulta SQL directa basada en la tabla contestant_level_grades
-        $scoreCut = DB::table('evaluations as e')
-            ->join('registrations as r', 'e.registration_id', '=', 'r.id')
-            ->join('contestant_level_grades as clg', 'r.contestant_id', '=', 'clg.contestant_id')
-            ->join('olympiad_area_phase_level_grades as oaplg', 'clg.level_grade_id', '=', 'oaplg.level_grade_id')
-            ->where('e.id', $evaluation->id)
-            ->value('oaplg.score_cut');
-
-        return $scoreCut;
+        // The score_cut is directly in the olympiad_area_phase_level_grades record
+        return $olympiadAreaPhaseLevelGrade->score_cut;
     }
 
     /**
-     * Check if the current phase is the final phase for this olympiad area
+     * Check if the current phase is the final phase for this level
      */
-    private function isFinalPhase($currentOlympiadAreaPhase, $olympiadArea)
+    private function isFinalPhase($olympiadAreaPhaseLevelGrade, $levelGrade)
     {
-        $maxOrder = OlympiadAreaPhase::where('olympiad_area_id', $olympiadArea->id)
-            ->join('phases', 'olympiad_area_phases.phase_id', '=', 'phases.id')
+        // Get the maximum order of phases for this specific level
+        $maxOrder = OlympiadAreaPhaseLevelGrade::where('level_grade_id', $levelGrade->id)
+            ->join('olympiad_area_phases as oap', 'olympiad_area_phase_level_grades.olympiad_area_phase_id', '=', 'oap.id')
+            ->join('phases', 'oap.phase_id', '=', 'phases.id')
             ->max('phases.order');
 
-        $currentPhase = $currentOlympiadAreaPhase->load('phase');
+        $currentPhase = $olympiadAreaPhaseLevelGrade->olympiadAreaPhase->load('phase');
 
         return $currentPhase->phase->order == $maxOrder;
     }
@@ -646,7 +538,7 @@ class PhaseController extends Controller
      */
     private function assignMedals($evaluations)
     {
-        // Ordenar por puntuación descendente (solo clasificados)
+        // Sort by score descending (only classified competitors)
         $classifiedEvaluations = $evaluations
             ->where('classification_status', 'clasificado')
             ->sortByDesc('score')
@@ -671,26 +563,35 @@ class PhaseController extends Controller
     }
 
     /**
-     * Get the next phase for this olympiad area
+     * Get the next phase for this level
      */
-    private function getNextPhase($currentOlympiadAreaPhase, $olympiadArea)
+    private function getNextPhase($olympiadAreaPhaseLevelGrade, $levelGrade)
     {
-        $currentPhase = $currentOlympiadAreaPhase->load('phase');
+        $currentPhase = $olympiadAreaPhaseLevelGrade->olympiadAreaPhase->load('phase');
         $nextPhaseOrder = $currentPhase->phase->order + 1;
 
-        // Buscar la siguiente fase en orden
+        // Find the next phase in order
         $nextPhase = Phase::where('order', $nextPhaseOrder)->first();
 
         if (!$nextPhase) {
             return null;
         }
 
-        // Buscar el OlympiadAreaPhase correspondiente para la siguiente fase
-        $nextOlympiadAreaPhase = OlympiadAreaPhase::where('olympiad_area_id', $olympiadArea->id)
+        // Find the corresponding OlympiadAreaPhase for the next phase
+        $nextOlympiadAreaPhase = OlympiadAreaPhase::where('olympiad_area_id', $levelGrade->olympiad_area_id)
             ->where('phase_id', $nextPhase->id)
             ->first();
 
-        return $nextOlympiadAreaPhase;
+        if (!$nextOlympiadAreaPhase) {
+            return null;
+        }
+
+        // Find the OlympiadAreaPhaseLevelGrade for this level in the next phase
+        $nextOaplg = OlympiadAreaPhaseLevelGrade::where('olympiad_area_phase_id', $nextOlympiadAreaPhase->id)
+            ->where('level_grade_id', $levelGrade->id)
+            ->first();
+
+        return $nextOaplg;
     }
 
     /**
@@ -698,12 +599,12 @@ class PhaseController extends Controller
      */
     private function createNextPhaseEvaluation($currentEvaluation, $nextOlympiadAreaPhase)
     {
-        // Verificar si ya existe un registro para este competidor en la siguiente fase
+        // Check if a record already exists for this competitor in the next phase
         $existingEvaluation = Evaluation::where('registration_id', $currentEvaluation->registration_id)
             ->where('olympiad_area_phase_id', $nextOlympiadAreaPhase->id)
             ->first();
 
-        // Solo crear si no existe
+        // Only create if it doesn't exist
         if (!$existingEvaluation) {
             Evaluation::create([
                 'registration_id' => $currentEvaluation->registration_id,
