@@ -26,7 +26,7 @@ class User extends Authenticatable
         'ci',
         'phone_number',
         'genre',
-        'roles_id',
+        // 'roles_id',
         'profesion'
     ];
 
