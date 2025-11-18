@@ -987,42 +987,55 @@ class OlympiadController extends Controller
             $defaultScoreCutAssignments = [];
             if ($olympiad->default_score_cut !== null || $olympiad->default_max_score !== null) {
                 try {
-                    // Get all phases for this olympiad
-                    $phases = $olympiad->phases;
+                    // Get all existing olympiad_area_phases for this olympiad area
+                    $olympiadAreaPhases = OlympiadAreaPhase::where('olympiad_area_id', $olympiadArea->id)
+                        ->with('phase')
+                        ->get();
 
-                    if ($phases->isNotEmpty()) {
-                        foreach ($phases as $phase) {
-                            // Get or create OlympiadAreaPhase
-                            $olympiadAreaPhase = OlympiadAreaPhase::firstOrCreate([
-                                'olympiad_area_id' => $olympiadArea->id,
-                                'phase_id' => $phase->id
-                            ]);
+                    if ($olympiadAreaPhases->isNotEmpty()) {
+                        foreach ($olympiadAreaPhases as $olympiadAreaPhase) {
+                            // Only proceed if the phase actually exists
+                            if (!$olympiadAreaPhase->phase) {
+                                Log::warning("Phase not found for olympiad_area_phase_id: {$olympiadAreaPhase->id}");
+                                continue;
+                            }
 
                             // Assign default score cut, max score to all newly created level-grades for this phase
                             $scoreCutsCreated = 0;
                             foreach ($createdLevelGrades as $levelGrade) {
-                                $defaultData = [];
+                                // Prepare default data - ensure score_cut is always provided
+                                $defaultData = [
+                                    'score_cut' => $olympiad->default_score_cut ?? 0, // Fallback to 0 if null
+                                    'status' => 'Sin empezar' // Set default status
+                                ];
 
-                                if ($olympiad->default_score_cut !== null) {
-                                    $defaultData['score_cut'] = $olympiad->default_score_cut;
-                                }
                                 if ($olympiad->default_max_score !== null) {
                                     $defaultData['max_score'] = $olympiad->default_max_score;
                                 }
 
-                                $scoreCutRecord = OlympiadAreaPhaseLevelGrade::firstOrCreate([
-                                    'olympiad_area_phase_id' => $olympiadAreaPhase->id,
-                                    'level_grade_id' => $levelGrade->id
-                                ], $defaultData);
+                                // Check if the record already exists
+                                $existingRecord = OlympiadAreaPhaseLevelGrade::where('olympiad_area_phase_id', $olympiadAreaPhase->id)
+                                    ->where('level_grade_id', $levelGrade->id)
+                                    ->first();
 
-                                if ($scoreCutRecord->wasRecentlyCreated) {
-                                    $scoreCutsCreated++;
+                                if (!$existingRecord) {
+                                    $scoreCutRecord = OlympiadAreaPhaseLevelGrade::create([
+                                        'olympiad_area_phase_id' => $olympiadAreaPhase->id,
+                                        'level_grade_id' => $levelGrade->id,
+                                        'score_cut' => $defaultData['score_cut'],
+                                        'max_score' => $defaultData['max_score'] ?? null,
+                                        'status' => $defaultData['status']
+                                    ]);
+
+                                    if ($scoreCutRecord) {
+                                        $scoreCutsCreated++;
+                                    }
                                 }
                             }
 
                             $phaseAssignment = [
-                                'phase_name' => $phase->name,
-                                'phase_id' => $phase->id,
+                                'phase_name' => $olympiadAreaPhase->phase->name,
+                                'phase_id' => $olympiadAreaPhase->phase->id,
                                 'score_cuts_created' => $scoreCutsCreated
                             ];
 
@@ -1805,11 +1818,13 @@ class OlympiadController extends Controller
                             $failedCount++;
                         }
                     } else {
-                        // Create new score cut
+                        // Create new score cut with proper defaults
                         $newScoreCut = OlympiadAreaPhaseLevelGrade::create([
                             'olympiad_area_phase_id' => $olympiadAreaPhase->id,
                             'level_grade_id' => $levelGrade->id,
-                            'score_cut' => $request->score_cut
+                            'score_cut' => $request->score_cut,
+                            'max_score' => $olympiad->default_max_score ?? null,
+                            'status' => 'Sin empezar'
                         ]);
 
                         if ($newScoreCut) {
@@ -2124,7 +2139,9 @@ class OlympiadController extends Controller
                         'olympiad_area_phase_id' => $olympiadAreaPhase->id,
                         'level_grade_id' => $levelGrade->id
                     ], [
-                        'max_score' => $request->max_score
+                        'max_score' => $request->max_score,
+                        'score_cut' => $olympiad->default_score_cut ?? 0, // Ensure score_cut is not null
+                        'status' => 'Sin empezar'
                     ]);
 
                     if ($maxScoreRecord->wasRecentlyCreated) {

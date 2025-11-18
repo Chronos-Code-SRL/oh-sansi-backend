@@ -161,7 +161,7 @@ class EvaluationController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'classification_status' => 'required|string|in:clasificado,no_clasificado,descalificado',
+            'classification_status' => 'nullable|string|in:clasificado,no_clasificado,descalificado',
             'classification_place' => 'nullable|string|in:Oro,Plata,Bronce,Mención honorífica',
             'description' => 'string|nullable'
         ]);
@@ -174,7 +174,9 @@ class EvaluationController extends Controller
             ], 400);
         }
 
-        $evaluation->classification_status = $request->classification_status;
+        if($request->has('classification_status')) {
+            $evaluation->classification_status = $request->classification_status;
+        }
 
         if ($request->has('classification_place')) {
             $evaluation->classification_place = $request->classification_place;
