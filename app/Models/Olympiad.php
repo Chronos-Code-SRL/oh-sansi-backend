@@ -67,17 +67,25 @@ class Olympiad extends Model
                 ->where('area_id', $areaId)
                 ->first();
 
-            // Create phases for this area
+            // Create phases for this area only if they don't exist
             for ($i = 1; $i <= $this->number_of_phases; $i++) {
+                // First, ensure the phase exists in the phases table
                 $phase = Phase::firstOrCreate([
                     'name' => 'Fase ' . $i,
                     'order' => $i,
                 ]);
 
-                OlympiadAreaPhase::firstOrCreate([
-                    'olympiad_area_id' => $olympiadArea->id,
-                    'phase_id' => $phase->id,
-                ]);
+                // Only create the olympiad_area_phase relationship if it doesn't exist
+                $existingRelation = OlympiadAreaPhase::where('olympiad_area_id', $olympiadArea->id)
+                    ->where('phase_id', $phase->id)
+                    ->first();
+
+                if (!$existingRelation) {
+                    OlympiadAreaPhase::create([
+                        'olympiad_area_id' => $olympiadArea->id,
+                        'phase_id' => $phase->id,
+                    ]);
+                }
             }
         }
 

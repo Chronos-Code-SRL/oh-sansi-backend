@@ -61,13 +61,18 @@ Route::delete('/phases/{id}', [PhaseController::class, 'destroy']);
 
 // <--- CRUD Olympiad-Area-Phases (Status) --->
 Route::get('/olympiads/{olympiadId}/areas/{areaId}/levels/{levelId}/phase-status', [PhaseController::class, 'getPhaseStatus']);
+Route::get('/olympiads/{olympiadId}/areas/{areaId}/levels/{levelId}/phases/{phaseId}/status', [PhaseController::class, 'getSinglePhaseStatus']);
 Route::put('/olympiads/{olympiadId}/areas/{areaId}/levels/{levelId}/phase-status', [PhaseController::class, 'updatePhaseStatus']);
 Route::put('/olympiads/{olympiadId}/areas/{areaId}/levels/{levelId}/phases/{phaseId}/endorse', [PhaseController::class, 'endorsePhase']);
+Route::put('/olympiads/{olympiadId}/areas/{areaId}/phases/{phaseId}/endorse-all-levels', [PhaseController::class, 'endorsePhaseAllLevels']);
 
 // <--- CRUD Olympiad-Area-Level-Grades --->
 Route::post('/olympiads/{olympiadId}/areas/{areaId}/level-grades', [OlympiadController::class, 'assignLevelGradesToArea']);
 Route::get('/olympiads/{olympiadId}/areas/{areaId}/level-grades', [OlympiadController::class, 'getLevelGradesFromArea']);
 Route::delete('/olympiads/{olympiadId}/areas/{areaId}/level-grades', [OlympiadController::class, 'removeLevelGradesFromArea']);
+
+// <--- Get Specific Phase Scores by Level --->
+Route::get('/olympiads/{olympiadId}/areas/{areaId}/phases/{phaseId}/level/{levelId}/scores', [PhaseController::class, 'getPhaseScoresByLevel']);
 
 // <--- CRUD Grade --->
 Route::get('/grades', [GradeController::class, 'index']);
@@ -83,9 +88,6 @@ Route::get('/olympiads/{olympiadId}/areas/{areaId}/score-cuts', [OlympiadControl
 // <--- CRUD Olympiad-Area-Phase-Level-Grades (Max Scores) --->
 Route::post('/olympiads/{olympiadId}/areas/{areaId}/max-scores', [OlympiadController::class, 'assignMaxScores']);
 Route::get('/olympiads/{olympiadId}/areas/{areaId}/max-scores', [OlympiadController::class, 'getMaxScores']);
-
-// <--- Get Specific Phase Scores by Level --->
-Route::get('/olympiads/{olympiadId}/areas/{areaId}/phases/{phaseId}/level/{levelId}/scores', [OlympiadController::class, 'getPhaseScoresByLevel']);
 
 // login
 Route::post('/login', [AuthController::class, 'login']);
