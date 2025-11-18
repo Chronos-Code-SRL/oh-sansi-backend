@@ -1,4 +1,4 @@
-<?php
+    <?php
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -151,6 +151,8 @@ Route::get('/contestants/ranked/{phase_id}/{olympiad_id}/{area_id}/{level_id}', 
 Route::get('/contestants/{olympiad_id}', [ContestantController::class, 'showContestantsOlympiad']);
 Route::get('/contestants/olympiads/{olympiad_id}/areas/{area_id}/phases/{phase_id}/levels/{level_id}', [ContestantController::class, 'countsByAreaPhaseLevel']);
 Route::get('/contestants/olympiads/{olympiad_id}/areas/{area_id}/levels/{level_id}', [ContestantController::class, 'getAwardWinningContestants']);
+Route::get('/contestants/olympiads/{olympiad_id}/areas/{area_id}/phases/{phase_id}/levels/{level_id}/classifieds', [ContestantController::class, 'getContestantsClassifieds']);
+Route::get('/contestants/awarded/olympiads/{olympiad_id}/areas/{area_id}', [ContestantController::class, 'getAwardWinningContestantsArea']);
 
 // <--- CRUD Level --->
 Route::get('/levels-olympiad', [App\Http\Controllers\Api\LevelController::class, 'getLevelsOlympiad']);

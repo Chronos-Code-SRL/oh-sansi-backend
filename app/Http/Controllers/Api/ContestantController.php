@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use App\Models\Evaluation;
 use Illuminate\Support\Facades\DB;
+use App\Models\Contestant;
 
 class ContestantController extends Controller
 {
@@ -321,5 +322,138 @@ class ContestantController extends Controller
             ->get();
 
         return response()->json($listWinners, 200);
+    }
+
+    public function getContestantsClassifieds(string $olympiad_id, string $area_id, string $phase_id, string $level_id)
+    {
+        $classifieds = Contestant::select(
+            'contestants.first_name as first_name',
+            'contestants.last_name as last_name',
+            'contestants.ci_document as ci_document',
+            'contestants.grade as grade',
+            'e.classification_status as classification_status',
+            'e.score as score'
+        )
+        ->join('registrations as r', 'r.contestant_id', '=', 'contestants.id')
+        ->join('evaluations as e', 'e.registration_id', '=', 'r.id')
+        ->join('olympiad_area_phases as oap', 'e.olympiad_area_phase_id', '=', 'oap.id')
+        ->join('olympiad_areas as oa', 'oap.olympiad_area_id', '=', 'oa.id')
+        ->join('contestant_level_grades as clg', 'clg.contestant_id', '=', 'contestants.id')
+        ->join('level_grades as lg', 'lg.id', '=', 'clg.level_grade_id')
+        ->join('olympiad_area_phase_level_grades AS oapl', 'oapl.olympiad_area_phase_id', '=', 'oap.id')
+        ->where('oa.olympiad_id', $olympiad_id)
+        ->where('oa.area_id', $area_id)
+        ->where('oap.phase_id', $phase_id)
+        ->where('oapl.status', 'Terminada') // para avalar por nivel
+        // ->where('oap.status', 'Terminada') para avalar por area
+        ->where('lg.level_id', $level_id)
+        ->distinct()
+        ->get();
+        
+        if ($classifieds->isEmpty()) {
+            return response()->json([
+                'message' => 'No classified contestants found',
+                'status' => 404
+            ], 404);
+        }
+
+        return response()->json($classifieds, 200);
+    }
+
+    public function getAwardWinningContestantsArea(string $olympiad_id, string $area_id)
+    {
+
+        $olympiadAreaId = DB::table('olympiad_areas')
+            ->where('olympiad_id', $olympiad_id)
+            ->where('area_id', $area_id)
+            ->value('id');
+
+        $cantLevelArea = DB::table('level_grades')
+            ->where('olympiad_area_id', $olympiadAreaId)
+            ->distinct('level_id')
+            ->count('level_id');
+
+        $levelIds = DB::table('level_grades')
+            ->where('olympiad_area_id', $olympiadAreaId)
+            ->distinct()
+            ->pluck('level_id');
+
+        $cont = 0;
+
+        for ($i=0; $i < $cantLevelArea; $i++) { 
+            if ($this->checkLevel($olympiad_id, $area_id, $levelIds[$i]) !== null) {
+                $cont++;
+            }
+        }
+        
+        if ($cont !== $cantLevelArea) {
+            return response()->json([
+                'message' => 'levels not fully endorsed',
+            ], 404);
+        }
+
+        $lastPhase = $lastPhase = DB::table('olympiad_area_phases AS oap')
+            ->join('phases AS p', 'oap.phase_id', '=', 'p.id')
+            ->where('oap.olympiad_area_id', $olympiadAreaId)
+            ->orderByDesc('p.order')
+            ->select('oap.id')
+            ->first();
+
+        $results = DB::table('evaluations AS e')
+            ->join('registrations AS r', 'e.registration_id', '=', 'r.id')
+            ->join('contestants AS c', 'r.contestant_id', '=', 'c.id')
+            ->join('contestant_level_grades AS clg', 'clg.contestant_id', '=', 'c.id')
+            ->join('level_grades AS lg', 'clg.level_grade_id', '=', 'lg.id')
+            ->join('levels AS l', 'lg.level_id', '=', 'l.id')
+            ->join('olympiad_areas AS oa', 'r.olympiad_area_id', '=', 'oa.id')
+            ->join('areas AS a', 'oa.area_id', '=', 'a.id')
+            ->where('e.olympiad_area_phase_id', $lastPhase->id)
+            ->where('oa.olympiad_id', $olympiad_id)
+            ->where('oa.area_id', $area_id)
+            ->select(
+                'c.first_name AS nombre',
+                'c.last_name AS apellido',
+                'c.school_name AS unidad_educativa',
+                'a.name AS nombre_area',
+                'c.first_name AS departamento',
+                'l.name AS nombre_nivel',
+                'e.classification_place AS lugar'
+            )
+
+            ->orderByRaw("CASE 
+                WHEN e.classification_place = 'Oro' THEN 1
+                WHEN e.classification_place = 'Plata' THEN 2
+                WHEN e.classification_place = 'Bronce' THEN 3
+                ELSE 4
+            END")
+
+            ->get();
+
+        return response()->json([
+            'contestants' => $results
+        ], 200);
+    }
+
+    private function checkLevel(string $olympiad_id, string $area_id, string $level_id)
+    {
+        $lastPhaseId = DB::table('olympiad_area_phases AS oap')
+            ->join('olympiad_areas AS oa', 'oap.olympiad_area_id', '=', 'oa.id')
+            ->join('phases AS p', 'oap.phase_id', '=', 'p.id')
+            ->join('olympiad_area_phase_level_grades AS oapl', 'oapl.olympiad_area_phase_id', '=', 'oap.id')
+            ->join('level_grades AS lg', 'lg.id', '=', 'oapl.level_grade_id')
+            ->where('oa.olympiad_id', $olympiad_id)
+            ->where('oa.area_id', $area_id)
+            ->where('lg.level_id', $level_id)
+            ->where('oapl.status', 'Terminada') // para avalar por nivel
+            // ->where('oap.status', 'Terminada') para avalar por area
+            ->orderByDesc('p.order')
+            ->select('oap.id')
+            ->first();
+        
+        if (!$lastPhaseId) {
+            return null;
+        }
+
+        return $lastPhaseId;
     }
 }
