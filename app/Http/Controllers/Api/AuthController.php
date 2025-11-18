@@ -87,20 +87,25 @@ class AuthController extends Controller
         // search user by ci
         $user = User::where('ci', $request->ci)->first();
         if ($user) {
-            $userRole = DB::table('user_roles')
+            
+            $currentRole = DB::table('user_roles')
                 ->where('user_id', $user->id)
-                ->where('role_id', $request->roles_id)
                 ->first();
 
-            if (!$userRole) {
-                $userRoleId = DB::table('user_roles')->insertGetId([
-                    'user_id' => $user->id,
-                    'role_id' => $request->roles_id,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
+            if ($currentRole && $currentRole->role_id != $request->roles_id) {
+                $userRoleId = $this->changeUserRole($user, $request->roles_id);
+
             } else {
-                $userRoleId = $userRole->id;
+                if (!$currentRole) {
+                    $userRoleId = DB::table('user_roles')->insertGetId([
+                        'user_id' => $user->id,
+                        'role_id' => $request->roles_id,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                } else {
+                    $userRoleId = $currentRole->id;
+                }
             }
 
             $this->syncUserAreasOlympiad($userRoleId, $request->areas_id, $request->olympiad_id);
@@ -259,6 +264,8 @@ class AuthController extends Controller
 
         // Calcular nuevas áreas a insertar
         $newAreas = array_diff($areas_id, $existingAreas);
+        // elimina areas que no estan en el arreglo
+        $areasToDelete = array_diff($existingAreas, $areas_id);
 
         // Insertar solo las nuevas
         foreach ($newAreas as $areaId) {
@@ -269,6 +276,14 @@ class AuthController extends Controller
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
+        }
+
+        if (!empty($areasToDelete)) {
+            DB::table('user_area_olympiads')
+            ->where('user_role_id', $userRoleId)
+            ->where('olympiad_id', $olympiad_id)
+            ->whereIn('area_id', $areasToDelete)
+            ->delete();
         }
     }
 
@@ -321,5 +336,33 @@ class AuthController extends Controller
                 'areas' => []
             ]);
         }
+    }
+
+    private function changeUserRole($user, $newRoleId)
+    {
+        // search old role
+        $oldRole = DB::table('user_roles')
+            ->where('user_id', $user->id)
+            ->first();
+
+        if ($oldRole) {
+            // delete areas associated with old role
+            DB::table('user_area_olympiads')
+                ->where('user_role_id', $oldRole->id)
+                ->delete();
+
+            // delete rol
+            DB::table('user_roles')
+                ->where('id', $oldRole->id)
+                ->delete();
+        }
+
+        // create new role
+        return DB::table('user_roles')->insertGetId([
+            'user_id' => $user->id,
+            'role_id' => $newRoleId,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 }
