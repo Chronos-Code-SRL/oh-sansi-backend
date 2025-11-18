@@ -232,6 +232,76 @@ class PhaseController extends Controller
         return response()->json($data, 200);
     }
 
+    public function getSinglePhaseStatus(string $olympiadId, string $areaId, string $levelId, string $phaseId)
+    {
+        // Verify that the olympiad_area relationship exists
+        $olympiadArea = OlympiadArea::where('olympiad_id', $olympiadId)
+            ->where('area_id', $areaId)
+            ->first();
+
+        if (!$olympiadArea) {
+            return response()->json([
+                'message' => 'Olympiad area relationship not found',
+                'status' => 404
+            ], 404);
+        }
+
+        // Verify that the level_grade exists for this level and olympiad_area
+        $levelGrade = LevelGrade::where('olympiad_area_id', $olympiadArea->id)
+            ->where('level_id', $levelId)
+            ->first();
+
+        if (!$levelGrade) {
+            return response()->json([
+                'message' => 'Level not found for this olympiad area',
+                'status' => 404
+            ], 404);
+        }
+
+        // Verify that the phase exists for this olympiad area
+        $olympiadAreaPhase = OlympiadAreaPhase::where('olympiad_area_id', $olympiadArea->id)
+            ->where('phase_id', $phaseId)
+            ->with('phase')
+            ->first();
+
+        if (!$olympiadAreaPhase) {
+            return response()->json([
+                'message' => 'Phase not found for this olympiad area',
+                'status' => 404
+            ], 404);
+        }
+
+        // Get the specific phase status for this level
+        $oaplg = OlympiadAreaPhaseLevelGrade::where('olympiad_area_phase_id', $olympiadAreaPhase->id)
+            ->where('level_grade_id', $levelGrade->id)
+            ->first();
+
+        if (!$oaplg) {
+            return response()->json([
+                'message' => 'Phase status configuration not found for this level',
+                'error' => 'Please configure this phase for the specified level first.',
+                'status' => 404
+            ], 404);
+        }
+
+        $phaseStatus = [
+            'phase_id' => (int)$phaseId,
+            'phase_name' => $olympiadAreaPhase->phase->name,
+            'phase_order' => $olympiadAreaPhase->phase->order,
+            'status' => $oaplg->status,
+            'score_cut' => $oaplg->score_cut,
+            'max_score' => $oaplg->max_score
+        ];
+
+        return response()->json([
+            'olympiad_id' => (int)$olympiadId,
+            'area_id' => (int)$areaId,
+            'level_id' => (int)$levelId,
+            'phase_status' => $phaseStatus,
+            'status' => 200
+        ], 200);
+    }
+
     public function updatePhaseStatus(Request $request, string $olympiadId, string $areaId, string $levelId)
     {
         // Data validation
