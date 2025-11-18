@@ -277,84 +277,49 @@ class ContestantController extends Controller
         $lastPhaseId = DB::table('olympiad_area_phases AS oap')
             ->join('olympiad_areas AS oa', 'oap.olympiad_area_id', '=', 'oa.id')
             ->join('phases AS p', 'oap.phase_id', '=', 'p.id')
+            ->join('olympiad_area_phase_level_grades AS oapl', 'oapl.olympiad_area_phase_id', '=', 'oap.id')
+            ->join('level_grades AS lg', 'lg.id', '=', 'oapl.level_grade_id')
             ->where('oa.olympiad_id', $olympiad_id)
             ->where('oa.area_id', $area_id)
-            // ->where('oap.status', 'Terminada') filtar por estado de la fase
+            ->where('lg.level_id', $level_id)
+            ->where('oapl.status', 'Terminada') // para avalar por nivel
+            // ->where('oap.status', 'Terminada') para avalar por area
             ->orderByDesc('p.order')
-            ->value('oap.phase_id');
+            ->select('oap.id')
+            ->first();
 
         if (!$lastPhaseId) {
             return response()->json([
                 'message' => 'No phases found for the specified olympiad and area',
-                'status' => 404
-            ], 404);
-        }
-        
-        $oapId = DB::table('olympiad_area_phases AS oap')
-            ->join('olympiad_areas AS oa', 'oap.olympiad_area_id', '=', 'oa.id')
-            ->where('oa.olympiad_id', $olympiad_id)
-            ->where('oa.area_id', $area_id)
-            ->where('oap.phase_id', $lastPhaseId)
-            // ->where('oap.status', 'Terminada') aca comentario
-            ->value('oap.id');
-        
-        if (!$oapId) {
-            return response()->json([
-                'message' => 'The last phase is not completed yet',
-                'status' => 404
             ], 404);
         }
 
-        $rankingQuery = DB::table('evaluations AS e')
+        $listWinners = DB::table('evaluations AS e')
             ->join('registrations AS r', 'e.registration_id', '=', 'r.id')
             ->join('contestants AS c', 'r.contestant_id', '=', 'c.id')
             ->join('contestant_level_grades AS clg', 'clg.contestant_id', '=', 'c.id')
             ->join('level_grades AS lg', 'clg.level_grade_id', '=', 'lg.id')
-            ->where('e.olympiad_area_phase_id', $oapId)
-            ->where('lg.level_id', $level_id)  // <-- Nivel filtrado correctamente
-            ->select(
-                'c.id AS contestant_id',
-                'e.id AS evaluation_id',
-                'e.score',
-                DB::raw("DENSE_RANK() OVER (ORDER BY e.score DESC) AS ranking_place")
-            );
-
-        $results = DB::table('contestants AS c')
-            ->joinSub($rankingQuery, 'rk', 'rk.contestant_id', '=', 'c.id')
-            ->join('registrations AS r', 'r.contestant_id', '=', 'c.id')
-            ->join('evaluations AS e', 'e.id', '=', 'rk.evaluation_id')
             ->join('olympiad_areas AS oa', 'r.olympiad_area_id', '=', 'oa.id')
             ->join('areas AS a', 'oa.area_id', '=', 'a.id')
-            ->join('contestant_level_grades AS clg', 'clg.contestant_id', '=', 'c.id')
-            ->join('level_grades AS lg', 'clg.level_grade_id', '=', 'lg.id')
             ->join('levels AS l', 'lg.level_id', '=', 'l.id')
-            ->where('oa.olympiad_id', $olympiad_id)
-            ->where('oa.area_id', $area_id)
+            ->where('e.olympiad_area_phase_id', $lastPhaseId->id)
             ->where('lg.level_id', $level_id)
+            ->where('e.classification_place', '!=', null)
             ->select(
                 'c.id AS contestant_id',
-                'c.first_name AS first_name',
-                'c.last_name AS last_name',
-                'c.school_name AS school_name',
-                'c.ci_document AS ci_document',
+                'c.first_name',
+                'c.last_name',
+                'c.school_name',
+                'c.ci_document',
                 'a.name AS area_name',
                 'l.name AS level_name',
-                'rk.score AS score',
+                'e.score',
                 'e.id AS evaluation_id',
-                DB::raw("
-                    CASE 
-                        WHEN rk.ranking_place = 1 THEN 'Oro'
-                        WHEN rk.ranking_place = 2 THEN 'Plata'
-                        WHEN rk.ranking_place = 3 THEN 'Bronce'
-                        ELSE 'Mención de Honor'
-                    END AS classification_place
-                "),
-
-                'rk.ranking_place'
+                'e.classification_place'
             )
-            ->orderBy('rk.ranking_place')
+            ->orderBy('e.classification_place')
             ->get();
-        
-        return response()->json($results, 200);
+
+        return response()->json($listWinners, 200);
     }
 }
