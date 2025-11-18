@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\UserAreaController;
 use App\Http\Controllers\Api\EvaluationController;
 use App\Http\Controllers\Api\ContestantController;
 use App\Http\Controllers\Api\LevelController;
+use App\Http\Controllers\Api\AuditController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -75,6 +76,9 @@ Route::get('/grades/{id}', [GradeController::class, 'show']);
 Route::post('/grades', [GradeController::class, 'store']);
 Route::put('/grades/{id}', [GradeController::class, 'update']);
 Route::delete('/grades/{id}', [GradeController::class, 'destroy']);
+
+// Audits: evaluations (calificaciones)
+Route::get('/audits/evaluations', [AuditController::class, 'evaluations']);
 
 // <--- CRUD Olympiad-Area-Phase-Level-Grades (Score Cuts) --->
 Route::post('/olympiads/{olympiadId}/areas/{areaId}/score-cuts', [OlympiadController::class, 'assignScoreCuts']);
