@@ -271,4 +271,55 @@ class ContestantController extends Controller
             'disqualified' => $disqualified,
         ]);
     }
+
+    public function getAwardWinningContestants(string $olympiad_id, string $area_id, string $level_id)
+    {
+        $lastPhaseId = DB::table('olympiad_area_phases AS oap')
+            ->join('olympiad_areas AS oa', 'oap.olympiad_area_id', '=', 'oa.id')
+            ->join('phases AS p', 'oap.phase_id', '=', 'p.id')
+            ->join('olympiad_area_phase_level_grades AS oapl', 'oapl.olympiad_area_phase_id', '=', 'oap.id')
+            ->join('level_grades AS lg', 'lg.id', '=', 'oapl.level_grade_id')
+            ->where('oa.olympiad_id', $olympiad_id)
+            ->where('oa.area_id', $area_id)
+            ->where('lg.level_id', $level_id)
+            ->where('oapl.status', 'Terminada') // para avalar por nivel
+            // ->where('oap.status', 'Terminada') para avalar por area
+            ->orderByDesc('p.order')
+            ->select('oap.id')
+            ->first();
+
+        if (!$lastPhaseId) {
+            return response()->json([
+                'message' => 'No phases found for the specified olympiad and area',
+            ], 404);
+        }
+
+        $listWinners = DB::table('evaluations AS e')
+            ->join('registrations AS r', 'e.registration_id', '=', 'r.id')
+            ->join('contestants AS c', 'r.contestant_id', '=', 'c.id')
+            ->join('contestant_level_grades AS clg', 'clg.contestant_id', '=', 'c.id')
+            ->join('level_grades AS lg', 'clg.level_grade_id', '=', 'lg.id')
+            ->join('olympiad_areas AS oa', 'r.olympiad_area_id', '=', 'oa.id')
+            ->join('areas AS a', 'oa.area_id', '=', 'a.id')
+            ->join('levels AS l', 'lg.level_id', '=', 'l.id')
+            ->where('e.olympiad_area_phase_id', $lastPhaseId->id)
+            ->where('lg.level_id', $level_id)
+            ->where('e.classification_place', '!=', null)
+            ->select(
+                'c.id AS contestant_id',
+                'c.first_name',
+                'c.last_name',
+                'c.school_name',
+                'c.ci_document',
+                'a.name AS area_name',
+                'l.name AS level_name',
+                'e.score',
+                'e.id AS evaluation_id',
+                'e.classification_place'
+            )
+            ->orderBy('e.classification_place')
+            ->get();
+
+        return response()->json($listWinners, 200);
+    }
 }
