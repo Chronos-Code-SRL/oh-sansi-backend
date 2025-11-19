@@ -413,7 +413,7 @@ class ContestantController extends Controller
             ->select(
                 'c.first_name AS first_name',
                 'c.last_name AS last_name',
-                'c.school_name AS shool_name',
+                'c.school_name AS school_name',
                 'a.name AS area_name',
                 'c.department AS department',
                 'l.name AS level_name',
