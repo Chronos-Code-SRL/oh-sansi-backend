@@ -411,22 +411,22 @@ class ContestantController extends Controller
             ->where('oa.olympiad_id', $olympiad_id)
             ->where('oa.area_id', $area_id)
             ->select(
-                'c.first_name AS nombre',
-                'c.last_name AS apellido',
-                'c.school_name AS unidad_educativa',
-                'a.name AS nombre_area',
-                'c.first_name AS departamento',
-                'l.name AS nombre_nivel',
-                'e.classification_place AS lugar'
+                'c.first_name AS first_name',
+                'c.last_name AS last_name',
+                'c.school_name AS shool_name',
+                'a.name AS area_name',
+                'c.first_name AS department',
+                'l.name AS level_name',
+                'e.classification_place AS classification_place'
             )
 
-            ->orderByRaw("CASE 
-                WHEN e.classification_place = 'Oro' THEN 1
-                WHEN e.classification_place = 'Plata' THEN 2
-                WHEN e.classification_place = 'Bronce' THEN 3
-                ELSE 4
-            END")
-
+            // ->orderByRaw("CASE 
+            //     WHEN e.classification_place = 'Oro' THEN 1
+            //     WHEN e.classification_place = 'Plata' THEN 2
+            //     WHEN e.classification_place = 'Bronce' THEN 3
+            //     ELSE 4
+            // END")
+            ->distinct()
             ->get();
 
         return response()->json([
