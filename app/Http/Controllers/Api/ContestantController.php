@@ -415,7 +415,7 @@ class ContestantController extends Controller
                 'c.last_name AS last_name',
                 'c.school_name AS shool_name',
                 'a.name AS area_name',
-                'c.first_name AS department',
+                'c.department AS department',
                 'l.name AS level_name',
                 'e.classification_place AS classification_place'
             )
