@@ -1,0 +1,11 @@
+N.,CI,NOMBRE,APELLIDO,GENERO,DEPARTAMENTO,COLEGIO,CELULAR,E-MAIL,AREA,GRADO,NIVEL,NUMERO TUTOR,NOMBRE TUTOR
+1,123,Juan123,Pérez,M,Santa Cruz,Colegio San José,76543210,juan.perez@email.com,Matemática,primero de primaria,Primaria,76543211,Maria Pérez
+2,87654321,Ana,García,X,La Paz,Colegio Nacional,76543212,ana.garcia@email.com,Física,segundo de primaria,Primaria,76543213,Carlos García
+3,11223344,Pedro,López,M,Cochabamba,Instituto Técnico,76543214,pedro.lopez@email.com,Química;Biología,tercero de primaria,Primaria,76543215,Laura López
+4,44332211,Sofia,Martínez,F,Tarija,Colegio Privado,76543216,sofia.martinez@email.com,Informática,cuarto de primaria,Primaria,76543217,Roberto Martínez
+5,55667788,Carlos,Rodríguez,M,Oruro,Escuela Pública,123456,invalid-email,Robótica;Astronomía;Física;Química,quinto de primaria,Primaria,76543219,Elena Rodríguez
+6,99887766,Luis,Fernández,M,Beni,Colegio Beniano,76543220,luis.fernandez@email.com,Matemática,sexto de primaria,Primaria,76543221,Carmen Fernández
+7,11111111,María,González,F,Pando,Escuela Rural,76543222,maria.gonzalez@email.com,Biología,segundo de primaria,Primaria,76543223,José González
+8,22222222,Roberto,Silva,M,Potosi,Instituto Minero,76543224,roberto.silva@email.com,Física;Química,tercero de primaria,Primaria,76543225,Ana Silva
+9,33333333,Lucia,Torres,F,Chuquisaca,Colegio Sucre,76543226,lucia.torres@email.com,Informática,cuarto de primaria,Primaria,76543227,Miguel Torres
+10,44444444,Diego,Morales,M,Santa Cruz,Colegio Privado,76543228,diego.morales@email.com,Robótica,quinto de primaria,Primaria,76543229,Patricia Morales

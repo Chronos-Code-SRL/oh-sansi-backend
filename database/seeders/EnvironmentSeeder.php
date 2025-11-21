@@ -2,19 +2,16 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
-// use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use App\Models\Grade;
+use App\Models\User;
+use App\Models\Area;
 
-class DatabaseSeeder extends Seeder
+class EnvironmentSeeder extends Seeder
 {
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
-
         $grades = [
             // Primaria
             ['name' => 'Primero de primaria'],
@@ -49,29 +46,20 @@ class DatabaseSeeder extends Seeder
         ];
 
         foreach ($areas as $area) {
-            \App\Models\Area::firstOrCreate($area);
+            Area::firstOrCreate($area);
         }
 
-        $this->call([
-            AreaSeeder::class,
-            LevelSeeder::class,
-            GradeSeeder::class,
-            OlympiadWithAreasSeeder::class,
-            \Database\Seeders\RankedContestantsSeeder::class,
-        ]);
-
-        $user = new User();
-        $user->first_name = 'Root';
-        $user->last_name = 'Admin';
-        $user->email = 'admin@gmail.com';
-        $user->password = bcrypt('password');
-        $user->ci = '12345678';
-        $user->phone_number = '+59 71780589';
-        $user->genre = 'femenino';
+        // $user = new User();
+        // $user->first_name = 'Root';
+        // $user->last_name = 'Admin';
+        // $user->email = 'admin@gmail.com';
+        // $user->password = bcrypt('password');
+        // $user->ci = '12345678';
+        // $user->phone_number = '+59 71780589';
+        // $user->genre = 'femenino';
         // $user->roles_id = 1;
-        $user->save();
-
-        $this->command->info('Grades, Areas and user admin created successfully.');
-
+        // $user->save();
+        // // $user->areas()->attach([1, 2, 3, 4, 5, 6, 7, 8]); 
+        // $this->command->info('Grades, Areas and user admin created successfully.');
     }
 }
