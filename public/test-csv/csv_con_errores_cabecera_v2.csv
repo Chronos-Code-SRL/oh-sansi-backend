@@ -1,0 +1,3 @@
+Numero,CEDULA,NOMBRES,APELLIDOS,GENERO,DEPARTAMENTO,ESCUELA,CELULAR,EMAIL,AREA,GRADO,NIVEL,NUMERO_TUTOR,NOMBRE_TUTOR
+1,12345678,Juan,Pérez,M,La Paz,Colegio Nacional,76543210,juan@email.com,Matemáticas,Primero,Nivel 1,12345678,Prof. García
+2,87654321,María,González,F,Cochabamba,Colegio Internacional,65432109,maria@email.com,Física,Segundo,Nivel 2,87654321,Prof. López

@@ -1,0 +1,6 @@
+N.,CI,NOMBRE,APELLIDO,GENERO,DEPARTAMENTO,COLEGIO,CELULAR,E-MAIL,AREA,GRADO,NIVEL,NUMERO TUTOR,NOMBRE TUTOR
+1,99887766,Luis,Fernández,M,Beni,Colegio Beniano,76543220,luis.fernandez@email.com,Matemática,sexto de primaria,Primaria,76543221,Carmen Fernández
+2,12345678,Juan,Pérez,M,Santa Cruz,Colegio San José,76543210,juan.perez@email.com,Matemática,primero de primaria,Primaria,76543211,Maria Pérez
+3,11111111,María,González,F,Pando,Escuela Rural,76543222,maria.gonzalez@email.com,Biología,segundo de primaria,Primaria,76543223,José González
+4,22222222,Roberto,Silva,M,Potosi,Instituto Minero,76543224,roberto.silva@email.com,Física;Química,tercero de primaria,Primaria,76543225,Ana Silva
+5,33333333,Lucia,Torres,F,Chuquisaca,Colegio Sucre,76543226,lucia.torres@email.com,Informática,cuarto de primaria,Primaria,76543227,Miguel Torres
