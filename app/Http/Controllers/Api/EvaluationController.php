@@ -12,6 +12,9 @@ use App\Models\Phase;
 use Illuminate\Http\JsonResponse;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rules\Exists;
+
+use function Adminer\where;
 
 class EvaluationController extends Controller
 {
@@ -301,5 +304,40 @@ class EvaluationController extends Controller
                 // The competitor does not have a registered level
                 $evaluation->classification_status = 'descalificado';
         }
+    }
+
+    public function checkEvaluations(string $olympiadId, string $phaseId, string $areaId, string $levelId)
+    {
+        $olympiadAreaId = OlympiadArea::query()
+            ->where('olympiad_id', $olympiadId)
+            ->where('area_id', $areaId)
+            ->value('id');
+        
+        if (!$olympiadAreaId) {
+            return response()->json([
+                'message' => 'Olympiad and area not found'
+            ], 404);
+        }
+
+        $existEvaluation = DB::table('evaluations as e')
+            ->join('registrations as r', 'e.registration_id', '=', 'r.id')
+            ->join('contestants as c', 'r.contestant_id', '=', 'c.id')
+            ->join('contestant_level_grades AS clg', 'clg.contestant_id', '=', 'c.id')
+            ->join('level_grades AS lg', 'clg.level_grade_id', '=', 'lg.id')
+            ->where('r.olympiad_area_id', $olympiadAreaId)
+            ->where('lg.level_id', $levelId)
+            ->where('e.olympiad_area_phase_id', $phaseId)
+            ->whereNotNull('e.score')
+            ->exists();
+        
+        if (!$existEvaluation) {
+            return response()->json([
+                'message' => 'There are no qualified competitors; you can edit the threshold'
+            ], 200);
+        }
+
+        return response()->json([
+            'message'=> 'The threshold cannot be edited qualified competitors already exist'
+        ], 403);
     }
 }
