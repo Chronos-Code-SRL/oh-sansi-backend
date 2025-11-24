@@ -307,7 +307,8 @@ class ContestantController extends Controller
             ->join('levels AS l', 'lg.level_id', '=', 'l.id')
             ->where('e.olympiad_area_phase_id', $lastPhaseId->id)
             ->where('lg.level_id', $level_id)
-            ->where('e.classification_place', '!=', null)
+            // ->where('e.classification_place', '!=', null)
+            ->whereNotNull('e.classification_place')
             ->select(
                 'c.id AS contestant_id',
                 'c.first_name',
@@ -320,7 +321,8 @@ class ContestantController extends Controller
                 'e.id AS evaluation_id',
                 'e.classification_place'
             )
-            ->orderBy('e.classification_place')
+            // ->orderBy('e.classification_place')
+            ->orderBy('e.score', 'desc')
             ->get();
 
         return response()->json($listWinners, 200);
@@ -535,43 +537,13 @@ class ContestantController extends Controller
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['error' => $e->getMessage()], 500);
+            return response()->json([
+                'message' => 'Internal Server Error'
+            ], 500);
         }
 
-        $listWinners = DB::table('evaluations AS e')
-            ->join('registrations AS r', 'e.registration_id', '=', 'r.id')
-            ->join('contestants AS c', 'r.contestant_id', '=', 'c.id')
-            ->join('contestant_level_grades AS clg', 'clg.contestant_id', '=', 'c.id')
-            ->join('level_grades AS lg', 'lg.id', '=', 'clg.level_grade_id')
-            ->join('olympiad_areas AS oa', 'r.olympiad_area_id', '=', 'oa.id')
-            ->join('areas AS a', 'oa.area_id', '=', 'a.id')
-            ->join('levels AS l', 'lg.level_id', '=', 'l.id')
-            ->where('e.olympiad_area_phase_id', $lastPhaseId->id)
-            ->where('lg.level_id', $levelId)
-            ->whereNotNull('e.classification_place')
-            ->select(
-                'c.id AS contestant_id',
-                'c.first_name',
-                'c.last_name',
-                'c.school_name',
-                'c.ci_document',
-                'a.name AS area_name',
-                'l.name AS level_name',
-                'e.score',
-                'e.id AS evaluation_id',
-                'e.classification_place'
-            )
-            ->orderBy('e.score', 'desc')
-            // ->orderByRaw("CASE
-            //     WHEN e.classification_place = 'Oro' THEN 1
-            //     WHEN e.classification_place = 'Plata' THEN 2
-            //     WHEN e.classification_place = 'Bronce' THEN 3
-            //     WHEN e.classification_place = 'Mencion de honor' THEN 4
-            // END")
-            ->get();
-
         return response()->json([
-            'winners' => $listWinners,
+            'message' => 'Classification applied correctly'
         ], 200);
     }
 }
