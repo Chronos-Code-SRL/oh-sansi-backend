@@ -58,6 +58,7 @@ Route::get('/phases/{id}', [PhaseController::class, 'show']);
 Route::post('/phases', [PhaseController::class, 'store']);
 Route::put('/phases/{id}', [PhaseController::class, 'update']);
 Route::delete('/phases/{id}', [PhaseController::class, 'destroy']);
+Route::get('/phases/olympiads/{olympiadId}/areas/{areaId}/levels/{levelId}/last-phase-status', [PhaseController::class, 'lastPhaseStatus']);
 
 // <--- CRUD Olympiad-Area-Phases (Status) --->
 Route::get('/olympiads/{olympiadId}/areas/{areaId}/levels/{levelId}/phase-status', [PhaseController::class, 'getPhaseStatus']);
