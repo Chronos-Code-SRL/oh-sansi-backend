@@ -47,6 +47,7 @@ class ContestantController extends Controller
             ->where('levels.id', $level_id)
             ->whereColumn('olympiad_area_phases.olympiad_area_id', 'olympiad_areas.id')
             ->distinct()
+            ->orderBy('contestants.last_name', 'ASC')
             ->get();
 
         if ($contestants->isEmpty()) {
