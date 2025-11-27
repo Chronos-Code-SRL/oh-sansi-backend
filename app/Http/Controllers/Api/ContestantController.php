@@ -309,7 +309,7 @@ class ContestantController extends Controller
             ->where('e.olympiad_area_phase_id', $lastPhaseId->id)
             ->where('lg.level_id', $level_id)
             // ->where('e.classification_place', '!=', null)
-            ->whereNotNull('e.classification_place')
+            // ->whereNotNull('e.classification_place')
             ->select(
                 'c.id AS contestant_id',
                 'c.first_name',
@@ -517,6 +517,15 @@ class ContestantController extends Controller
             ->select('e.id AS evaluation_id', 'e.score')
             ->get();
 
+        $numberMedals = $request->gold + $request->silver + $request->bronze + $request->honorable_mention;
+        $totalCompetitors = $competitors->count();
+
+        if ($numberMedals > $totalCompetitors) {
+            return response()->json([
+                'message' => 'La cantidad de medallas no puede ser mayor que el número de competidores premiados',
+            ], 422);
+        }
+
         $index = 0;
 
         DB::beginTransaction();
@@ -533,6 +542,14 @@ class ContestantController extends Controller
                         ]);
                     $index++;
                 }
+            }
+
+            for ($j = $index; $j < $competitors->count(); $j++) {
+                DB::table('evaluations')
+                    ->where('id', $competitors[$j]->evaluation_id)
+                    ->update([
+                        'classification_place' => null,
+                    ]);
             }
 
             DB::commit();
