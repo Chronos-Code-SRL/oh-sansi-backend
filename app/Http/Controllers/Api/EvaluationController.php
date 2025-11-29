@@ -332,12 +332,12 @@ class EvaluationController extends Controller
         
         if (!$existEvaluation) {
             return response()->json([
-                'message' => 'There are no qualified competitors; you can edit the threshold'
+                'message' => 'No hay competidores calificados puedes editar el umbral'
             ], 200);
         }
 
         return response()->json([
-            'message'=> 'The threshold cannot be edited qualified competitors already exist'
+            'message'=> 'El umbral no se puede editar ya existen competidores calificados'
         ], 403);
     }
 }
