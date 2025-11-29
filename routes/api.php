@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\CsvUploadController;
 use App\Http\Controllers\CompetitorRegistrationController;
 use App\Http\Controllers\Api\UserAreaController;
 use App\Http\Controllers\Api\EvaluationController;
+use App\Http\Controllers\Api\EvaluationAuditController;
 use App\Http\Controllers\Api\ContestantController;
 use App\Http\Controllers\Api\LevelController;
 
@@ -140,10 +141,19 @@ Route::get('/csv-uploads/{id}/download', [CsvUploadController::class, 'download'
 Route::get('/csv-uploads/{id}/download-errors', [CsvUploadController::class, 'downloadErrors']);
 
 // <--- CRUD Evaluation --->
-Route::patch('/evaluations/{id}',[EvaluationController::class, 'updatePartialEvaluation']);
+Route::middleware(['auth:sanctum'])->group(function () {
+    Route::patch('/evaluations/{id}',[EvaluationController::class, 'updatePartialEvaluation']);
+    Route::patch('/evaluations/{id}/classification', [EvaluationController::class, 'updateClassificationStatus']);
+});
 Route::get('/evaluations/check-updates/',[EvaluationController::class, 'checksUpdates']);
 Route::get('/olympiads/{olympiadId}/areas/{areaId}/phases/{phaseId}/competitors', [EvaluationController::class, 'getCompetitorsByPhase']);
-Route::patch('/evaluations/{id}/classification', [EvaluationController::class, 'updateClassificationStatus']);
+
+// <--- Evaluation Audit Logs --->
+Route::middleware(['auth:sanctum'])->group(function () {
+    Route::get('/evaluations/audit/logs', [EvaluationAuditController::class, 'getEvaluationLogs']);
+    Route::get('/evaluations/audit/statistics', [EvaluationAuditController::class, 'getEvaluationAuditStats']);
+    Route::get('/evaluations/{evaluationId}/audit/history', [EvaluationAuditController::class, 'getEvaluationHistory']);
+});
 
 // <--- Get Contestants --->
 Route::get('/contestants/{phase_id}/{olympiad_id}/{area_id}/{level_id}', [ContestantController::class, 'showContestant']);

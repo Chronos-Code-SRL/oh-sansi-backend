@@ -4,10 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use OwenIt\Auditing\Contracts\Auditable;
 
-class Evaluation extends Model
+class Evaluation extends Model implements Auditable
 {
     use HasFactory;
+    use \OwenIt\Auditing\Auditable;
 
     protected $fillable = [
         'score',
@@ -17,6 +19,39 @@ class Evaluation extends Model
         'status',
         'classification_status',
         'classification_place'
+    ];
+
+    /**
+     * Attributes to include in the Audit.
+     *
+     * @var array
+     */
+    protected $auditInclude = [
+        'score',
+        'description',
+        'status',
+        'classification_status',
+        'classification_place'
+    ];
+
+    /**
+     * Exclude events from being audited.
+     *
+     * @var array
+     */
+    protected $auditEvents = [
+        'created',
+        'updated'
+    ];
+
+    /**
+     * Exclude specific fields from being audited.
+     *
+     * @var array
+     */
+    protected $auditExclude = [
+        'updated_at',
+        'created_at'
     ];
 
     /**
