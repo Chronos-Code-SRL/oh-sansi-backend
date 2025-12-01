@@ -145,6 +145,7 @@ Route::patch('/evaluations/{id}',[EvaluationController::class, 'updatePartialEva
 Route::get('/evaluations/check-updates/',[EvaluationController::class, 'checksUpdates']);
 Route::get('/olympiads/{olympiadId}/areas/{areaId}/phases/{phaseId}/competitors', [EvaluationController::class, 'getCompetitorsByPhase']);
 Route::patch('/evaluations/{id}/classification', [EvaluationController::class, 'updateClassificationStatus']);
+Route::get('/olympiads/{olympiadId}/phases/{phaseId}/areas/{areaId}/levels/{levelId}/competitors', [EvaluationController::class, 'checkEvaluations']);
 
 // <--- Get Contestants --->
 Route::get('/contestants/{phase_id}/{olympiad_id}/{area_id}/{level_id}', [ContestantController::class, 'showContestant']);
