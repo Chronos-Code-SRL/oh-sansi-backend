@@ -923,20 +923,26 @@ class PhaseController extends Controller
 
     public function lastPhaseStatus(string $olympiadId, string $areaId, string $levelId)
     {
-        $lastPhaseId = DB::table('olympiad_area_phases AS oap')
-            ->join('olympiad_areas AS oa', 'oap.olympiad_area_id', '=', 'oa.id')
-            ->join('phases AS p', 'oap.phase_id', '=', 'p.id')
-            ->join('olympiad_area_phase_level_grades AS oapl', 'oapl.olympiad_area_phase_id', '=', 'oap.id')
+        $lastPhaseId = DB::table('olympiad_area_phase_level_grades AS oapl')
+            ->join('olympiad_area_phases AS oap', 'oap.id', '=', 'oapl.olympiad_area_phase_id')
+            ->join('phases AS p', 'p.id', '=', 'oap.phase_id')
             ->join('level_grades AS lg', 'lg.id', '=', 'oapl.level_grade_id')
+            ->join('olympiad_areas AS oa', 'oa.id', '=', 'lg.olympiad_area_id')
             ->where('oa.olympiad_id', $olympiadId)
             ->where('oa.area_id', $areaId)
             ->where('lg.level_id', $levelId)
-            ->where('oapl.status', 'Terminada')
             ->orderByDesc('p.order')
-            ->select('oap.id')
+            ->select('p.order', 'oapl.status')
             ->first();
 
-        if (!$lastPhaseId) {
+        // if (!$lastPhaseId) {
+        //     return response()->json([
+        //         'message' => 'Last phase not endorsed',
+        //         'status' => 403
+        //     ], 403);
+        // }
+
+        if ($lastPhaseId->status !== 'Terminada') {
             return response()->json([
                 'message' => 'Last phase not endorsed',
                 'status' => 403

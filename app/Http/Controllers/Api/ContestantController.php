@@ -561,7 +561,7 @@ class ContestantController extends Controller
         }
 
         return response()->json([
-            'message' => 'Classification applied correctly'
+            'message' => 'Clasificación de medallero aplicada correctamente'
         ], 200);
     }
 }
