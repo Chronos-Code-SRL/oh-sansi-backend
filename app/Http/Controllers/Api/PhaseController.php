@@ -920,4 +920,32 @@ class PhaseController extends Controller
             ], 500);
         }
     }
+
+    public function lastPhaseStatus(string $olympiadId, string $areaId, string $levelId)
+    {
+        $lastPhaseId = DB::table('olympiad_area_phases AS oap')
+            ->join('olympiad_areas AS oa', 'oap.olympiad_area_id', '=', 'oa.id')
+            ->join('phases AS p', 'oap.phase_id', '=', 'p.id')
+            ->join('olympiad_area_phase_level_grades AS oapl', 'oapl.olympiad_area_phase_id', '=', 'oap.id')
+            ->join('level_grades AS lg', 'lg.id', '=', 'oapl.level_grade_id')
+            ->where('oa.olympiad_id', $olympiadId)
+            ->where('oa.area_id', $areaId)
+            ->where('lg.level_id', $levelId)
+            ->where('oapl.status', 'Terminada')
+            ->orderByDesc('p.order')
+            ->select('oap.id')
+            ->first();
+
+        if (!$lastPhaseId) {
+            return response()->json([
+                'message' => 'Last phase not endorsed',
+                'status' => 403
+            ], 403);
+        }
+
+        return response()->json([
+            'message' => 'Final approved phase',
+            'status' => 200
+        ], 200);
+    }
 }
