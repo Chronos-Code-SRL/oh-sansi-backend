@@ -172,7 +172,7 @@ class TheOrigin extends Seeder
             'phone_number' => '12345678',
             'genre' => 'masculino',
             // 'role_id' => 3,
-            'profesion' => 'INGENIERO EN INFORMATICA',
+            // 'profesion' => 'INGENIERO EN INFORMATICA',
         ]);
 
         $evaluatorUserRole = DB::table('user_roles')->updateOrInsert([
