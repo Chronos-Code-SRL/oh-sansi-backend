@@ -48,17 +48,6 @@ class AuthController extends Controller
     public function register(Request $request)
     {
 
-        // $userExists = User::where('ci', $request->ci)->first();
-        // if ($userExists) {
-        //     $this->syncUserAreasOlympiad($userExists, $request->areas_id, $request->olympiad_id);
-
-        //     $data = [
-        //         'message' => 'User updated successfully',
-        //         'user' => $userExists,
-        //     ];
-        //     return response()->json($data, 200);
-        // }
-
         $validator = Validator::make(
             $request->all(),
             [
@@ -87,13 +76,18 @@ class AuthController extends Controller
         // search user by ci
         $user = User::where('ci', $request->ci)->first();
         if ($user) {
-            
+            if ($request->roles_id == 2) {
+                $user->update([
+                    'profesion' => $request->profesion
+                ]);
+            }
+
             $currentRole = DB::table('user_roles')
                 ->where('user_id', $user->id)
                 ->first();
 
             if ($currentRole && $currentRole->role_id != $request->roles_id) {
-                $userRoleId = $this->changeUserRole($user, $request->roles_id);
+                $userRoleId = $this->addUserRole($user, $request->roles_id);
 
             } else {
                 if (!$currentRole) {
@@ -194,18 +188,13 @@ class AuthController extends Controller
 
         $user = User::where('email', $request['email'])->firstOrFail();
 
-        $user->roles_id = $user->roles()
-            ->select('roles.id', 'roles.name')
-            ->get()
-            ->makeHidden('pivot');
-            
+        $roleId = $user->roles()->pluck('user_roles.role_id')->first();
+
+        $user->roles_id = $roleId;
+    
         $token = $user->createToken('auth_token')->plainTextToken;
 
-        return response()->json([
-            'token' => $token, 
-            'token_type' => 'Bearer', 
-            'user' => $user
-        ], 200);
+        return response()->json(['token' => $token, 'token_type' => 'Bearer', 'user' => $user], 200);
     }
     /**
      * @OA\Post(
@@ -270,7 +259,7 @@ class AuthController extends Controller
         // Calcular nuevas áreas a insertar
         $newAreas = array_diff($areas_id, $existingAreas);
         // elimina areas que no estan en el arreglo
-        $areasToDelete = array_diff($existingAreas, $areas_id);
+        // $areasToDelete = array_diff($existingAreas, $areas_id);
 
         // Insertar solo las nuevas
         foreach ($newAreas as $areaId) {
@@ -283,13 +272,13 @@ class AuthController extends Controller
             ]);
         }
 
-        if (!empty($areasToDelete)) {
-            DB::table('user_area_olympiads')
-            ->where('user_role_id', $userRoleId)
-            ->where('olympiad_id', $olympiad_id)
-            ->whereIn('area_id', $areasToDelete)
-            ->delete();
-        }
+        // if (!empty($areasToDelete)) {
+        //     DB::table('user_area_olympiads')
+        //     ->where('user_role_id', $userRoleId)
+        //     ->where('olympiad_id', $olympiad_id)
+        //     ->whereIn('area_id', $areasToDelete)
+        //     ->delete();
+        // }
     }
 
     public function searchUser(string $olympiadId, string $ci, string $roleId)
@@ -343,26 +332,17 @@ class AuthController extends Controller
         }
     }
 
-    private function changeUserRole($user, $newRoleId)
+    private function addUserRole($user, $newRoleId)
     {
-        // search old role
-        $oldRole = DB::table('user_roles')
+        $existingRole = DB::table('user_roles')
             ->where('user_id', $user->id)
+            ->where('role_id', $newRoleId)
             ->first();
 
-        if ($oldRole) {
-            // delete areas associated with old role
-            DB::table('user_area_olympiads')
-                ->where('user_role_id', $oldRole->id)
-                ->delete();
-
-            // delete rol
-            DB::table('user_roles')
-                ->where('id', $oldRole->id)
-                ->delete();
+        if ($existingRole) {
+            return $existingRole->id;
         }
 
-        // create new role
         return DB::table('user_roles')->insertGetId([
             'user_id' => $user->id,
             'role_id' => $newRoleId,
