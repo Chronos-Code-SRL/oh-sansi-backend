@@ -1003,10 +1003,13 @@ class OlympiadController extends Controller
                             // Assign default score cut, max score to all newly created level-grades for this phase
                             $scoreCutsCreated = 0;
                             foreach ($createdLevelGrades as $levelGrade) {
+                                // Determine status based on phase order - first phase (order = 1) should be 'Activa'
+                                $phaseStatus = ($olympiadAreaPhase->phase->order === 1) ? 'Activa' : 'Sin empezar';
+
                                 // Prepare default data - ensure score_cut is always provided
                                 $defaultData = [
                                     'score_cut' => $olympiad->default_score_cut ?? 0, // Fallback to 0 if null
-                                    'status' => 'Sin empezar' // Set default status
+                                    'status' => $phaseStatus // Set status based on phase order
                                 ];
 
                                 if ($olympiad->default_max_score !== null) {
@@ -1782,7 +1785,7 @@ class OlympiadController extends Controller
             }
 
             // Get or create OlympiadAreaPhase
-            $olympiadAreaPhase = OlympiadAreaPhase::firstOrCreate([
+            $olympiadAreaPhase = OlympiadAreaPhase::with('phase')->firstOrCreate([
                 'olympiad_area_id' => $olympiadArea->id,
                 'phase_id' => $request->phase_id
             ]);
@@ -1794,6 +1797,9 @@ class OlympiadController extends Controller
                     'status' => 500
                 ], 500);
             }
+
+            // Determine status based on phase order - first phase (order = 1) should be 'Activa'
+            $phaseStatus = ($olympiadAreaPhase->phase && $olympiadAreaPhase->phase->order === 1) ? 'Activa' : 'Sin empezar';
 
             // Begin transaction to ensure data consistency
             DB::beginTransaction();
@@ -1824,7 +1830,7 @@ class OlympiadController extends Controller
                             'level_grade_id' => $levelGrade->id,
                             'score_cut' => $request->score_cut,
                             'max_score' => $olympiad->default_max_score ?? null,
-                            'status' => 'Sin empezar'
+                            'status' => $phaseStatus
                         ]);
 
                         if ($newScoreCut) {
@@ -2113,7 +2119,7 @@ class OlympiadController extends Controller
             }
 
             // Get or create OlympiadAreaPhase
-            $olympiadAreaPhase = OlympiadAreaPhase::firstOrCreate([
+            $olympiadAreaPhase = OlympiadAreaPhase::with('phase')->firstOrCreate([
                 'olympiad_area_id' => $olympiadArea->id,
                 'phase_id' => $request->phase_id
             ]);
@@ -2126,6 +2132,9 @@ class OlympiadController extends Controller
                 ], 500);
             }
 
+            // Determine status based on phase order - first phase (order = 1) should be 'Activa'
+            $phaseStatus = ($olympiadAreaPhase->phase && $olympiadAreaPhase->phase->order === 1) ? 'Activa' : 'Sin empezar';
+
             // Begin transaction to ensure data consistency
             DB::beginTransaction();
 
@@ -2135,19 +2144,26 @@ class OlympiadController extends Controller
 
                 // Assign max score to all level-grades for this level in this phase
                 foreach ($levelGrades as $levelGrade) {
-                    $maxScoreRecord = OlympiadAreaPhaseLevelGrade::updateOrCreate([
-                        'olympiad_area_phase_id' => $olympiadAreaPhase->id,
-                        'level_grade_id' => $levelGrade->id
-                    ], [
-                        'max_score' => $request->max_score,
-                        'score_cut' => $olympiad->default_score_cut ?? 0, // Ensure score_cut is not null
-                        'status' => 'Sin empezar'
-                    ]);
+                    $existing = OlympiadAreaPhaseLevelGrade::where('olympiad_area_phase_id', $olympiadAreaPhase->id)
+                        ->where('level_grade_id', $levelGrade->id)
+                        ->first();
 
-                    if ($maxScoreRecord->wasRecentlyCreated) {
-                        $createdCount++;
-                    } else {
+                    if ($existing) {
+                        // Only update max_score, leave score_cut unchanged
+                        $existing->max_score = $request->max_score;
+                        $existing->status = $phaseStatus;
+                        $existing->save();
                         $updatedCount++;
+                    } else {
+                        // Create new record with default score_cut
+                        OlympiadAreaPhaseLevelGrade::create([
+                            'olympiad_area_phase_id' => $olympiadAreaPhase->id,
+                            'level_grade_id' => $levelGrade->id,
+                            'max_score' => $request->max_score,
+                            'score_cut' => $olympiad->default_score_cut ?? 0,
+                            'status' => $phaseStatus
+                        ]);
+                        $createdCount++;
                     }
                 }
 
@@ -2972,7 +2988,7 @@ class OlympiadController extends Controller
      *     summary="To obtain active or planned Olympics",
      *     description="Return all Olympics whose status is 'Active' or 'In planning'.",
      *     tags={"Olympiads"},
-     *     
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Olympiads retrieved successfully",
@@ -3018,7 +3034,7 @@ class OlympiadController extends Controller
         }
 
         return response()->json([
-            'message' => 'Olympiads retrieved successfully.', 
+            'message' => 'Olympiads retrieved successfully.',
             'data' => $olympiads,
             'status' => 200
         ], 200);
