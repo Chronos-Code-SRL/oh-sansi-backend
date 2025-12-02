@@ -188,13 +188,18 @@ class AuthController extends Controller
 
         $user = User::where('email', $request['email'])->firstOrFail();
 
-        $roleId = $user->roles()->pluck('user_roles.role_id')->first();
-
-        $user->roles_id = $roleId;
-    
+        $user->roles_id = $user->roles()
+                ->select('roles.id', 'roles.name')
+                ->get()
+                ->makeHidden('pivot');
+                
         $token = $user->createToken('auth_token')->plainTextToken;
 
-        return response()->json(['token' => $token, 'token_type' => 'Bearer', 'user' => $user], 200);
+        return response()->json([
+            'token' => $token, 
+            'token_type' => 'Bearer', 
+            'user' => $user
+        ], 200);
     }
     /**
      * @OA\Post(
