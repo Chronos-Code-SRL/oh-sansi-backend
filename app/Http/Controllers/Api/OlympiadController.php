@@ -2144,19 +2144,26 @@ class OlympiadController extends Controller
 
                 // Assign max score to all level-grades for this level in this phase
                 foreach ($levelGrades as $levelGrade) {
-                    $maxScoreRecord = OlympiadAreaPhaseLevelGrade::updateOrCreate([
-                        'olympiad_area_phase_id' => $olympiadAreaPhase->id,
-                        'level_grade_id' => $levelGrade->id
-                    ], [
-                        'max_score' => $request->max_score,
-                        // 'score_cut' => $olympiad->default_score_cut ?? 0, // Ensure score_cut is not null
-                        'status' => $phaseStatus
-                    ]);
+                    $existing = OlympiadAreaPhaseLevelGrade::where('olympiad_area_phase_id', $olympiadAreaPhase->id)
+                        ->where('level_grade_id', $levelGrade->id)
+                        ->first();
 
-                    if ($maxScoreRecord->wasRecentlyCreated) {
-                        $createdCount++;
-                    } else {
+                    if ($existing) {
+                        // Only update max_score, leave score_cut unchanged
+                        $existing->max_score = $request->max_score;
+                        $existing->status = $phaseStatus;
+                        $existing->save();
                         $updatedCount++;
+                    } else {
+                        // Create new record with default score_cut
+                        OlympiadAreaPhaseLevelGrade::create([
+                            'olympiad_area_phase_id' => $olympiadAreaPhase->id,
+                            'level_grade_id' => $levelGrade->id,
+                            'max_score' => $request->max_score,
+                            'score_cut' => $olympiad->default_score_cut ?? 0,
+                            'status' => $phaseStatus
+                        ]);
+                        $createdCount++;
                     }
                 }
 
