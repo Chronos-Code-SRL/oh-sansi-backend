@@ -48,17 +48,6 @@ class AuthController extends Controller
     public function register(Request $request)
     {
 
-        // $userExists = User::where('ci', $request->ci)->first();
-        // if ($userExists) {
-        //     $this->syncUserAreasOlympiad($userExists, $request->areas_id, $request->olympiad_id);
-
-        //     $data = [
-        //         'message' => 'User updated successfully',
-        //         'user' => $userExists,
-        //     ];
-        //     return response()->json($data, 200);
-        // }
-
         $validator = Validator::make(
             $request->all(),
             [
@@ -87,7 +76,12 @@ class AuthController extends Controller
         // search user by ci
         $user = User::where('ci', $request->ci)->first();
         if ($user) {
-            
+            if ($request->roles_id == 2) {
+                $user->update([
+                    'profesion' => $request->profesion
+                ]);
+            }
+
             $currentRole = DB::table('user_roles')
                 ->where('user_id', $user->id)
                 ->first();
