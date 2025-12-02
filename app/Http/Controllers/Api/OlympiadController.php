@@ -2149,7 +2149,7 @@ class OlympiadController extends Controller
                         'level_grade_id' => $levelGrade->id
                     ], [
                         'max_score' => $request->max_score,
-                        'score_cut' => $olympiad->default_score_cut ?? 0, // Ensure score_cut is not null
+                        // 'score_cut' => $olympiad->default_score_cut ?? 0, // Ensure score_cut is not null
                         'status' => $phaseStatus
                     ]);
 
