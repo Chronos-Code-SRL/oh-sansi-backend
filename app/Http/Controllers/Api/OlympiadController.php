@@ -2178,9 +2178,8 @@ class OlympiadController extends Controller
                         ->first();
 
                     if ($existing) {
-                        // Only update max_score, leave score_cut unchanged
+                        // Only update max_score, leave score_cut and status unchanged
                         $existing->max_score = $request->max_score;
-                        $existing->status = $phaseStatus;
                         $existing->save();
                         $updatedCount++;
                     } else {
