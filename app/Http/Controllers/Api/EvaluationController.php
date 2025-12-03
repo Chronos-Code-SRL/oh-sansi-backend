@@ -308,38 +308,46 @@ class EvaluationController extends Controller
 
     public function checkEvaluations(string $olympiadId, string $phaseId, string $areaId, string $levelId)
     {
-        $olympiadAreaId = OlympiadArea::query()
-            ->where('olympiad_id', $olympiadId)
-            ->where('area_id', $areaId)
-            ->value('id');
-        
-        if (!$olympiadAreaId) {
-            return response()->json([
-                'message' => 'Olympiad and area not found'
-            ], 404);
-        }
+        $olympiadAreaId = OlympiadArea::where('olympiad_id', $olympiadId)
+        ->where('area_id', $areaId)
+        ->value('id');
 
-        $existEvaluation = DB::table('evaluations as e')
-            ->join('registrations as r', 'e.registration_id', '=', 'r.id')
-            ->join('contestants as c', 'r.contestant_id', '=', 'c.id')
-            ->join('contestant_level_grades AS clg', 'clg.contestant_id', '=', 'c.id')
-            ->join('level_grades AS lg', 'clg.level_grade_id', '=', 'lg.id')
-            ->where('r.olympiad_area_id', $olympiadAreaId)
-            ->where('lg.level_id', $levelId)
-            ->where('e.olympiad_area_phase_id', $phaseId)
-            ->whereNotNull('e.score')
-            ->exists();
-        
-        if (!$existEvaluation) {
-            return response()->json([
-                'message' => 'No hay competidores calificados puedes editar el umbral',
-                'status' => 200
-            ], 200);
-        }
-
+    if (!$olympiadAreaId) {
         return response()->json([
-            'message'=> 'El umbral no se puede editar ya existen competidores calificados',
-            'status' => 403
-        ], 403);
+            'message' => 'Olympiad and area not found'
+        ], 404);
+    }
+
+    $olympiadAreaPhaseId = OlympiadAreaPhase::where('olympiad_area_id', $olympiadAreaId)
+        ->where('phase_id', $phaseId)
+        ->value('id');
+
+    if (!$olympiadAreaPhaseId) {
+        return response()->json([
+            'message' => 'Phase not found for this olympiad area'
+        ], 404);
+    }
+
+    $existEvaluation = DB::table('evaluations as e')
+        ->join('registrations as r', 'e.registration_id', '=', 'r.id')
+        ->join('contestant_level_grades as clg', 'clg.contestant_id', '=', 'r.contestant_id')
+        ->join('level_grades as lg', 'lg.id', '=', 'clg.level_grade_id')
+        ->where('r.olympiad_area_id', $olympiadAreaId)
+        ->where('lg.level_id', $levelId)
+        ->where('e.olympiad_area_phase_id', $olympiadAreaPhaseId)
+        ->whereNotNull('e.score')
+        ->exists();
+
+    if (!$existEvaluation) {
+        return response()->json([
+            'message' => 'No hay competidores calificados puedes editar el umbral',
+            'status' => 200
+        ]);
+    }
+
+    return response()->json([
+        'message'=> 'El umbral no se puede editar ya existen competidores calificados',
+        'status' => 403
+    ]);
     }
 }
