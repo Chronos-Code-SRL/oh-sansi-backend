@@ -298,6 +298,16 @@ class ContestantController extends Controller
             ], 404);
         }
 
+        $responsibleName = DB::table('user_area_olympiads as uao')
+            ->join('user_roles as ur', 'uao.user_role_id', '=', 'ur.id')
+            ->join('roles as r', 'ur.role_id', '=', 'r.id')
+            ->join('users as u', 'ur.user_id', '=', 'u.id')
+            ->where('uao.area_id', $area_id)
+            ->where('uao.olympiad_id', $olympiad_id)
+            ->where('r.name', 'responsable_academico')
+            ->select(DB::raw("CONCAT(u.first_name, ' ', u.last_name) AS full_name"))
+            ->value('full_name');
+
         $listWinners = DB::table('evaluations AS e')
             ->join('registrations AS r', 'e.registration_id', '=', 'r.id')
             ->join('contestants AS c', 'r.contestant_id', '=', 'c.id')
@@ -327,6 +337,11 @@ class ContestantController extends Controller
             // ->orderBy('e.classification_place')
             ->orderBy('e.score', 'desc')
             ->get();
+
+        $listWinners = $listWinners->map(function ($row) use ($responsibleName) {
+            $row->responsible_academic = $responsibleName; // string o null
+            return $row;
+        });
 
         return response()->json($listWinners, 200);
     }
