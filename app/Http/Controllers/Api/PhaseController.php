@@ -302,7 +302,7 @@ class PhaseController extends Controller
         ], 200);
     }
 
-    public function updatePhaseStatus(Request $request, string $olympiadId, string $areaId, string $levelId)
+    public function updatePhaseStatus(Request $request, string $olympiadId, string $areaId, string $levelId, ?string $gradeId = null)
     {
         // Data validation
         $validator = Validator::make($request->all(), [
@@ -333,13 +333,18 @@ class PhaseController extends Controller
         }
 
         // Verify that the level_grade exists for this level and olympiad_area
-        $levelGrade = LevelGrade::where('olympiad_area_id', $olympiadArea->id)
-            ->where('level_id', $levelId)
-            ->first();
+        $levelGradeQuery = LevelGrade::where('olympiad_area_id', $olympiadArea->id)
+            ->where('level_id', $levelId);
+
+        if ($gradeId !== null) {
+            $levelGradeQuery->where('grade_id', $gradeId);
+        }
+
+        $levelGrade = $levelGradeQuery->first();
 
         if (!$levelGrade) {
             $data = [
-                'message' => 'Level not found for this olympiad area',
+                'message' => $gradeId ? 'Grade not found for this level and olympiad area' : 'Level not found for this olympiad area',
                 'status' => 404
             ];
             return response()->json($data, 404);
@@ -418,12 +423,12 @@ class PhaseController extends Controller
             ], 404);
         }
 
-        // Verify that the level_grade exists for this level and olympiad_area
-        $levelGrade = LevelGrade::where('olympiad_area_id', $olympiadArea->id)
+        // Verify that level_grades exist for this level and olympiad_area
+        $levelGrades = LevelGrade::where('olympiad_area_id', $olympiadArea->id)
             ->where('level_id', $levelId)
-            ->first();
+            ->get();
 
-        if (!$levelGrade) {
+        if ($levelGrades->isEmpty()) {
             return response()->json([
                 'message' => 'Level not found for this olympiad area',
                 'status' => 404
@@ -442,52 +447,64 @@ class PhaseController extends Controller
             ], 404);
         }
 
-        // Verify the specific status for this level
-        $currentOaplg = OlympiadAreaPhaseLevelGrade::where('olympiad_area_phase_id', $currentOlympiadAreaPhase->id)
-            ->where('level_grade_id', $levelGrade->id)
-            ->first();
+        $processedGrades = [];
+        $failedGrades = [];
+        $firstLevelGrade = $levelGrades->first(); // For compatibility with existing logic
 
-        if (!$currentOaplg) {
-            // Try to create the missing configuration with default values
-            $olympiad = Olympiad::find($olympiadId);
-            if ($olympiad && ($olympiad->default_score_cut !== null || $olympiad->default_max_score !== null)) {
-                $currentOaplg = OlympiadAreaPhaseLevelGrade::create([
-                    'olympiad_area_phase_id' => $currentOlympiadAreaPhase->id,
-                    'level_grade_id' => $levelGrade->id,
-                    'score_cut' => $olympiad->default_score_cut ?? 0,
-                    'max_score' => $olympiad->default_max_score ?? null,
-                    'status' => 'Sin empezar'
-                ]);
-            }
+        // Process each grade in this level
+        foreach ($levelGrades as $levelGrade) {
+            // Verify the specific status for this level-grade
+            $currentOaplg = OlympiadAreaPhaseLevelGrade::where('olympiad_area_phase_id', $currentOlympiadAreaPhase->id)
+                ->where('level_grade_id', $levelGrade->id)
+                ->first();
 
             if (!$currentOaplg) {
-                return response()->json([
-                    'message' => 'Phase level grade configuration not found',
-                    'error' => 'Please configure score cuts and max scores for this phase and level first using the appropriate endpoints.',
-                    'status' => 404
-                ], 404);
+                // Try to create the missing configuration with default values
+                $olympiad = Olympiad::find($olympiadId);
+                if ($olympiad && ($olympiad->default_score_cut !== null || $olympiad->default_max_score !== null)) {
+                    $currentOaplg = OlympiadAreaPhaseLevelGrade::create([
+                        'olympiad_area_phase_id' => $currentOlympiadAreaPhase->id,
+                        'level_grade_id' => $levelGrade->id,
+                        'score_cut' => $olympiad->default_score_cut ?? 0,
+                        'max_score' => $olympiad->default_max_score ?? null,
+                        'status' => 'Sin empezar'
+                    ]);
+                }
+
+                if (!$currentOaplg) {
+                    $failedGrades[] = $levelGrade->grade->name ?? "Grade {$levelGrade->grade_id}";
+                    continue;
+                }
+            }
+
+            // Skip if already completed
+            if ($currentOaplg->status === 'Terminada') {
+                continue;
+            }
+
+            // Mark this grade's phase as "Terminada" using updatePhaseStatus
+            $updateRequest = new Request([
+                'phase_id' => $phaseId,
+                'status' => 'Terminada'
+            ]);
+
+            // Create a temporary level ID for this specific grade to maintain updatePhaseStatus compatibility
+            $gradeResponse = $this->updatePhaseStatus($updateRequest, $olympiadId, $areaId, $levelId, $levelGrade->grade_id);
+
+            if ($gradeResponse->getStatusCode() === 200) {
+                $processedGrades[] = $levelGrade->grade->name ?? "Grade {$levelGrade->grade_id}";
+            } else {
+                $failedGrades[] = $levelGrade->grade->name ?? "Grade {$levelGrade->grade_id}";
             }
         }
 
-        // Verify that the phase is not already completed
-        if ($currentOaplg->status === 'Terminada') {
+        // Return error if no grades were processed
+        if (empty($processedGrades)) {
             return response()->json([
-                'message' => 'Phase is already completed for this level',
+                'message' => 'No grades could be endorsed for this level',
+                'failed_grades' => $failedGrades,
                 'status' => 400
             ], 400);
-        }
-
-        // Mark the current phase as "Terminada" using updatePhaseStatus
-        $updateRequest = new Request([
-            'phase_id' => $phaseId,
-            'status' => 'Terminada'
-        ]);
-
-        $updateResponse = $this->updatePhaseStatus($updateRequest, $olympiadId, $areaId, $levelId);
-
-        // Check if the update was successful
-        if ($updateResponse->getStatusCode() !== 200) {
-            return $updateResponse;
         }
 
         $responseData = [
@@ -499,34 +516,55 @@ class PhaseController extends Controller
             'olympiad_id' => $olympiadId,
             'area_id' => $areaId,
             'level_id' => $levelId,
+            'processed_grades' => $processedGrades,
             'status' => 200
         ];
 
+        if (!empty($failedGrades)) {
+            $responseData['failed_grades'] = $failedGrades;
+            $responseData['message'] = 'Phase endorsed with some failures';
+        }
+
+        // Use the first level-grade for compatibility with existing next phase logic
+        $firstOaplg = OlympiadAreaPhaseLevelGrade::where('olympiad_area_phase_id', $currentOlympiadAreaPhase->id)
+            ->where('level_grade_id', $firstLevelGrade->id)
+            ->first();
+
         // Check if it's not the final phase and activate the next one
-        if (!$this->isFinalPhase($currentOaplg, $levelGrade)) {
-            $nextOaplg = $this->getNextPhase($currentOaplg, $levelGrade);
+        if ($firstOaplg && !$this->isFinalPhase($firstOaplg, $firstLevelGrade)) {
+            $nextOaplg = $this->getNextPhase($firstOaplg, $firstLevelGrade);
 
             if ($nextOaplg) {
-                // Activate the next phase
-                $nextUpdateRequest = new Request([
-                    'phase_id' => $nextOaplg->olympiadAreaPhase->phase_id,
-                    'status' => 'Activa'
-                ]);
+                // Activate the next phase for all grades in this level
+                $nextPhaseId = $nextOaplg->olympiadAreaPhase->phase_id;
+                $activatedGrades = [];
 
-                $nextUpdateResponse = $this->updatePhaseStatus($nextUpdateRequest, $olympiadId, $areaId, $levelId);
+                foreach ($levelGrades as $levelGrade) {
+                    $nextUpdateRequest = new Request([
+                        'phase_id' => $nextPhaseId,
+                        'status' => 'Activa'
+                    ]);
 
-                if ($nextUpdateResponse->getStatusCode() === 200) {
+                    $nextUpdateResponse = $this->updatePhaseStatus($nextUpdateRequest, $olympiadId, $areaId, $levelId, $levelGrade->grade_id);
+
+                    if ($nextUpdateResponse->getStatusCode() === 200) {
+                        $activatedGrades[] = $levelGrade->grade->name ?? "Grade {$levelGrade->grade_id}";
+                    }
+                }
+
+                if (!empty($activatedGrades)) {
                     $nextOaplg->load('olympiadAreaPhase.phase');
                     $responseData['next_phase'] = [
-                        'phase_id' => $nextOaplg->olympiadAreaPhase->phase_id,
+                        'phase_id' => $nextPhaseId,
                         'phase_name' => $nextOaplg->olympiadAreaPhase->phase->name,
-                        'status' => 'Activa'
+                        'status' => 'Activa',
+                        'activated_grades' => $activatedGrades
                     ];
                     $responseData['message'] = 'Phase endorsed successfully and next phase activated';
                 }
             }
         } else {
-            $responseData['message'] = 'Phase endorsed successfully - final phase completed';
+            $responseData['message'] = 'Phase endorsed successfully - final phase completed for all grades';
             $responseData['is_final_phase'] = true;
         }
 
