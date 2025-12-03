@@ -18,6 +18,7 @@ use App\Models\OlympiadArea;
 use App\Models\OlympiadAreaPhase;
 use App\Models\OlympiadAreaLevelGrade;
 use App\Models\OlympiadAreaPhaseLevelGrade;
+use App\Models\Evaluation;
 
 /**
  * @OA\Tag(
@@ -1839,6 +1840,34 @@ class OlympiadController extends Controller
                             $failedCount++;
                         }
                     }
+                }
+                //sofia
+                $contestantIds = DB::table('contestant_level_grades')
+                    ->whereIn('level_grade_id', $levelGrades->pluck('id'))
+                    ->pluck('contestant_id');
+
+                $registrationIds = DB::table('registrations')
+                    ->whereIn('contestant_id', $contestantIds)
+                    ->where('olympiad_area_id', $olympiadArea->id)
+                    ->pluck('id');
+
+                $evaluations = Evaluation::whereIn('registration_id', $registrationIds)
+                    ->where('olympiad_area_phase_id', $olympiadAreaPhase->id)
+                    ->get();
+
+                $reclassified = 0;
+                foreach ($evaluations as $evaluation) {
+                    if ($evaluation->score === null) {
+                        continue;
+                    }
+
+                    $oldStatus = $evaluation->classification_status;
+                    $evaluation->classification_status = $evaluation->score >= $request->score_cut 
+                        ? 'clasificado' 
+                        : 'no_clasificado';
+
+                    if ($evaluation->classification_status !== $oldStatus) $reclassified++;
+                    $evaluation->save();
                 }
 
                 // Check if any operations failed
