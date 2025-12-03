@@ -309,13 +309,15 @@ class ContestantController extends Controller
             ->where('e.olympiad_area_phase_id', $lastPhaseId->id)
             ->where('lg.level_id', $level_id)
             // ->where('e.classification_place', '!=', null)
-            // ->whereNotNull('e.classification_place')
+            // ->whereNotNull('e.classification_place') sofia 2
             ->select(
                 'c.id AS contestant_id',
                 'c.first_name',
                 'c.last_name',
                 'c.school_name',
                 'c.ci_document',
+                'c.department',
+                'c.tutor_name',
                 'a.name AS area_name',
                 'l.name AS level_name',
                 'e.score',
