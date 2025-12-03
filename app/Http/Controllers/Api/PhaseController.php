@@ -332,7 +332,7 @@ class PhaseController extends Controller
             return response()->json($data, 404);
         }
 
-        // Verify that the level_grade exists for this level and olympiad_area
+        // Verify that level_grades exist for this level and olympiad_area
         $levelGradeQuery = LevelGrade::where('olympiad_area_id', $olympiadArea->id)
             ->where('level_id', $levelId);
 
@@ -340,9 +340,9 @@ class PhaseController extends Controller
             $levelGradeQuery->where('grade_id', $gradeId);
         }
 
-        $levelGrade = $levelGradeQuery->first();
+        $levelGrades = $levelGradeQuery->get(); // Changed from first() to get()
 
-        if (!$levelGrade) {
+        if ($levelGrades->isEmpty()) {
             $data = [
                 'message' => $gradeId ? 'Grade not found for this level and olympiad area' : 'Level not found for this olympiad area',
                 'status' => 404
@@ -363,33 +363,39 @@ class PhaseController extends Controller
             return response()->json($data, 404);
         }
 
-        // Find the specific record for this level
-        $olympiadAreaPhaseLevelGrade = OlympiadAreaPhaseLevelGrade::where('olympiad_area_phase_id', $olympiadAreaPhase->id)
-            ->where('level_grade_id', $levelGrade->id)
-            ->first();
+        // Process all level grades
+        $updatedCount = 0;
+        $firstLevelGrade = $levelGrades->first(); // Keep for response compatibility
 
-        if (!$olympiadAreaPhaseLevelGrade) {
-            $data = [
-                'message' => 'Phase level grade configuration not found',
-                'status' => 404
-            ];
-            return response()->json($data, 404);
+        foreach ($levelGrades as $levelGrade) {
+            // Find the specific record for this level grade
+            $olympiadAreaPhaseLevelGrade = OlympiadAreaPhaseLevelGrade::where('olympiad_area_phase_id', $olympiadAreaPhase->id)
+                ->where('level_grade_id', $levelGrade->id)
+                ->first();
+
+            if (!$olympiadAreaPhaseLevelGrade) {
+                continue; // Skip if configuration doesn't exist for this grade
+            }
+
+            // Update the status
+            $olympiadAreaPhaseLevelGrade->status = $request->status;
+
+            if ($olympiadAreaPhaseLevelGrade->save()) {
+                $updatedCount++;
+
+                // If the phase is marked as "Terminada", process classifications
+                if ($request->status === 'Terminada') {
+                    $this->processPhaseClassifications($olympiadAreaPhaseLevelGrade, $levelGrade);
+                }
+            }
         }
 
-        // Update the status
-        $olympiadAreaPhaseLevelGrade->status = $request->status;
-
-        if (!$olympiadAreaPhaseLevelGrade->save()) {
+        if ($updatedCount === 0) {
             $data = [
-                'message' => 'Error updating phase status',
+                'message' => 'Error updating phase status - no grades were updated',
                 'status' => 500
             ];
             return response()->json($data, 500);
-        }
-
-        // If the phase is marked as "Terminada", process classifications
-        if ($request->status === 'Terminada') {
-            $this->processPhaseClassifications($olympiadAreaPhaseLevelGrade, $levelGrade);
         }
 
         // Load the phase information for the response
@@ -402,7 +408,7 @@ class PhaseController extends Controller
             'level_id' => $levelId,
             'phase_id' => $olympiadAreaPhase->phase_id,
             'phase_name' => $olympiadAreaPhase->phase->name,
-            'status' => $olympiadAreaPhaseLevelGrade->status,
+            'status' => $request->status,
             'status_code' => 200
         ];
 
