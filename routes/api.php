@@ -148,7 +148,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
 });
 Route::get('/evaluations/check-updates/',[EvaluationController::class, 'checksUpdates']);
 Route::get('/olympiads/{olympiadId}/areas/{areaId}/phases/{phaseId}/competitors', [EvaluationController::class, 'getCompetitorsByPhase']);
-
+Route::get('/olympiads/{olympiadId}/phases/{phaseId}/areas/{areaId}/levels/{levelId}/competitors', [EvaluationController::class, 'checkEvaluations']);
 // <--- Evaluation Audit Logs --->
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/evaluations/audit/logs', [EvaluationAuditController::class, 'getEvaluationLogs']);
