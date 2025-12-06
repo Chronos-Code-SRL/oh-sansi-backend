@@ -167,6 +167,7 @@ Route::get('/contestants/olympiads/{olympiad_id}/areas/{area_id}/phases/{phase_i
 Route::get('/contestants/awarded/olympiads/{olympiad_id}/areas/{area_id}', [ContestantController::class, 'getAwardWinningContestantsArea']);
 Route::post('/contestants/awarded/olympiads/{olympiadId}/areas/{areaId}/levels/{levelId}', [ContestantController::class, 'competitorsReadjustment']);
 Route::get('/contestants/certificate/olympiads/{olympiadId}/areas/{areaId}', [ContestantController::class, 'getListCompetitorsCertificate']);
+Route::get('/medals/olympiads/{olympiadId}/areas/{areaId}/levels/{levelId}', [ContestantController::class, 'getMedals']);
 
 // <--- CRUD Level --->
 Route::get('/levels-olympiad', [App\Http\Controllers\Api\LevelController::class, 'getLevelsOlympiad']);

@@ -681,4 +681,71 @@ class ContestantController extends Controller
 
         return response()->json($result, 200);
     }
+
+    public function getMedals(string $olympiadId, string $areaId, string $levelId)
+    {
+        $lastPhaseId = DB::table('olympiad_area_phases AS oap')
+            ->join('olympiad_areas AS oa', 'oap.olympiad_area_id', '=', 'oa.id')
+            ->join('phases AS p', 'oap.phase_id', '=', 'p.id')
+            ->join('olympiad_area_phase_level_grades AS oapl', 'oapl.olympiad_area_phase_id', '=', 'oap.id')
+            ->join('level_grades AS lg', 'lg.id', '=', 'oapl.level_grade_id')
+            ->where('oa.olympiad_id', $olympiadId)
+            ->where('oa.area_id', $areaId)
+            ->where('lg.level_id', $levelId)
+            ->where('oapl.status', 'Terminada')
+            ->orderByDesc('p.order')
+            ->select('oap.id')
+            ->first();
+
+        if (!$lastPhaseId) {
+            return response()->json([
+                'message' => 'No phases found for the specified olympiad, area and level',
+            ], 404);
+        }
+
+        $medals = DB::table('evaluations AS e')
+            ->join('registrations AS r', 'e.registration_id', '=', 'r.id')
+            ->join('olympiad_areas AS oa', 'r.olympiad_area_id', '=', 'oa.id')
+            ->join('contestant_level_grades AS clg', 'clg.contestant_id', '=', 'r.contestant_id')
+            ->join('level_grades AS lg', 'clg.level_grade_id', '=', 'lg.id')
+            ->where('e.olympiad_area_phase_id', $lastPhaseId->id)
+            ->where('oa.olympiad_id', $olympiadId)
+            ->where('oa.area_id', $areaId)
+            ->where('lg.level_id', $levelId)
+            ->whereNotNull('e.classification_place')
+            ->select('e.classification_place')
+            ->selectRaw('COUNT(*) as cantidad')
+            ->groupBy('e.classification_place')
+            ->get();
+
+        if ($medals->isEmpty()) {
+            return response()->json([
+                'number_gold' => 0,
+                'number_silver' => 0,
+                'number_bronze' => 0,
+                'number_honorable_mention' => 0,
+            ], 200);
+        }
+
+        $result = [
+            'number_gold' => 0,
+            'number_silver' => 0,
+            'number_bronze' => 0,
+            'number_honorable_mention' => 0,
+        ];
+
+        foreach ($medals as $medal) {
+            if ($medal->classification_place === 'Oro') {
+                $result['number_gold'] = $medal->cantidad;
+            } elseif ($medal->classification_place === 'Plata') {
+                $result['number_silver'] = $medal->cantidad;
+            } elseif ($medal->classification_place === 'Bronce') {
+                $result['number_bronze'] = $medal->cantidad;
+            } elseif ($medal->classification_place === 'Mención honorífica') {
+                $result['number_honorable_mention'] = $medal->cantidad;
+            }
+        }
+
+        return response()->json($result, 200);
+    }
 }
