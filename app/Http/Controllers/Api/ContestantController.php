@@ -581,4 +581,104 @@ class ContestantController extends Controller
             'message' => 'Clasificación de medallero aplicada correctamente'
         ], 200);
     }
+
+    public function getListCompetitorsCertificate(string $olympiadId, string $areaId)
+    {
+        $olympiadAreaId = DB::table('olympiad_areas')
+        ->where('olympiad_id', $olympiadId)
+        ->where('area_id', $areaId)
+        ->value('id');
+
+        if (!$olympiadAreaId) {
+            return response()->json([
+                'message' => 'Olympiad and area not found'
+            ], 404);
+        }
+
+        $levelIds = DB::table('level_grades')
+            ->where('olympiad_area_id', $olympiadAreaId)
+            ->distinct()
+            ->pluck('level_id');
+
+        $lastPhase = DB::table('olympiad_area_phases AS oap')
+        ->join('phases AS p', 'oap.phase_id', '=', 'p.id')
+        ->where('oap.olympiad_area_id', $olympiadAreaId)
+        ->orderByDesc('p.order')
+        ->select('oap.id')
+        ->first();
+
+    if (!$lastPhase) {
+        return response()->json([
+            'message' => 'This area has no phases (not in last phase)',
+        ], 404);
+    }
+
+    foreach ($levelIds as $levelId) {
+        $endorsed = DB::table('olympiad_area_phase_level_grades as oapl')
+            ->join('level_grades as lg', 'oapl.level_grade_id', '=', 'lg.id')
+            ->where('oapl.olympiad_area_phase_id', $lastPhase->id)
+            ->where('lg.level_id', $levelId)
+            ->where('lg.olympiad_area_id', $olympiadAreaId)
+            ->where('oapl.status', 'Terminada')
+            ->exists();
+
+        if (!$endorsed) {
+            return response()->json([
+                'message' => "Los niveles del area no están completamente avalados",
+            ], 404);
+        }
+    }
+
+        $responsibleName = DB::table('user_area_olympiads as uao')
+            ->join('user_roles as ur', 'uao.user_role_id', '=', 'ur.id')
+            ->join('roles as r', 'ur.role_id', '=', 'r.id')
+            ->join('users as u', 'ur.user_id', '=', 'u.id')
+            ->where('uao.area_id', $areaId)
+            ->where('uao.olympiad_id', $olympiadId)
+            ->where('r.name', 'responsable_academico')
+            ->select(DB::raw("CONCAT(u.first_name, ' ', u.last_name) AS full_name"))
+            ->value('full_name');
+        
+        $rows = DB::table('evaluations AS e')
+            ->join('registrations AS r', 'e.registration_id', '=', 'r.id')
+            ->join('contestants AS c', 'r.contestant_id', '=', 'c.id')
+            ->leftJoin('contestant_level_grades AS clg', 'clg.contestant_id', '=', 'c.id')
+            ->leftJoin('level_grades AS lg', 'clg.level_grade_id', '=', 'lg.id')
+            ->leftJoin('levels AS l', 'lg.level_id', '=', 'l.id')
+            ->join('olympiad_areas AS oa', 'r.olympiad_area_id', '=', 'oa.id')
+            ->join('areas AS a', 'oa.area_id', '=', 'a.id')
+            ->where('e.olympiad_area_phase_id', $lastPhase->id)
+            ->where('oa.olympiad_id', $olympiadId)
+            ->where('oa.area_id', $areaId)
+            ->select(
+                'c.first_name AS Nombre',
+                'c.last_name AS Apellido',
+                'c.school_name AS Unidad_Educativa',
+                'c.department AS Departamento',
+                'a.name AS Area',
+                'l.name AS Nivel',
+                'e.score AS Nota',
+                'e.classification_place AS Posicion_obtenida',
+                'c.tutor_name AS Profesor'
+            )
+            ->orderBy('c.last_name')
+            ->get();
+        
+        $result = $rows->map(function ($r) use ($responsibleName) {
+            return [
+                    'name' => $r->Nombre,
+                    'last_name' => $r->Apellido,
+                    'school_name' => $r->Unidad_Educativa,
+                    'department' => $r->Departamento,
+                    'area' => $r->Area,
+                    'level' => $r->Nivel,
+                    'score' => $r->Nota,
+                    'classification_place' => $r->Posicion_obtenida,
+                    'teacher' => $r->Profesor,
+                    'area_responsible' => $responsibleName,
+                ];
+            });
+
+        return response()->json($result, 200);
+    }
 }
