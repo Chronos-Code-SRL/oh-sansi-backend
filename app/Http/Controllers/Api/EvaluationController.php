@@ -276,6 +276,11 @@ class EvaluationController extends Controller
     // Automatically update classification status based on score cut threshold
     private function updateClassificationAutomatic(Evaluation $evaluation)
     {
+        // Don't change status if already disqualified
+        if ($evaluation->classification_status === 'descalificado') {
+            return;
+        }
+
         $contestantId = $evaluation->registration->contestant->id;
 
         // Get contestant's level grade information
