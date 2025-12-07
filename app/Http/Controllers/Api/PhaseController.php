@@ -720,6 +720,11 @@ class PhaseController extends Controller
         }
 
         foreach ($evaluations as $evaluation) {
+
+            if ($evaluation->classification_status==='descalificado') {
+                // Skip disqualified competitors
+                continue;
+            }
             // Get score_cut for this specific evaluation (already level-aware)
             $scoreCut = $this->getScoreCut($olympiadAreaPhaseLevelGrade, $evaluation);
 
