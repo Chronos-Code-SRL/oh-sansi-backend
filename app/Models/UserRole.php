@@ -23,4 +23,10 @@ class UserRole extends Model
     {
         return $this->belongsTo(Roles::class, 'role_id');
     }
+
+    public function areas()
+    {
+        return $this->belongsToMany(Area::class, 'user_area_olympiads')
+            ->withPivot('olympiad_id');
+    }
 }

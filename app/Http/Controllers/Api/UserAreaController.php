@@ -8,6 +8,7 @@ use GuzzleHttp\Psr7\Message;
 use Illuminate\Database\Eloquent\Casts\Json;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\JsonResponse;
+use App\Models\UserRole;
 
 class UserAreaController extends Controller
 {
@@ -15,39 +16,33 @@ class UserAreaController extends Controller
     {
         $user = $request->user();
 
-        $userRole = DB::table('user_roles')
-            ->where('user_id', $user->id)
-            ->first();
+        $roles = UserRole::with(['role', 'areas' => function ($q) use ($olympiad_id) {
+            $q->where('user_area_olympiads.olympiad_id', $olympiad_id);
+        }])
+        ->where('user_id', $user->id)
+        ->get();
 
-        if (!$userRole) {
+        if ($roles->isEmpty()) {
             return response()->json([
                 'message' => 'User does not have any assigned role.',
                 'status' => 404
             ], 404);
         }
 
-        // Search olympiad active
-        $userAreaOlympiad = DB::table('user_area_olympiads as uao')
-            ->join('areas as a', 'uao.area_id', '=', 'a.id')
-            ->join('olympiads as o', 'uao.olympiad_id', '=', 'o.id')
-            ->where('uao.user_role_id', $userRole->id)
-            ->where('uao.olympiad_id', $olympiad_id)
-            ->select('a.id', 'a.name')
-            ->distinct()
-            ->get();
-
-        if ($userAreaOlympiad->isEmpty()) {
-            $data = [
-                'message' => 'User is not registered in any area for this olympiad.',
-                'status' => 404
+        $data = $roles->map(function ($ur) {
+            return [
+                'role_id'   => $ur->role->id,
+                'role_name' => $ur->role->name,
+                'areas'     => $ur->areas->map(fn($a) => [
+                    'id'   => $a->id,
+                    'name' => $a->name
+                ])
             ];
-
-            return response()->json($data, 404);
-        }
+        });
 
         return response()->json([
             'message' => 'User areas retrieved successfully.',
-            'data' => $userAreaOlympiad,
+            'data' => $data,
             'status' => 200
         ], 200);
     }
