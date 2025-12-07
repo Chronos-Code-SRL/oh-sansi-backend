@@ -21,23 +21,16 @@ use App\Models\OlympiadAreaPhaseLevelGrade;
 use App\Models\Evaluation;
 
 /**
- * @OA\Tag(
- *     name="Olympiads",
- *     description="Endpoints for Olympiad management"
- * )
+ * Controller for managing Olympiad operations.
+ * Handles CRUD operations, area assignments, level-grade assignments,
+ * score cuts, max scores, and olympiad activation.
  */
 class OlympiadController extends Controller
 {
     /**
-     * @OA\Get(
-     *     path="/api/olympiads",
-     *     summary="Get list of olympiads",
-     *     tags={"Olympiads"},
-     *     @OA\Response(
-     *         response=200,
-     *         description="Returns a list of all olympiads with their associated areas",
-     *     )
-     * )
+     * Get all olympiads with their associated areas.
+     *
+     * @return \Illuminate\Http\JsonResponse
      */
     public function index()
     {
@@ -50,11 +43,7 @@ class OlympiadController extends Controller
             return response()->json($data, 404);
         }
 
-        /* $olympiads->each(function ($olympiad) {
-            $olympiad->updateStatus();
-        }); */
-
-        // Mapping olympiads and merging areas names
+        // Map olympiads and include their associated area names
         $data = [
             'olympiads' => $olympiads->map(function ($olympiad) {
                 return array_merge(
@@ -62,7 +51,7 @@ class OlympiadController extends Controller
                     ['areas' => $olympiad->areas->pluck('name')->toArray()]
                 );
             }),
-            'stauts' => 200
+            'status' => 200
 
         ];
 
@@ -70,153 +59,16 @@ class OlympiadController extends Controller
     }
 
     /**
-     * @OA\Post(
-     *     path="/api/olympiads",
-     *     summary="Create a new olympiad",
-     *     description="Creates a new olympiad with areas and automatically generates the specified number of phases. Areas are automatically assigned to the olympiad.",
-     *     tags={"Olympiads"},
-     *     @OA\RequestBody(
-     *         required=true,
-     *         description="Olympiad data including basic info, areas, phases and default score cut",
-     *         @OA\JsonContent(
-     *             required={"name", "start_date", "end_date", "number_of_phases", "default_score_cut", "areas"},
-     *             @OA\Property(
-     *                 property="name",
-     *                 type="string",
-     *                 maxLength=30,
-     *                 example="OHSansi 2025",
-     *                 description="Name of the olympiad"
-     *             ),
-     *             @OA\Property(
-     *                 property="start_date",
-     *                 type="string",
-     *                 format="date",
-     *                 example="2025-01-15",
-     *                 description="Start date of the olympiad"
-     *             ),
-     *             @OA\Property(
-     *                 property="end_date",
-     *                 type="string",
-     *                 format="date",
-     *                 example="2025-06-15",
-     *                 description="End date of the olympiad (must be after start_date)"
-     *             ),
-     *             @OA\Property(
-     *                 property="number_of_phases",
-     *                 type="integer",
-     *                 minimum=1,
-     *                 example=3,
-     *                 description="Number of phases to create for this olympiad"
-     *             ),
-     *             @OA\Property(
-     *                 property="default_score_cut",
-     *                 type="integer",
-     *                 minimum=0,
-     *                 maximum=100,
-     *                 example=75,
-     *                 description="Default score cut that will be automatically assigned when creating level-grades"
-     *             ),
-     *             @OA\Property(
-     *                 property="default_max_score",
-     *                 type="integer",
-     *                 minimum=0,
-     *                 maximum=100,
-     *                 example=100,
-     *                 description="Default max score that will be automatically assigned when creating level-grades (optional)"
-     *             ),
-     *             @OA\Property(
-     *                 property="status",
-     *                 type="string",
-     *                 enum={"En planificación", "Activa", "Terminada"},
-     *                 example="En planificación",
-     *                 description="Status of the olympiad (optional, defaults to 'En planificación')"
-     *             ),
-     *             @OA\Property(
-     *                 property="areas",
-     *                 type="array",
-     *                 minItems=1,
-     *                 description="Array of area names to assign to this olympiad",
-     *                 example={"Matemáticas", "Informática"},
-     *                 @OA\Items(
-     *                     type="string",
-     *                     maxLength=25
-     *                 )
-     *             )
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=201,
-     *         description="Olympiad created successfully with areas and phases",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Olympiad created successfully with specific areas and phases"),
-     *             @OA\Property(
-     *                 property="data",
-     *                 type="object",
-     *                 description="The created olympiad with loaded relationships",
-     *                 @OA\Property(property="id", type="integer", example=1),
-     *                 @OA\Property(property="name", type="string", example="OHSansi 2025"),
-     *                 @OA\Property(property="start_date", type="string", format="date", example="2025-01-15"),
-     *                 @OA\Property(property="end_date", type="string", format="date", example="2025-06-15"),
-     *                 @OA\Property(property="number_of_phases", type="integer", example=3),
-     *                 @OA\Property(property="default_score_cut", type="integer", example=75),
-     *                 @OA\Property(property="default_max_score", type="integer", example=100),
-     *                 @OA\Property(property="status", type="string", example="En planificación"),
-     *                 @OA\Property(
-     *                     property="areas",
-     *                     type="array",
-     *                     @OA\Items(
-     *                         type="object",
-     *                         @OA\Property(property="id", type="integer"),
-     *                         @OA\Property(property="name", type="string")
-     *                     ),
-     *                     example={
-     *                         {"id": 1, "name": "Matemáticas"},
-     *                         {"id": 2, "name": "Informática"}
-     *                     }
-     *                 ),
-     *                 @OA\Property(
-     *                     property="phases",
-     *                     type="array",
-     *                     description="Automatically created phases based on number_of_phases",
-     *                     @OA\Items(
-     *                         type="object",
-     *                         @OA\Property(property="id", type="integer", example=1),
-     *                         @OA\Property(property="name", type="string", example="Fase 1"),
-     *                         @OA\Property(property="order", type="integer", example=1)
-     *                     )
-     *                 )
-     *             )
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=400,
-     *         description="Validation error",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Error in data validation"),
-     *             @OA\Property(
-     *                 property="error",
-     *                 type="object",
-     *                 description="Validation errors details"
-     *             ),
-     *             @OA\Property(property="status", type="integer", example=400)
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=500,
-     *         description="Server error during olympiad creation",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Error creating the Olympiad"),
-     *             @OA\Property(property="status", type="integer", example=500)
-     *         )
-     *     )
-     * )
+     * Create a new olympiad with areas and phases.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
      */
     public function store(Request $request)
     {
-        // Data validation
+        // Validate input data for olympiad creation
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:30',
-            // 'edition' => 'required|string|max:25', //|unique:olympiads,edition',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after:start_date',
             'number_of_phases' => 'required|integer|min:1',
@@ -238,7 +90,6 @@ class OlympiadController extends Controller
 
         $olympiad = Olympiad::create([
             'name' => $request->name,
-            //'edition' => $request->edition,
             'start_date' => $request->start_date,
             'end_date' => $request->end_date,
             'number_of_phases' => $request->number_of_phases,
@@ -247,7 +98,7 @@ class OlympiadController extends Controller
             'status' => $request->status ?? 'En planificación',
         ]);
 
-        // If the Olympiad creation fails
+        // Verify olympiad creation was successful
         if (!$olympiad) {
             $data = [
                 'message' => 'Error creating the Olympiad',
@@ -256,7 +107,7 @@ class OlympiadController extends Controller
             return response()->json($data, 500);
         }
 
-        // Assign areas
+        // Assign specified areas to the newly created olympiad
         $olympiad = $olympiad->assignAreas($request->areas);
 
         return response()->json([
@@ -266,31 +117,14 @@ class OlympiadController extends Controller
     }
 
     /**
-     * @OA\Get(
-     *     path="/api/olympiads/{id}",
-     *     summary="Get a specific olympiad by ID",
-     *     tags={"Olympiads"},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         required=true,
-     *         description="Olympiad ID",
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Olympiad found and returned successfully",
-     *     ),
-     *     @OA\Response(
-     *         response=404,
-     *         description="Olympiad not found",
-     *     )
-     * )
+     * Get a specific olympiad by ID with its areas.
+     *
+     * @param  string  $id
+     * @return \Illuminate\Http\JsonResponse
      */
     public function show(string $id)
     {
         $olympiad = Olympiad::find($id);
-        // $olympiad->updateStatus();
 
         if (!$olympiad) {
             $data = [
@@ -312,30 +146,11 @@ class OlympiadController extends Controller
     }
 
     /**
-     * @OA\Put(
-     *     path="/api/olympiads/{id}",
-     *     summary="Update an existing olympiad",
-     *     tags={"Olympiads"},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             @OA\Property(property="name", type="string"),
-     *             @OA\Property(property="description", type="string"),
-     *             @OA\Property(property="start_date", type="string", format="date"),
-     *             @OA\Property(property="end_date", type="string", format="date")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Olympiad updated successfully",
-     *     )
-     * )
+     * Update an existing olympiad.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  string  $id
+     * @return \Illuminate\Http\JsonResponse
      */
     public function update(Request $request, string $id)
     {
@@ -349,16 +164,9 @@ class OlympiadController extends Controller
             return response()->json($data, 404);
         };
 
-        // Rule set to ignore the edition if it is the same as the one sent
+        // Define validation rules for olympiad update
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
-            // 'edition' => 'required|string|max:25',
-            // 'edition' => [
-            //     'required',
-            //     'string',
-            //     'max:20',
-            //     Rule::unique('olympiads', 'edition')->ignore($olympiad->id),
-            // ],
             'start_date' => 'required|date',
             'end_date' => 'required|date|after:start_date',
             'default_score_cut' => 'nullable|integer|min:0|max:100',
@@ -376,7 +184,6 @@ class OlympiadController extends Controller
         }
 
         $olympiad->name = $request->name;
-        // $olympiad->edition = $request->edition;
         $olympiad->start_date = $request->start_date;
         $olympiad->end_date = $request->end_date;
         $olympiad->default_score_cut = $request->default_score_cut ?? $olympiad->default_score_cut;
@@ -395,21 +202,10 @@ class OlympiadController extends Controller
     }
 
     /**
-     * @OA\Delete(
-     *     path="/api/olympiads/{id}",
-     *     summary="Delete an olympiad by ID",
-     *     tags={"Olympiads"},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Olympiad deleted successfully",
-     *     )
-     * )
+     * Delete an olympiad by ID.
+     *
+     * @param  string  $id
+     * @return \Illuminate\Http\JsonResponse
      */
     public function destroy(string $id)
     {
@@ -434,31 +230,11 @@ class OlympiadController extends Controller
     }
 
     /**
-     * @OA\Post(
-     *     path="/api/olympiads/{id}/areas",
-     *     summary="Assign areas to an olympiad",
-     *     tags={"Olympiads"},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             @OA\Property(
-     *                 property="areas",
-     *                 type="array",
-     *                 @OA\Items(type="integer")
-     *             )
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Areas assigned successfully",
-     *     )
-     * )
+     * Assign areas to an existing olympiad.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  int  $id
+     * @return \Illuminate\Http\JsonResponse
      */
     public function assignAreas(Request $request, $id)
     {
@@ -471,7 +247,7 @@ class OlympiadController extends Controller
             ], 404);
         }
 
-        // Data validation
+        // Validate area assignment data
         $validator = Validator::make($request->all(), [
             'areas' => 'required|array|min:1',
             'areas.*' => 'required|string|max:25|exists:areas,name'
@@ -494,21 +270,10 @@ class OlympiadController extends Controller
     }
 
     /**
-     * @OA\Get(
-     *     path="/api/olympiads/{id}/areas",
-     *     summary="Get areas of a specific olympiad",
-     *     tags={"Olympiads"},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="List of areas for the specified olympiad",
-     *     )
-     * )
+     * Get all areas associated with an olympiad.
+     *
+     * @param  string  $id  Olympiad ID
+     * @return \Illuminate\Http\JsonResponse
      */
     public function getAreas(string $id)
     {
@@ -537,71 +302,10 @@ class OlympiadController extends Controller
     }
 
     /**
-     * @OA\Get(
-     *     path="/api/olympiads/{id}/phases",
-     *     summary="Get all phases related to a specific olympiad",
-     *     description="Retrieves all phases that are associated with any area of the specified olympiad. When an olympiad is created, it generates a specified number of phases that are automatically related to each area through the olympiad_area_phases table.",
-     *     tags={"Olympiads"},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         required=true,
-     *         description="Olympiad ID",
-     *         @OA\Schema(type="integer", example=1)
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="List of phases for the specified olympiad retrieved successfully",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Phases retrieved successfully"),
-     *             @OA\Property(
-     *                 property="olympiad",
-     *                 type="object",
-     *                 description="Basic olympiad information",
-     *                 @OA\Property(property="id", type="integer", example=1),
-     *                 @OA\Property(property="name", type="string", example="OHSansi 2025"),
-     *                 @OA\Property(property="number_of_phases", type="integer", example=3)
-     *             ),
-     *             @OA\Property(
-     *                 property="phases",
-     *                 type="array",
-     *                 description="List of phases associated with the olympiad",
-     *                 @OA\Items(
-     *                     type="object",
-     *                     @OA\Property(property="id", type="integer", example=1),
-     *                     @OA\Property(property="name", type="string", example="Fase 1"),
-     *                     @OA\Property(property="order", type="integer", example=1),
-     *                     @OA\Property(
-     *                         property="areas_count",
-     *                         type="integer",
-     *                         example=2,
-     *                         description="Number of areas this phase is associated with in this olympiad"
-     *                     )
-     *                 )
-     *             ),
-     *             @OA\Property(property="total_phases", type="integer", example=3, description="Total number of phases found"),
-     *             @OA\Property(property="status", type="integer", example=200)
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=404,
-     *         description="Olympiad not found or no phases found",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Olympiad not found"),
-     *             @OA\Property(property="error", type="string", example="No olympiad found with ID: 1"),
-     *             @OA\Property(property="status", type="integer", example=404)
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=500,
-     *         description="Server error during phase retrieval",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Internal server error"),
-     *             @OA\Property(property="error", type="string", example="An unexpected error occurred while retrieving phases"),
-     *             @OA\Property(property="status", type="integer", example=500)
-     *         )
-     *     )
-     * )
+     * Get all phases associated with an olympiad.
+     *
+     * @param  string  $id  Olympiad ID
+     * @return \Illuminate\Http\JsonResponse
      */
     public function getPhases(string $id)
     {
@@ -689,153 +393,24 @@ class OlympiadController extends Controller
         }
     }
 
-    // <--- Level-Grades to Areas in Olympiads --->
+    /* ========================================
+     * LEVEL-GRADE MANAGEMENT METHODS
+     * Methods for assigning and managing level-grade
+     * relationships within olympiad areas.
+     * ======================================== */
 
     /**
-     * @OA\Post(
-     *     path="/api/olympiads/{olympiadId}/areas/{areaId}/level-grades",
-     *     summary="Assign a level and its grades to an olympiad area with smart level reuse",
-     *     description="Assigns grades to a level within an olympiad area. Reuses existing levels with the same name or creates new ones. Automatically assigns default score cuts to all phases if the olympiad has a default_score_cut configured. Prevents duplicate grade assignments within the same olympiad area.",
-     *     tags={"Level (with Grades) - Olympiad Areas"},
-     *     @OA\Parameter(
-     *         name="olympiadId",
-     *         in="path",
-     *         required=true,
-     *         description="ID of the olympiad",
-     *         @OA\Schema(type="integer", example=1)
-     *     ),
-     *     @OA\Parameter(
-     *         name="areaId",
-     *         in="path",
-     *         required=true,
-     *         description="ID of the area within the olympiad",
-     *         @OA\Schema(type="integer", example=2)
-     *     ),
-     *     @OA\RequestBody(
-     *         required=true,
-     *         description="Level name and grade IDs to assign",
-     *         @OA\JsonContent(
-     *             required={"level_name", "grade_ids"},
-     *             @OA\Property(
-     *                 property="level_name",
-     *                 type="string",
-     *                 maxLength=255,
-     *                 example="Booster",
-     *                 description="Name of the level. If a level with this name already exists, it will be reused instead of creating a new one."
-     *             ),
-     *             @OA\Property(
-     *                 property="grade_ids",
-     *                 type="array",
-     *                 minItems=1,
-     *                 description="Array of grade IDs to assign to this level. Each grade can only be assigned to one level per olympiad area.",
-     *                 @OA\Items(type="integer", example={1,2,3})
-     *             )
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=201,
-     *         description="Level and grades assigned successfully",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Level and grades assigned successfully"),
-     *             @OA\Property(
-     *                 property="level",
-     *                 type="object",
-     *                 description="The level with its assigned grades",
-     *                 @OA\Property(property="id", type="integer", example=5),
-     *                 @OA\Property(property="name", type="string", example="Booster"),
-     *                 @OA\Property(
-     *                     property="grades",
-     *                     type="array",
-     *                     @OA\Items(
-     *                         type="object",
-     *                         @OA\Property(property="id", type="integer"),
-     *                         @OA\Property(property="name", type="string")
-     *                     ),
-     *                    example={
-     *                         {"id": 1, "name": "1° Grado"},
-     *                         {"id": 2, "name": "2° Grado"},
-     *                         {"id": 3, "name": "3° Grado"}
-     *                     }
-     *                 )
-     *             ),
-     *             @OA\Property(
-     *                 property="level_was_created",
-     *                 type="boolean",
-     *                 example=false,
-     *                 description="Indicates if a new level was created (true) or an existing one was reused (false)"
-     *             ),
-     *             @OA\Property(
-     *                 property="created_relationships",
-     *                 type="integer",
-     *                 example=3,
-     *                 description="Number of level-grade relationships created"
-     *             ),
-     *             @OA\Property(
-     *                 property="default_score_cut_assignments",
-     *                 type="object",
-     *                 description="Information about automatic score cut assignments (only present if olympiad has default_score_cut)",
-     *                 @OA\Property(property="olympiad_default_score_cut", type="integer", example=75),
-     *                 @OA\Property(
-     *                     property="phases",
-     *                     type="array",
-     *                     @OA\Items(
-     *                         type="object",
-     *                         @OA\Property(property="phase_id", type="integer", example=1),
-     *                         @OA\Property(property="phase_name", type="string", example="Fase 1"),
-     *                         @OA\Property(property="score_cuts_assigned", type="integer", example=3)
-     *                     )
-     *                 ),
-     *                 @OA\Property(property="total_phases_processed", type="integer", example=2)
-     *             ),
-     *             @OA\Property(property="status", type="integer", example=201)
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=422,
-     *         description="Validation error",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Validation failed"),
-     *             @OA\Property(
-     *                 property="errors",
-     *                 type="object",
-     *                 description="Detailed validation errors"
-     *             ),
-     *             @OA\Property(property="status", type="integer", example=422)
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=404,
-     *         description="Resource not found",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Olympiad not found"),
-     *             @OA\Property(property="error", type="string", example="No olympiad found with ID: 1"),
-     *             @OA\Property(property="status", type="integer", example=404)
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=409,
-     *         description="Duplicate grade assignment conflict",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Duplicate grade assignments found"),
-     *             @OA\Property(property="error", type="string", example="The following grades are already assigned to levels in this olympiad area: Grade ID 3 (Level: Nivel Secundario)"),
-     *             @OA\Property(property="status", type="integer", example=409)
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=500,
-     *         description="Server error during level-grade assignment",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Database error"),
-     *             @OA\Property(property="error", type="string", example="A database constraint or connection error occurred. Please check your data and try again."),
-     *             @OA\Property(property="status", type="integer", example=500)
-     *         )
-     *     )
-     * )
+     * Assign level and grades to a specific area within an olympiad.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  int  $olympiadId
+     * @param  int  $areaId
+     * @return \Illuminate\Http\JsonResponse
      */
     public function assignLevelGradesToArea(Request $request, $olympiadId, $areaId)
     {
         try {
-            // Input validation
+            // Validate request input data
             $validator = Validator::make($request->all(), [
                 'level_name' => 'required|string|max:255',
                 'grade_ids' => 'required|array|min:1',
@@ -883,15 +458,15 @@ class OlympiadController extends Controller
                 ], 404);
             }
 
-            // Find existing level or create new one
+            // Check if level already exists or create new one
             $existingLevel = Level::where('name', $request->level_name)->first();
 
             if ($existingLevel) {
-                // Use existing level
+                // Use the existing level found in database
                 $level = $existingLevel;
                 $levelWasCreated = false;
             } else {
-                // Create new level
+                // Create new level since it doesn't exist
                 $level = Level::create([
                     'name' => $request->level_name
                 ]);
@@ -1113,66 +688,12 @@ class OlympiadController extends Controller
     }
 
     /**
-     * @OA\Get(
-     *     path="/api/olympiads/{olympiadId}/areas/{areaId}/level-grades",
-     *     summary="Get all level-grade associations from an olympiad area",
-     *     description="Retrieves all level-grade relationships attached to the specified olympiad area, including their associated level and grade data.",
-     *     tags={"Level (with Grades) - Olympiad Areas"},
-     *     @OA\Parameter(
-     *         name="olympiadId",
-     *         in="path",
-     *         required=true,
-     *         description="ID of the olympiad",
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\Parameter(
-     *         name="areaId",
-     *         in="path",
-     *         required=true,
-     *         description="ID of the olympiad area",
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="List of level-grade relationships retrieved successfully",
-     *         @OA\JsonContent(
-     *             @OA\Property(
-     *                 property="level_grades",
-     *                 type="array",
-     *                 @OA\Items(
-     *                     @OA\Property(property="id", type="integer", example=25),
-     *                     @OA\Property(
-     *                         property="level",
-     *                         type="object",
-     *                         @OA\Property(property="id", type="integer", example=10),
-     *                         @OA\Property(property="name", type="string", example="Primary Level")
-     *                     ),
-     *                     @OA\Property(
-     *                         property="grade",
-     *                         type="object",
-     *                         @OA\Property(property="id", type="integer", example=3),
-     *                         @OA\Property(property="name", type="string", example="4th Grade")
-     *                     )
-     *                 )
-     *             )
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=404,
-     *         description="Olympiad area not found"
-     *     )
-     * )
+     * Get all level-grade relationships for a specific olympiad area.
+     *
+     * @param  int  $olympiadId
+     * @param  int  $areaId
+     * @return \Illuminate\Http\JsonResponse
      */
-    // public function getLevelGradesFromArea($olympiadId, $areaId)
-    // {
-    //     $olympiadArea = OlympiadArea::where('olympiad_id', $olympiadId)
-    //         ->where('id', $areaId)
-    //         ->firstOrFail();
-
-    //     return response()->json([
-    //         'level_grades' => $olympiadArea->levelGrades()->with(['level', 'grade'])->get()
-    //     ]);
-    // }
     public function getLevelGradesFromArea($olympiadId, $areaId)
     {
         try {
@@ -1321,24 +842,14 @@ class OlympiadController extends Controller
         }
     }
 
-    /* public function removeLevelGradesFromArea(Request $request, $olympiadId, $areaId)
-    {
-        $request->validate([
-            'level_id' => 'required|exists:levels,id'
-        ]);
-
-        $olympiadArea = OlympiadArea::where('olympiad_id', $olympiadId)
-            ->where('id', $areaId)
-            ->firstOrFail();
-
-        $levelGradeIds = LevelGrade::where('level_id', $request->level_id)->pluck('id');
-
-        $olympiadArea->levelGrades()->detach($levelGradeIds);
-
-        return response()->json([
-            'message' => 'Level and all its grades removed from area successfully'
-        ]);
-    } */
+    /**
+     * Remove level-grade relationships from a specific olympiad area.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  int  $olympiadId
+     * @param  int  $areaId
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function removeLevelGradesFromArea(Request $request, $olympiadId, $areaId)
     {
         try {
@@ -1579,136 +1090,19 @@ class OlympiadController extends Controller
         }
     }
 
-    // <--- Score cuts per phase/area/level-grade --->
+    /* ========================================
+     * SCORE CUT AND MAX SCORE MANAGEMENT
+     * Methods for assigning and managing score cuts
+     * and maximum scores per phase/area/level-grade.
+     * ======================================== */
 
     /**
-     * @OA\Post(
-     *     path="/api/olympiads/{olympiadId}/areas/{areaId}/score-cuts",
-     *     summary="Assign score cut to all grades of a level for a specific phase",
-     *     description="Assigns the same score cut (minimum passing score) to ALL grades within a specific level for a given phase in an olympiad area. This simplified approach applies the score cut to every grade in the level at once, making it much easier to manage score cuts by educational level rather than individual grades.",
-     *     tags={"Score cuts"},
-     *     @OA\Parameter(
-     *         name="olympiadId",
-     *         in="path",
-     *         required=true,
-     *         description="ID of the olympiad",
-     *         @OA\Schema(type="integer", example=1)
-     *     ),
-     *     @OA\Parameter(
-     *         name="areaId",
-     *         in="path",
-     *         required=true,
-     *         description="ID of the area within the olympiad",
-     *         @OA\Schema(type="integer", example=2)
-     *     ),
-     *     @OA\RequestBody(
-     *         required=true,
-     *         description="Phase, level and score cut configuration",
-     *         @OA\JsonContent(
-     *             required={"phase_id", "level_id", "score_cut"},
-     *             @OA\Property(
-     *                 property="phase_id",
-     *                 type="integer",
-     *                 example=1,
-     *                 description="ID of the phase where the score cut will be applied"
-     *             ),
-     *             @OA\Property(
-     *                 property="level_id",
-     *                 type="integer",
-     *                 example=3,
-     *                 description="ID of the level. Score cut will be applied to ALL grades within this level."
-     *             ),
-     *             @OA\Property(
-     *                 property="score_cut",
-     *                 type="number",
-     *                 format="float",
-     *                 minimum=0,
-     *                 maximum=100,
-     *                 example=75.5,
-     *                 description="Minimum score required to pass this phase (0-100)"
-     *             )
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Score cuts assigned successfully to all grades in the level",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Score cuts assigned successfully"),
-     *             @OA\Property(
-     *                 property="data",
-     *                 type="object",
-     *                 description="The olympiad area phase with its score cut assignments",
-     *                 @OA\Property(property="id", type="integer", example=15),
-     *                 @OA\Property(
-     *                     property="phase",
-     *                     type="object",
-     *                     @OA\Property(property="id", type="integer", example=1),
-     *                     @OA\Property(property="name", type="string", example="Fase 1")
-     *                 ),
-     *                 @OA\Property(
-     *                     property="olympiad_area_phase_level_grades",
-     *                     type="array",
-     *                     description="All level-grade relationships with their assigned score cuts",
-     *                     @OA\Items(
-     *                         type="object",
-     *                         @OA\Property(property="id", type="integer", example=21),
-     *                         @OA\Property(property="score_cut", type="number", format="float", example=75.5),
-     *                         @OA\Property(
-     *                             property="level_grade",
-     *                             type="object",
-     *                             @OA\Property(property="id", type="integer", example=12),
-     *                             @OA\Property(property="level_id", type="integer", example=3),
-     *                             @OA\Property(property="grade_id", type="integer", example=9)
-     *                         )
-     *                     )
-     *                 )
-     *             ),
-     *             @OA\Property(property="level_name", type="string", example="Booster"),
-     *             @OA\Property(property="level_id", type="integer", example=3),
-     *             @OA\Property(property="score_cut", type="number", format="float", example=75.5),
-     *             @OA\Property(
-     *                 property="affected_grades_count",
-     *                 type="integer",
-     *                 example=4,
-     *                 description="Number of grades affected by this score cut assignment"
-     *             ),
-     *             @OA\Property(property="created_count", type="integer", example=2, description="Number of new score cut records created"),
-     *             @OA\Property(property="updated_count", type="integer", example=2, description="Number of existing score cut records updated"),
-     *             @OA\Property(property="status", type="integer", example=200)
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=422,
-     *         description="Validation error",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Validation failed"),
-     *             @OA\Property(
-     *                 property="errors",
-     *                 type="object",
-     *                 description="Detailed validation errors"
-     *             ),
-     *             @OA\Property(property="status", type="integer", example=422)
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=404,
-     *         description="Resource not found",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Level not found"),
-     *             @OA\Property(property="error", type="string", example="The level 'Booster' (ID: 3) has no grade associations in the area 'Matemáticas' for olympiad 'Olimpiada 2025'. Please assign grades to this level first."),
-     *             @OA\Property(property="status", type="integer", example=404)
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=500,
-     *         description="Server error during score cut assignment",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Database error"),
-     *             @OA\Property(property="error", type="string", example="A database error occurred while assigning score cuts. Please try again."),
-     *             @OA\Property(property="status", type="integer", example=500)
-     *         )
-     *     )
-     * )
+     * Assign score cuts to level-grades for a specific phase and area.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  int  $olympiadId
+     * @param  int  $areaId
+     * @return \Illuminate\Http\JsonResponse
      */
     public function assignScoreCuts(Request $request, $olympiadId, $areaId)
     {
@@ -1810,14 +1204,14 @@ class OlympiadController extends Controller
                 $updatedCount = 0;
                 $failedCount = 0;
 
-                // Assign the same score cut to all level-grades of this level
+                // Apply the same score cut to all grade relationships for this level
                 foreach ($levelGrades as $levelGrade) {
                     $scoreCutRecord = OlympiadAreaPhaseLevelGrade::where('olympiad_area_phase_id', $olympiadAreaPhase->id)
                         ->where('level_grade_id', $levelGrade->id)
                         ->first();
 
                     if ($scoreCutRecord) {
-                        // Update existing score cut
+                        // Update score cut for existing record
                         $scoreCutRecord->score_cut = $request->score_cut;
                         if ($scoreCutRecord->save()) {
                             $updatedCount++;
@@ -1825,7 +1219,7 @@ class OlympiadController extends Controller
                             $failedCount++;
                         }
                     } else {
-                        // Create new score cut with proper defaults
+                        // Create new score cut record with default values
                         $newScoreCut = OlympiadAreaPhaseLevelGrade::create([
                             'olympiad_area_phase_id' => $olympiadAreaPhase->id,
                             'level_grade_id' => $levelGrade->id,
@@ -1841,7 +1235,7 @@ class OlympiadController extends Controller
                         }
                     }
                 }
-                //sofia
+                // Reclassify existing evaluations based on new score cut
                 $contestantIds = DB::table('contestant_level_grades')
                     ->whereIn('level_grade_id', $levelGrades->pluck('id'))
                     ->pluck('contestant_id');
@@ -1862,15 +1256,15 @@ class OlympiadController extends Controller
                     }
 
                     $oldStatus = $evaluation->classification_status;
-                    $evaluation->classification_status = $evaluation->score >= $request->score_cut 
-                        ? 'clasificado' 
+                    $evaluation->classification_status = $evaluation->score >= $request->score_cut
+                        ? 'clasificado'
                         : 'no_clasificado';
 
                     if ($evaluation->classification_status !== $oldStatus) $reclassified++;
                     $evaluation->save();
                 }
 
-                // Check if any operations failed
+                // Verify all operations completed successfully
                 if ($failedCount > 0) {
                     DB::rollBack();
                     return response()->json([
@@ -1944,133 +1338,12 @@ class OlympiadController extends Controller
     }
 
     /**
-     * @OA\Post(
-     *     path="/api/olympiads/{olympiadId}/areas/{areaId}/max-scores",
-     *     summary="Assign max score to all grades of a level for a specific phase",
-     *     description="Assigns the same max score (maximum achievable score) to ALL grades within a specific level for a given phase in an olympiad area. This simplified approach applies the max score to every grade in the level at once, making it much easier to manage maximum scores by educational level rather than individual grades.",
-     *     tags={"Max scores"},
-     *     @OA\Parameter(
-     *         name="olympiadId",
-     *         in="path",
-     *         required=true,
-     *         description="ID of the olympiad",
-     *         @OA\Schema(type="integer", example=1)
-     *     ),
-     *     @OA\Parameter(
-     *         name="areaId",
-     *         in="path",
-     *         required=true,
-     *         description="ID of the area within the olympiad",
-     *         @OA\Schema(type="integer", example=2)
-     *     ),
-     *     @OA\RequestBody(
-     *         required=true,
-     *         description="Phase, level and max score configuration",
-     *         @OA\JsonContent(
-     *             required={"phase_id", "level_id", "max_score"},
-     *             @OA\Property(
-     *                 property="phase_id",
-     *                 type="integer",
-     *                 example=1,
-     *                 description="ID of the phase where the max score will be applied"
-     *             ),
-     *             @OA\Property(
-     *                 property="level_id",
-     *                 type="integer",
-     *                 example=3,
-     *                 description="ID of the level. Max score will be applied to ALL grades within this level."
-     *             ),
-     *             @OA\Property(
-     *                 property="max_score",
-     *                 type="number",
-     *                 format="float",
-     *                 minimum=0,
-     *                 maximum=100,
-     *                 example=100,
-     *                 description="Maximum score achievable in this phase (0-100)"
-     *             )
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Max scores assigned successfully to all grades in the level",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Max scores assigned successfully"),
-     *             @OA\Property(
-     *                 property="data",
-     *                 type="object",
-     *                 description="The olympiad area phase with its max score assignments",
-     *                 @OA\Property(property="id", type="integer", example=15),
-     *                 @OA\Property(
-     *                     property="phase",
-     *                     type="object",
-     *                     @OA\Property(property="id", type="integer", example=1),
-     *                     @OA\Property(property="name", type="string", example="Fase 1")
-     *                 ),
-     *                 @OA\Property(
-     *                     property="olympiad_area_phase_level_grades",
-     *                     type="array",
-     *                     description="All level-grade relationships with their assigned max scores",
-     *                     @OA\Items(
-     *                         type="object",
-     *                         @OA\Property(property="id", type="integer", example=21),
-     *                         @OA\Property(property="max_score", type="number", format="float", example=100),
-     *                         @OA\Property(
-     *                             property="level_grade",
-     *                             type="object",
-     *                             @OA\Property(property="id", type="integer", example=12),
-     *                             @OA\Property(property="level_id", type="integer", example=3),
-     *                             @OA\Property(property="grade_id", type="integer", example=9)
-     *                         )
-     *                     )
-     *                 )
-     *             ),
-     *             @OA\Property(property="level_name", type="string", example="Booster"),
-     *             @OA\Property(property="level_id", type="integer", example=3),
-     *             @OA\Property(property="max_score", type="number", format="float", example=100),
-     *             @OA\Property(
-     *                 property="affected_grades_count",
-     *                 type="integer",
-     *                 example=4,
-     *                 description="Number of grades affected by this max score assignment"
-     *             ),
-     *             @OA\Property(property="created_count", type="integer", example=2, description="Number of new max score records created"),
-     *             @OA\Property(property="updated_count", type="integer", example=2, description="Number of existing max score records updated"),
-     *             @OA\Property(property="status", type="integer", example=200)
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=422,
-     *         description="Validation error",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Validation failed"),
-     *             @OA\Property(
-     *                 property="errors",
-     *                 type="object",
-     *                 description="Detailed validation errors"
-     *             ),
-     *             @OA\Property(property="status", type="integer", example=422)
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=404,
-     *         description="Resource not found",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Level not found"),
-     *             @OA\Property(property="error", type="string", example="The level 'Booster' (ID: 3) has no grade associations in the area 'Matemáticas' for olympiad 'Olimpiada 2025'. Please assign grades to this level first."),
-     *             @OA\Property(property="status", type="integer", example=404)
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=500,
-     *         description="Server error during max score assignment",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Database error"),
-     *             @OA\Property(property="error", type="string", example="A database error occurred while assigning max scores. Please try again."),
-     *             @OA\Property(property="status", type="integer", example=500)
-     *         )
-     *     )
-     * )
+     * Assign maximum scores to level-grades for a specific phase and area.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  int  $olympiadId
+     * @param  int  $areaId
+     * @return \Illuminate\Http\JsonResponse
      */
     public function assignMaxScores(Request $request, $olympiadId, $areaId)
     {
@@ -2171,7 +1444,7 @@ class OlympiadController extends Controller
                 $createdCount = 0;
                 $updatedCount = 0;
 
-                // Assign max score to all level-grades for this level in this phase
+                // Apply maximum score to all grade relationships for this level in this phase
                 foreach ($levelGrades as $levelGrade) {
                     $existing = OlympiadAreaPhaseLevelGrade::where('olympiad_area_phase_id', $olympiadAreaPhase->id)
                         ->where('level_grade_id', $levelGrade->id)
@@ -2255,67 +1528,11 @@ class OlympiadController extends Controller
     }
 
     /**
-     * @OA\Get(
-     *     path="/api/olympiads/{olympiadId}/areas/{areaId}/score-cuts",
-     *     summary="Get all score cuts for an olympiad area",
-     *     description="Retrieves all phases of the specified olympiad area, along with their associated level-grades and score cuts.",
-     *     tags={"Score cuts"},
-     *     @OA\Parameter(
-     *         name="olympiadId",
-     *         in="path",
-     *         required=true,
-     *         description="ID of the olympiad",
-     *         @OA\Schema(type="integer", example=1)
-     *     ),
-     *     @OA\Parameter(
-     *         name="areaId",
-     *         in="path",
-     *         required=true,
-     *         description="ID of the olympiad area",
-     *         @OA\Schema(type="integer", example=2)
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="List of score cuts retrieved successfully",
-     *         @OA\JsonContent(
-     *             @OA\Property(
-     *                 property="data",
-     *                 type="array",
-     *                 @OA\Items(
-     *                     type="object",
-     *                     @OA\Property(property="id", type="integer", example=15),
-     *                     @OA\Property(property="phase", type="object",
-     *                         @OA\Property(property="id", type="integer", example=3),
-     *                         @OA\Property(property="name", type="string", example="Final Phase")
-     *                     ),
-     *                     @OA\Property(
-     *                         property="olympiad_area_phase_level_grades",
-     *                         type="array",
-     *                         @OA\Items(
-     *                             @OA\Property(property="id", type="integer", example=22),
-     *                             @OA\Property(property="score_cut", type="number", format="float", example=75.0),
-     *                             @OA\Property(
-     *                                 property="olympiad_area_level_grade",
-     *                                 type="object",
-     *                                 @OA\Property(
-     *                                     property="level_grade",
-     *                                     type="object",
-     *                                     @OA\Property(property="id", type="integer", example=12),
-     *                                     @OA\Property(property="level_id", type="integer", example=5),
-     *                                     @OA\Property(property="grade_id", type="integer", example=9)
-     *                                 )
-     *                             )
-     *                         )
-     *                     )
-     *                 )
-     *             )
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=404,
-     *         description="Olympiad area not found"
-     *     )
-     * )
+     * Get all score cuts for a specific olympiad area.
+     *
+     * @param  int  $olympiadId
+     * @param  int  $areaId
+     * @return \Illuminate\Http\JsonResponse
      */
     public function getScoreCuts($olympiadId, $areaId)
     {
@@ -2370,7 +1587,7 @@ class OlympiadController extends Controller
                 ], 404);
             }
 
-            // Get all phases for this olympiad area with their score cuts
+            // Retrieve all phases with associated score cut configurations
             $data = OlympiadAreaPhase::where('olympiad_area_id', $olympiadArea->id)
                 ->with([
                     'phase',
@@ -2436,67 +1653,11 @@ class OlympiadController extends Controller
     }
 
     /**
-     * @OA\Get(
-     *     path="/api/olympiads/{olympiadId}/areas/{areaId}/max-scores",
-     *     summary="Get all max scores for an olympiad area",
-     *     description="Retrieves all phases of the specified olympiad area, along with their associated level-grades and max scores.",
-     *     tags={"Max scores"},
-     *     @OA\Parameter(
-     *         name="olympiadId",
-     *         in="path",
-     *         required=true,
-     *         description="ID of the olympiad",
-     *         @OA\Schema(type="integer", example=1)
-     *     ),
-     *     @OA\Parameter(
-     *         name="areaId",
-     *         in="path",
-     *         required=true,
-     *         description="ID of the olympiad area",
-     *         @OA\Schema(type="integer", example=2)
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="List of max scores retrieved successfully",
-     *         @OA\JsonContent(
-     *             @OA\Property(
-     *                 property="data",
-     *                 type="array",
-     *                 @OA\Items(
-     *                     type="object",
-     *                     @OA\Property(property="id", type="integer", example=15),
-     *                     @OA\Property(property="phase", type="object",
-     *                         @OA\Property(property="id", type="integer", example=3),
-     *                         @OA\Property(property="name", type="string", example="Final Phase")
-     *                     ),
-     *                     @OA\Property(
-     *                         property="olympiad_area_phase_level_grades",
-     *                         type="array",
-     *                         @OA\Items(
-     *                             @OA\Property(property="id", type="integer", example=22),
-     *                             @OA\Property(property="max_score", type="number", format="float", example=100.0),
-     *                             @OA\Property(
-     *                                 property="olympiad_area_level_grade",
-     *                                 type="object",
-     *                                 @OA\Property(
-     *                                     property="level_grade",
-     *                                     type="object",
-     *                                     @OA\Property(property="id", type="integer", example=12),
-     *                                     @OA\Property(property="level_id", type="integer", example=5),
-     *                                     @OA\Property(property="grade_id", type="integer", example=9)
-     *                                 )
-     *                             )
-     *                         )
-     *                     )
-     *                 )
-     *             )
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=404,
-     *         description="Olympiad area not found"
-     *     )
-     * )
+     * Get all maximum scores for a specific olympiad area.
+     *
+     * @param  int  $olympiadId
+     * @param  int  $areaId
+     * @return \Illuminate\Http\JsonResponse
      */
     public function getMaxScores($olympiadId, $areaId)
     {
@@ -2551,7 +1712,7 @@ class OlympiadController extends Controller
                 ], 404);
             }
 
-            // Get all phases for this olympiad area with their max scores
+            // Retrieve all phases with associated maximum score configurations
             $data = OlympiadAreaPhase::where('olympiad_area_id', $olympiadArea->id)
                 ->with([
                     'phase',
@@ -2617,84 +1778,10 @@ class OlympiadController extends Controller
     }
 
     /**
-     * @OA\Put(
-     *     path="/api/olympiads/{id}/activate",
-     *     summary="Activate an olympiad and update status of related olympiads",
-     *     description="Sets the specified olympiad as 'Activa' and automatically updates the status of other olympiads based on their date ranges relative to the selected olympiad. Olympiads with dates before the selected range become 'Terminada', those after become 'En planificación' (if not already), and the selected olympiad becomes 'Activa'.",
-     *     tags={"Olympiads"},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         required=true,
-     *         description="ID of the olympiad to activate",
-     *         @OA\Schema(type="integer", example=1)
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Olympiad activated and related olympiads updated successfully",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Olympiad activated and related olympiads updated successfully"),
-     *             @OA\Property(
-     *                 property="activated_olympiad",
-     *                 type="object",
-     *                 description="The olympiad that was activated",
-     *                 @OA\Property(property="id", type="integer", example=1),
-     *                 @OA\Property(property="name", type="string", example="OHSansi 2025"),
-     *                 @OA\Property(property="status", type="string", example="Activa"),
-     *                 @OA\Property(property="start_date", type="string", format="date", example="2025-01-15"),
-     *                 @OA\Property(property="end_date", type="string", format="date", example="2025-06-15")
-     *             ),
-     *             @OA\Property(
-     *                 property="updated_olympiads",
-     *                 type="object",
-     *                 description="Summary of olympiads that were updated",
-     *                 @OA\Property(
-     *                     property="terminated",
-     *                     type="array",
-     *                     description="Olympiads set to 'Terminada' (dates before selected range)",
-     *                     @OA\Items(
-     *                         type="object",
-     *                         @OA\Property(property="id", type="integer", example=2),
-     *                         @OA\Property(property="name", type="string", example="OHSansi 2024"),
-     *                         @OA\Property(property="previous_status", type="string", example="Activa"),
-     *                         @OA\Property(property="new_status", type="string", example="Terminada")
-     *                     )
-     *                 ),
-     *                 @OA\Property(
-     *                     property="planned",
-     *                     type="array",
-     *                     description="Olympiads set to 'En planificación' (dates after selected range)",
-     *                     @OA\Items(
-     *                         type="object",
-     *                         @OA\Property(property="id", type="integer", example=3),
-     *                         @OA\Property(property="name", type="string", example="OHSansi 2026"),
-     *                         @OA\Property(property="previous_status", type="string", example="Activa"),
-     *                         @OA\Property(property="new_status", type="string", example="En planificación")
-     *                     )
-     *                 )
-     *             ),
-     *             @OA\Property(property="status", type="integer", example=200)
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=404,
-     *         description="Olympiad not found",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Olympiad not found"),
-     *             @OA\Property(property="error", type="string", example="No olympiad found with ID: 1"),
-     *             @OA\Property(property="status", type="integer", example=404)
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=500,
-     *         description="Server error during olympiad activation",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Database error"),
-     *             @OA\Property(property="error", type="string", example="A database error occurred while updating olympiad statuses. Please try again."),
-     *             @OA\Property(property="status", type="integer", example=500)
-     *         )
-     *     )
-     * )
+     * Activate a specific olympiad and terminate all other active olympiads.
+     *
+     * @param  int  $id  Olympiad ID to activate
+     * @return \Illuminate\Http\JsonResponse
      */
     public function activateOlympiad($id)
     {
@@ -2708,7 +1795,7 @@ class OlympiadController extends Controller
                 ], 400);
             }
 
-            // Find the selected olympiad
+            // Retrieve the olympiad to be activated
             $selectedOlympiad = Olympiad::find($id);
             if (!$selectedOlympiad) {
                 return response()->json([
@@ -2775,6 +1862,12 @@ class OlympiadController extends Controller
         }
     }
 
+    /**
+     * Get all olympiads associated with the authenticated user.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function getUserOlympiads(Request $request){
         $user = $request->user();
 
@@ -2828,55 +1921,12 @@ class OlympiadController extends Controller
     }
 
     /**
-     * @OA\Get(
-     *     path="/api/olympiads/{id}/areas/{areaId}/levels",
-     *     summary="Get levels for a specific olympiad and area",
-     *     description="Retrieve all unique levels associated with a given olympiad and area.",
-     *     tags={"Olympiads"},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         required=true,
-     *         description="Olympiad ID",
-     *         @OA\Schema(type="string", example="1")
-     *     ),
-     *     @OA\Parameter(
-     *         name="areaId",
-     *         in="path",
-     *         required=true,
-     *         description="Area ID",
-     *         @OA\Schema(type="string", example="3")
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Levels retrieved successfully",
-     *         @OA\JsonContent(
-     *             type="object",
-     *             @OA\Property(property="message", type="string", example="Levels retrieved successfully."),
-     *             @OA\Property(property="status", type="integer", example=200),
-     *             @OA\Property(
-     *                 property="data",
-     *                 type="array",
-     *                 @OA\Items(
-     *                     type="object",
-     *                     @OA\Property(property="id", type="integer", example=2),
-     *                     @OA\Property(property="name", type="string", example="Intermediate")
-     *                 )
-     *             )
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=404,
-     *         description="No levels found for the specified olympiad and area",
-     *         @OA\JsonContent(
-     *             type="object",
-     *             @OA\Property(property="message", type="string", example="No levels found for the specified olympiad and area."),
-     *             @OA\Property(property="status", type="integer", example=404)
-     *         )
-     *     )
-     * )
+     * Get all levels for a specific olympiad and area.
+     *
+     * @param  string  $id  Olympiad ID
+     * @param  string  $areaId  Area ID
+     * @return \Illuminate\Http\JsonResponse
      */
-
     public function getLevels(string $id, string $areaId){
         $levels = DB::table('olympiads as o')
             ->join('olympiad_areas as oa', 'oa.olympiad_id', '=', 'o.id')
@@ -2906,12 +1956,18 @@ class OlympiadController extends Controller
     }
 
     /**
-     * Get score cut and max score for a specific olympiad area phase level
+     * Get score cut and maximum score for a specific level in an olympiad area phase.
+     *
+     * @param  int  $olympiadId
+     * @param  int  $areaId
+     * @param  int  $phaseId
+     * @param  int  $levelId
+     * @return \Illuminate\Http\JsonResponse
      */
     public function getPhaseScoresByLevel($olympiadId, $areaId, $phaseId, $levelId)
     {
         try {
-            // Validar parámetros
+            // Validate all input parameters
             if (!is_numeric($olympiadId) || $olympiadId <= 0) {
                 return response()->json([
                     'message' => 'Invalid olympiad ID',
@@ -2944,7 +2000,7 @@ class OlympiadController extends Controller
                 ], 400);
             }
 
-            // Usar consulta SQL simplificada que devuelve solo un resultado por nivel
+            // Execute optimized SQL query to get score data for the specific level
             $result = DB::selectOne("
                 SELECT oaplg.score_cut, oaplg.max_score
                 FROM olympiad_area_phase_level_grades oaplg
@@ -3010,45 +2066,11 @@ class OlympiadController extends Controller
             ], 500);
         }
     }
+
     /**
-     * @OA\Get(
-     *     path="/api/olympiads/active-or-planned",
-     *     summary="To obtain active or planned Olympics",
-     *     description="Return all Olympics whose status is 'Active' or 'In planning'.",
-     *     tags={"Olympiads"},
+     * Get all olympiads that are either active or in planning status.
      *
-     *     @OA\Response(
-     *         response=200,
-     *         description="Olympiads retrieved successfully",
-     *         @OA\JsonContent(
-     *             type="object",
-     *             @OA\Property(property="message", type="string", example="Olympiads retrieved successfully."),
-     *             @OA\Property(
-     *                 property="data",
-     *                 type="array",
-     *                 @OA\Items(
-     *                     type="object",
-     *                     @OA\Property(property="id", type="integer", example=1),
-     *                     @OA\Property(property="name", type="string", example="Olimpiada Nacional de Matemáticas"),
-     *                     @OA\Property(property="status", type="string", example="Activa"),
-     *                     @OA\Property(property="start_date", type="string", format="date", example="2025-04-01"),
-     *                     @OA\Property(property="end_date", type="string", format="date", example="2025-04-15")
-     *                 )
-     *             ),
-     *             @OA\Property(property="status", type="integer", example=200)
-     *         )
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=404,
-     *         description="There are no active or planned Olympics",
-     *         @OA\JsonContent(
-     *             type="object",
-     *             @OA\Property(property="message", type="string", example="There are no active or planned Olympics."),
-     *             @OA\Property(property="status", type="integer", example=404)
-     *         )
-     *     )
-     * )
+     * @return \Illuminate\Http\JsonResponse
      */
     public function activeOrPlannedOlympics()
     {

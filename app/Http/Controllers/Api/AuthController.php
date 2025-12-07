@@ -13,41 +13,10 @@ use Illuminate\Support\Facades\DB;
 
 class AuthController extends Controller
 {
-    /**
-     * @OA\Post(
-     *     path="/api/register",
-     *     summary="Registro de usuario",
-     *     description="Crea un nuevo usuario en el sistema",
-     *     tags={"Autenticación"},
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"first_name","last_name","email","password","password_confirmation","ci","phone_number","genre","roles_id"},
-     *             @OA\Property(property="first_name", type="string", example="Maria"),
-     *             @OA\Property(property="last_name", type="string", example="Perez"),
-     *             @OA\Property(property="email", type="string", format="email", example="maria@example.com"),
-     *             @OA\Property(property="ci", type="string", example="12345678"),
-     *             @OA\Property(property="phone_number", type="string", example="71717717"),
-     *             @OA\Property(property="genre", type="string", enum={"masculino","femenino"}, example="femenino"),
-     *             @OA\Property(property="roles_id", type="integer", example=2),
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=201,
-     *         description="Usuario registrado correctamente",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="User registration successfully"),
-     *             @OA\Property(property="acces_token", type="string", example="2|gfdsgsgfsgsgf..."),
-     *             @OA\Property(property="token_type", type="string", example="Bearer")
-     *         )
-     *     ),
-     *     @OA\Response(response=400, description="Error de validación"),
-     *     @OA\Response(response=500, description="Error al crear el usuario")
-     * )
-     */
+    // Register new user or update existing one with role and olympiad areas
     public function register(Request $request)
     {
-
+        // Validate input data
         $validator = Validator::make(
             $request->all(),
             [
@@ -76,16 +45,19 @@ class AuthController extends Controller
         // search user by ci
         $user = User::where('ci', $request->ci)->first();
         if ($user) {
+            // Update profession if role is tutor (role_id = 2)
             if ($request->roles_id == 2) {
                 $user->update([
                     'profesion' => $request->profesion
                 ]);
             }
 
+            // Check current user role
             $currentRole = DB::table('user_roles')
                 ->where('user_id', $user->id)
                 ->first();
 
+            // Handle role assignment based on current role
             if ($currentRole && $currentRole->role_id != $request->roles_id) {
                 $userRoleId = $this->addUserRole($user, $request->roles_id);
 
@@ -111,6 +83,7 @@ class AuthController extends Controller
             ]);
         }
 
+        // Create new user with generated password
         $full_name = $request->first_name . ' ' . $request->last_name;
         $generate_password = $this->generate_password($full_name, $request->ci);
 
@@ -122,7 +95,6 @@ class AuthController extends Controller
             'ci' => $request->ci,
             'phone_number' => $request->phone_number,
             'genre' => $request->genre,
-            // 'roles_id' => $request->roles_id,
             'profesion' => $request->roles_id == 2 ? $request->profesion : null,
         ]);
 
@@ -155,31 +127,7 @@ class AuthController extends Controller
         return response()->json($data, 201);
     }
 
-    /**
-     * @OA\Post(
-     *     path="/api/login",
-     *     summary="Iniciar sesión",
-     *     description="Autenticar usuario y devolver token",
-     *     tags={"Autenticación"},
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"email","password"},
-     *             @OA\Property(property="email", type="string", format="email", example="maria@example.com"),
-     *             @OA\Property(property="password", type="string", format="password", example="MP12345678")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Login exitoso",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="token", type="string", example="2|gfdsgsgfsgsgf..."),
-     *             @OA\Property(property="token_type", type="string", example="Bearer")
-     *         )
-     *     ),
-     *     @OA\Response(response=401, description="No autorizado")
-     * )
-     */
+    // Authenticate user and return token
     public function login(Request $request)
     {
         if (!Auth::attempt($request->only('email', 'password'))) {
@@ -192,31 +140,16 @@ class AuthController extends Controller
                 ->select('roles.id', 'roles.name')
                 ->get()
                 ->makeHidden('pivot');
-                
+
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
-            'token' => $token, 
-            'token_type' => 'Bearer', 
+            'token' => $token,
+            'token_type' => 'Bearer',
             'user' => $user
         ], 200);
     }
-    /**
-     * @OA\Post(
-     *     path="/api/logout",
-     *     summary="Cerrar sesión",
-     *     description="Elimina el token del usuario autenticado",
-     *     tags={"Autenticación"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Response(
-     *         response=200,
-     *         description="Logout exitoso",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Logged out successfully")
-     *         )
-     *     )
-     * )
-     */
+
     public function logout(Request $request)
     {
         $request->user()->tokens()->delete();
@@ -224,6 +157,7 @@ class AuthController extends Controller
         return response()->json(['message' => 'Logged out successfully']);
     }
 
+    // Generate password using first letters of names + CI
     public function generate_password($name, $ci)
     {
         $full_name = trim($name);
@@ -231,6 +165,7 @@ class AuthController extends Controller
         $name = "";
         $password = "";
 
+        // Split full name into individual names
         for ($i = 0; $i < strlen($full_name); $i++) {
             if ($full_name[$i] != ' ') {
                 $name .= $full_name[$i];
@@ -246,6 +181,7 @@ class AuthController extends Controller
             array_push($array_names, $name);
         }
 
+        // Build password with first letters of each name + CI
         for ($i = 0; $i < sizeof($array_names); $i++) {
             $password .= $array_names[$i][0];
         }
@@ -253,6 +189,7 @@ class AuthController extends Controller
         return strtoupper($password) . $ci;
     }
 
+    // Sync user areas for specific olympiad avoiding duplicates
     private function syncUserAreasOlympiad($userRoleId, $areas_id, $olympiad_id)
     {
         $existingAreas = DB::table('user_area_olympiads')
@@ -261,12 +198,10 @@ class AuthController extends Controller
             ->pluck('area_id')
             ->toArray();
 
-        // Calcular nuevas áreas a insertar
+        // Calculate new areas to insert
         $newAreas = array_diff($areas_id, $existingAreas);
-        // elimina areas que no estan en el arreglo
-        // $areasToDelete = array_diff($existingAreas, $areas_id);
 
-        // Insertar solo las nuevas
+        // Insert only new area assignments
         foreach ($newAreas as $areaId) {
             DB::table('user_area_olympiads')->insert([
                 'user_role_id' => $userRoleId,
@@ -276,19 +211,12 @@ class AuthController extends Controller
                 'updated_at' => now(),
             ]);
         }
-
-        // if (!empty($areasToDelete)) {
-        //     DB::table('user_area_olympiads')
-        //     ->where('user_role_id', $userRoleId)
-        //     ->where('olympiad_id', $olympiad_id)
-        //     ->whereIn('area_id', $areasToDelete)
-        //     ->delete();
-        // }
     }
 
+    // Search user by CI and check olympiad registration
     public function searchUser(string $olympiadId, string $ci, string $roleId)
     {
-        // search user by ci
+        // Check if user exists by CI
         $user = User::where('ci', $ci)->first();
 
         if (!$user) {
@@ -298,7 +226,7 @@ class AuthController extends Controller
             ], 404);
         }
 
-        // search user by role
+        // Check if user has the required role
         $userRole = DB::table('user_roles')
             ->where('user_id', $user->id)
             ->where('role_id', $roleId)
@@ -312,7 +240,7 @@ class AuthController extends Controller
             ], 404);
         }
 
-        // if not found, return unregistered user with role
+        // Check if user is registered in olympiad areas
         $areas = DB::table('user_area_olympiads')
             ->join('areas', 'user_area_olympiads.area_id', '=', 'areas.id')
             ->where('user_area_olympiads.user_role_id', $userRole->id)
@@ -337,6 +265,7 @@ class AuthController extends Controller
         }
     }
 
+    // Add new role to user or return existing one
     private function addUserRole($user, $newRoleId)
     {
         $existingRole = DB::table('user_roles')

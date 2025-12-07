@@ -18,10 +18,10 @@ use function Adminer\where;
 
 class EvaluationController extends Controller
 {
-
+    // Update evaluation score and/or description with automatic classification
     public function updatePartialEvaluation(Request $request, $id): JsonResponse
     {
-        // search evaluation by id
+        // Find evaluation by ID
         $evaluation = Evaluation::find($id);
 
         if (!$evaluation) {
@@ -37,7 +37,7 @@ class EvaluationController extends Controller
             'description' => 'string|nullable',
         ]);
 
-        //If validation fails
+        // Validate input data
         if ($validator->fails()) {
             $data = [
                 'message' => 'Error in data validation',
@@ -47,12 +47,15 @@ class EvaluationController extends Controller
             return response()->json($data, 400);
         }
 
+        // Update score and status if provided
         if ($request->has('score')) {
             $evaluation->score = $request->score;
             $evaluation->status = true;
+            // Automatically update classification based on score
             $this->updateClassificationAutomatic($evaluation);
         }
 
+        // Update description if provided
         if ($request->has('description')) {
             $evaluation->description = $request->description;
         }
@@ -67,23 +70,21 @@ class EvaluationController extends Controller
         return response()->json($data, 200);
     }
 
+    // Check for evaluation updates since last sync timestamp
     public function checksUpdates(Request $request): JsonResponse
     {
-
+        // Parse last update timestamp or use epoch time as fallback
         $lastUpdateAt = $request->query('lastUpdateAt');
         $lastUpdate = $lastUpdateAt
             ? Carbon::parse($lastUpdateAt)
             : Carbon::createFromTimestamp(0);
-
-        // $updatedEvaluations = Evaluation::where('updated_at', '>', $lastUpdate)
-        // ->orderBy('updated_at', 'asc')
-        // ->get();
 
         $updatedEvaluations = Evaluation::with(['registration.contestant'])
             ->where('updated_at', '>', $lastUpdate)
             ->orderBy('updated_at', 'asc')
             ->get();
 
+        // Transform evaluations for frontend consumption
         $transformedEvaluations = $updatedEvaluations->map(function ($evaluation) {
             $contestant = $evaluation->registration->contestant ?? null;
 
@@ -110,11 +111,11 @@ class EvaluationController extends Controller
     }
 
     /**
-     * Get competitors by phase with eligibility logic
+     * Get competitors eligible for a specific phase with validation logic
      */
     public function getCompetitorsByPhase(Request $request, $olympiadId, $areaId, $phaseId): JsonResponse
     {
-        // Verificar que existe la relación olympiad_area
+        // Verify that olympiad-area relationship exists
         $olympiadArea = OlympiadArea::where('olympiad_id', $olympiadId)
             ->where('area_id', $areaId)
             ->first();
@@ -137,7 +138,7 @@ class EvaluationController extends Controller
             ], 404);
         }
 
-        // Obtener competidores elegibles para esta fase
+        // Get competitors eligible for this phase
         $eligibleCompetitors = $this->getEligibleCompetitors($olympiadAreaPhase, $phaseId);
 
         return response()->json([
@@ -150,7 +151,7 @@ class EvaluationController extends Controller
     }
 
     /**
-     * Update classification status manually
+     * Update classification status and place manually
      */
     public function updateClassificationStatus(Request $request, $id): JsonResponse
     {
@@ -203,11 +204,11 @@ class EvaluationController extends Controller
      */
     private function getEligibleCompetitors($olympiadAreaPhase, $currentPhaseId)
     {
-        // Para la primera fase (order = 1), todos los registrados pueden participar
+        // For first phase (order = 1), all registered can participate
         $currentPhase = Phase::find($currentPhaseId);
 
         if ($currentPhase->order == 1) {
-            // Primera fase: todos los evaluados en esta fase
+            // First phase: all evaluated in this phase
             return Evaluation::where('olympiad_area_phase_id', $olympiadAreaPhase->id)
                 ->with(['registration.contestant'])
                 ->get()
@@ -215,16 +216,16 @@ class EvaluationController extends Controller
                     return $this->formatCompetitorData($evaluation);
                 });
         } else {
-            // Fases posteriores: solo clasificados de la fase anterior
+            // Subsequent phases: only qualified from previous phase
             $previousPhaseOrder = $currentPhase->order - 1;
 
-            // Obtener registros que clasificaron en la fase anterior
+            // Get registrations that qualified in previous phase
             $qualifiedRegistrations = $this->getQualifiedFromPreviousPhase(
                 $olympiadAreaPhase->olympiad_area_id,
                 $previousPhaseOrder
             );
 
-            // Obtener evaluaciones de la fase actual para estos competidores
+            // Get evaluations from current phase for these competitors
             return Evaluation::where('olympiad_area_phase_id', $olympiadAreaPhase->id)
                 ->whereIn('registration_id', $qualifiedRegistrations)
                 ->with(['registration.contestant'])
@@ -272,10 +273,17 @@ class EvaluationController extends Controller
         ];
     }
 
+    // Automatically update classification status based on score cut threshold
     private function updateClassificationAutomatic(Evaluation $evaluation)
     {
+        // Don't change status if already disqualified
+        if ($evaluation->classification_status === 'descalificado') {
+            return;
+        }
+
         $contestantId = $evaluation->registration->contestant->id;
 
+        // Get contestant's level grade information
         $levelGrade = DB::table('contestant_level_grades')
                 ->where('contestant_id', $contestantId)
                 ->join('level_grades', 'contestant_level_grades.level_grade_id', '=', 'level_grades.id')
@@ -285,27 +293,29 @@ class EvaluationController extends Controller
         $levelGradeId = $levelGrade->id ?? null;
 
         if ($levelGradeId) {
-            // Find the corresponding threshold
+            // Find the score cut threshold for this level
             $threshold = \App\Models\OlympiadAreaPhaseLevelGrade::where('olympiad_area_phase_id', $evaluation->olympiad_area_phase_id)
                 ->where('level_grade_id', $levelGradeId)
                 ->first();
 
             if ($threshold) {
+                // Compare score against threshold to determine classification
                 if ($evaluation->score >= $threshold->score_cut) {
                     $evaluation->classification_status = 'clasificado';
                 } else {
                     $evaluation->classification_status = 'no_clasificado';
                 }
             } else {
-                // No threshold was found for that level
+                // No threshold found for this level - disqualify
                 $evaluation->classification_status = 'descalificado';
             }
         } else {
-                // The competitor does not have a registered level
+                // Contestant has no registered level - disqualify
                 $evaluation->classification_status = 'descalificado';
         }
     }
 
+    // Check if score cut threshold can be edited (no evaluated competitors exist)
     public function checkEvaluations(string $olympiadId, string $phaseId, string $areaId, string $levelId)
     {
         $olympiadAreaId = OlympiadArea::where('olympiad_id', $olympiadId)
@@ -328,6 +338,7 @@ class EvaluationController extends Controller
         ], 404);
     }
 
+    // Check if there are evaluated competitors for this level
     $existEvaluation = DB::table('evaluations as e')
         ->join('registrations as r', 'e.registration_id', '=', 'r.id')
         ->join('contestant_level_grades as clg', 'clg.contestant_id', '=', 'r.contestant_id')

@@ -898,7 +898,7 @@ class PhaseController extends Controller
                 ], 400);
             }
 
-            // Usar consulta SQL simplificada que devuelve solo un resultado por nivel
+            // Use simplified SQL query that returns only one result per level
             $result = DB::selectOne("
                 SELECT oaplg.score_cut, oaplg.max_score
                 FROM olympiad_area_phase_level_grades oaplg
@@ -978,13 +978,6 @@ class PhaseController extends Controller
             ->orderByDesc('p.order')
             ->select('p.order', 'oapl.status')
             ->first();
-
-        // if (!$lastPhaseId) {
-        //     return response()->json([
-        //         'message' => 'Last phase not endorsed',
-        //         'status' => 403
-        //     ], 403);
-        // }
 
         if ($lastPhaseId->status !== 'Terminada') {
             return response()->json([
