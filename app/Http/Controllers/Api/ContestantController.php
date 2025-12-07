@@ -286,8 +286,7 @@ class ContestantController extends Controller
             ->where('oa.olympiad_id', $olympiad_id)
             ->where('oa.area_id', $area_id)
             ->where('lg.level_id', $level_id)
-            ->where('oapl.status', 'Terminada') // para avalar por nivel
-            // ->where('oap.status', 'Terminada') para avalar por area
+            ->where('oapl.status', 'Terminada')
             ->orderByDesc('p.order')
             ->select('oap.id')
             ->first();
@@ -298,15 +297,15 @@ class ContestantController extends Controller
             ], 404);
         }
 
-        $responsibleName = DB::table('user_area_olympiads as uao')
-            ->join('user_roles as ur', 'uao.user_role_id', '=', 'ur.id')
-            ->join('roles as r', 'ur.role_id', '=', 'r.id')
-            ->join('users as u', 'ur.user_id', '=', 'u.id')
-            ->where('uao.area_id', $area_id)
-            ->where('uao.olympiad_id', $olympiad_id)
-            ->where('r.name', 'responsable_academico')
-            ->select(DB::raw("CONCAT(u.first_name, ' ', u.last_name) AS full_name"))
-            ->value('full_name');
+        // $responsibleName = DB::table('user_area_olympiads as uao')
+        //     ->join('user_roles as ur', 'uao.user_role_id', '=', 'ur.id')
+        //     ->join('roles as r', 'ur.role_id', '=', 'r.id')
+        //     ->join('users as u', 'ur.user_id', '=', 'u.id')
+        //     ->where('uao.area_id', $area_id)
+        //     ->where('uao.olympiad_id', $olympiad_id)
+        //     ->where('r.name', 'responsable_academico')
+        //     ->select(DB::raw("CONCAT(u.first_name, ' ', u.last_name) AS full_name"))
+        //     ->value('full_name');
 
         $listWinners = DB::table('evaluations AS e')
             ->join('registrations AS r', 'e.registration_id', '=', 'r.id')
@@ -338,10 +337,10 @@ class ContestantController extends Controller
             ->orderBy('e.score', 'desc')
             ->get();
 
-        $listWinners = $listWinners->map(function ($row) use ($responsibleName) {
-            $row->responsible_academic = $responsibleName; // string o null
-            return $row;
-        });
+        // $listWinners = $listWinners->map(function ($row) use ($responsibleName) {
+        //     $row->responsible_academic = $responsibleName; // string o null
+        //     return $row;
+        // });
 
         return response()->json($listWinners, 200);
     }
