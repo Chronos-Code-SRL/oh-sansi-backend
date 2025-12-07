@@ -12,9 +12,10 @@ use App\Models\Contestant;
 
 class ContestantController extends Controller
 {
+    // Get contestants for a specific phase, olympiad, area and level
     public function showContestant(string $phase_id, string $olympiad_id, string $area_id, string $level_id): JsonResponse
     {
-
+        // Complex query to get contestants with evaluations and grade info
         $contestants = Evaluation::query()
             ->select(
                 'evaluations.id AS evaluation_id',
@@ -82,9 +83,10 @@ class ContestantController extends Controller
         return response()->json($result);
     }
 
+    // Get all contestants for a specific olympiad with basic info
     public function showContestantsOlympiad($olympiad_id): JsonResponse
     {
-
+        // Get contestants with evaluation data for entire olympiad
         $contestantsOlympiad = DB::table('contestants')
             ->join('registrations', 'registrations.contestant_id', '=', 'contestants.id')
             ->join('evaluations', 'evaluations.registration_id', '=', 'registrations.id')
@@ -139,7 +141,7 @@ class ContestantController extends Controller
     }
 
     /**
-     * Get ranked contestants for a specific phase/olympiad/area/level
+     * Get ranked contestants for a specific phase/olympiad/area/level with classification logic
      * Estado rules:
      *  - "Clasificado": score >= score_cut (or olympiad default)
      *  - "Desclasificado": score < score_cut
@@ -203,11 +205,11 @@ class ContestantController extends Controller
             // Determine applied score cut (threshold): prefer specific score_cut, then olympiad default, then fallback 51
             $scoreCut = $item->score_cut ?? $item->olympiad_default_score_cut ?? 51;
 
-            // Determine estado
+            // Determine classification status based on score and description
             if (is_null($score) || $desc !== '') {
                 $estado = 'Descalificado';
             } else {
-                // compare numerically using the applied threshold
+                // Compare score against threshold numerically
                 $estado = ((float)$score >= (float)$scoreCut) ? 'Clasificado' : 'Desclasificado';
             }
 
@@ -233,8 +235,10 @@ class ContestantController extends Controller
         return response()->json($result);
     }
 
+    // Get statistics counts for contestants by area, phase and level
     public function countsByAreaPhaseLevel(string $olympiad_id, string $area_id, string $phase_id, string $level_id)
     {
+        // Base query for all competitors in this level
         $competitorsCount = DB::table('contestants as c')
             ->join('contestant_level_grades as clg', 'c.id', '=', 'clg.contestant_id')
             ->join('level_grades as lg', 'clg.level_grade_id', '=', 'lg.id')
@@ -247,27 +251,32 @@ class ContestantController extends Controller
             ->where('oap.phase_id', $phase_id)
             ->where('lg.level_id', $level_id);
 
+        // Count total unique competitors
         $total = $competitorsCount->count(DB::raw('DISTINCT c.id'));
 
+        // Query for evaluated competitors with classification status
         $evaluatedQuery = (clone $competitorsCount)
             ->leftJoin('evaluations as e', 'e.registration_id', '=', 'r.id')
             ->select(DB::raw('COUNT(DISTINCT c.id)'));
-        
+
+        // Count classified competitors
         $classified = (clone $evaluatedQuery)
             ->where('e.classification_status', 'clasificado')
             ->first()->count;
-            
+
+        // Count not classified competitors
         $disclassified = (clone $evaluatedQuery)
             ->where('e.classification_status', 'no_clasificado')
             ->first()->count;
-            
+
+        // Count disqualified (descalificado) or not yet evaluated (NULL status)
         $disqualified = (clone $evaluatedQuery)
             ->where(function ($query) {
-                $query->where('e.classification_status', 'descalificado') // Es 'descalificado'
-                    ->orWhereNull('e.classification_status');          // O es NULL (aún no evaluado)
+                $query->where('e.classification_status', 'descalificado') // It is 'descalificado'
+                    ->orWhereNull('e.classification_status');          // Or NULL (not yet evaluated)
             })
             ->first()->count;
-            
+
         return response()->json([
             'total' => $total,
             'classified' => $classified,
@@ -276,6 +285,7 @@ class ContestantController extends Controller
         ]);
     }
 
+    // Get contestants eligible for awards in the final phase
     public function getAwardWinningContestants(string $olympiad_id, string $area_id, string $level_id)
     {
         $lastPhaseId = DB::table('olympiad_area_phases AS oap')
@@ -298,6 +308,7 @@ class ContestantController extends Controller
             ], 404);
         }
 
+        // Get the academic responsible for this area
         $responsibleName = DB::table('user_area_olympiads as uao')
             ->join('user_roles as ur', 'uao.user_role_id', '=', 'ur.id')
             ->join('roles as r', 'ur.role_id', '=', 'r.id')
@@ -308,6 +319,7 @@ class ContestantController extends Controller
             ->select(DB::raw("CONCAT(u.first_name, ' ', u.last_name) AS full_name"))
             ->value('full_name');
 
+        // Get winners from the last phase ordered by score
         $listWinners = DB::table('evaluations AS e')
             ->join('registrations AS r', 'e.registration_id', '=', 'r.id')
             ->join('contestants AS c', 'r.contestant_id', '=', 'c.id')
@@ -318,8 +330,6 @@ class ContestantController extends Controller
             ->join('levels AS l', 'lg.level_id', '=', 'l.id')
             ->where('e.olympiad_area_phase_id', $lastPhaseId->id)
             ->where('lg.level_id', $level_id)
-            // ->where('e.classification_place', '!=', null)
-            // ->whereNotNull('e.classification_place') sofia 2
             ->select(
                 'c.id AS contestant_id',
                 'c.first_name',
@@ -334,10 +344,10 @@ class ContestantController extends Controller
                 'e.id AS evaluation_id',
                 'e.classification_place'
             )
-            // ->orderBy('e.classification_place')
             ->orderBy('e.score', 'desc')
             ->get();
 
+        // Add responsible academic name to each winner
         $listWinners = $listWinners->map(function ($row) use ($responsibleName) {
             $row->responsible_academic = $responsibleName; // string o null
             return $row;
@@ -346,6 +356,7 @@ class ContestantController extends Controller
         return response()->json($listWinners, 200);
     }
 
+    // Get classified contestants for a specific phase/area/level
     public function getContestantsClassifieds(string $olympiad_id, string $area_id, string $phase_id, string $level_id)
     {
         $classifieds = Contestant::select(
@@ -371,7 +382,7 @@ class ContestantController extends Controller
         ->where('lg.level_id', $level_id)
         ->distinct()
         ->get();
-        
+
         if ($classifieds->isEmpty()) {
             return response()->json([
                 'message' => 'No classified contestants found',
@@ -382,14 +393,16 @@ class ContestantController extends Controller
         return response()->json($classifieds, 200);
     }
 
+    // Get award winners for entire area (all levels must be endorsed)
     public function getAwardWinningContestantsArea(string $olympiad_id, string $area_id)
     {
-
+        // Get olympiad area ID
         $olympiadAreaId = DB::table('olympiad_areas')
             ->where('olympiad_id', $olympiad_id)
             ->where('area_id', $area_id)
             ->value('id');
 
+        // Count total levels in this area
         $cantLevelArea = DB::table('level_grades')
             ->where('olympiad_area_id', $olympiadAreaId)
             ->distinct('level_id')
@@ -400,20 +413,23 @@ class ContestantController extends Controller
             ->distinct()
             ->pluck('level_id');
 
+        // Check how many levels are fully endorsed
         $cont = 0;
 
-        for ($i=0; $i < $cantLevelArea; $i++) { 
+        for ($i=0; $i < $cantLevelArea; $i++) {
             if ($this->checkLevel($olympiad_id, $area_id, $levelIds[$i]) !== null) {
                 $cont++;
             }
         }
-        
+
+        // All levels must be endorsed to proceed
         if ($cont !== $cantLevelArea) {
             return response()->json([
                 'message' => 'levels not fully endorsed',
             ], 404);
         }
 
+        // Get the last completed phase for awards
         $lastPhase = $lastPhase = DB::table('olympiad_area_phases AS oap')
             ->join('phases AS p', 'oap.phase_id', '=', 'p.id')
             ->where('oap.olympiad_area_id', $olympiadAreaId)
@@ -441,13 +457,6 @@ class ContestantController extends Controller
                 'l.name AS level_name',
                 'e.classification_place AS classification_place'
             )
-
-            // ->orderByRaw("CASE 
-            //     WHEN e.classification_place = 'Oro' THEN 1
-            //     WHEN e.classification_place = 'Plata' THEN 2
-            //     WHEN e.classification_place = 'Bronce' THEN 3
-            //     ELSE 4
-            // END")
             ->distinct()
             ->get();
 
@@ -456,6 +465,7 @@ class ContestantController extends Controller
         ], 200);
     }
 
+    // Helper method to check if a level is fully endorsed
     private function checkLevel(string $olympiad_id, string $area_id, string $level_id)
     {
         $lastPhaseId = DB::table('olympiad_area_phases AS oap')
@@ -466,12 +476,12 @@ class ContestantController extends Controller
             ->where('oa.olympiad_id', $olympiad_id)
             ->where('oa.area_id', $area_id)
             ->where('lg.level_id', $level_id)
-            ->where('oapl.status', 'Terminada') // para avalar por nivel
-            // ->where('oap.status', 'Terminada') para avalar por area
+            ->where('oapl.status', 'Terminada') // To endorse by level
+            // ->where('oap.status', 'Terminada') to endorse by area
             ->orderByDesc('p.order')
             ->select('oap.id')
             ->first();
-        
+
         if (!$lastPhaseId) {
             return null;
         }
@@ -479,6 +489,7 @@ class ContestantController extends Controller
         return $lastPhaseId;
     }
 
+    // Apply medal/award classification to competitors based on their ranking
     public function competitorsReadjustment(Request $request, string $olympiadId, string $areaId, string $levelId)
     {
         $lastPhaseId = DB::table('olympiad_area_phases AS oap')
@@ -500,6 +511,7 @@ class ContestantController extends Controller
             ], 404);
         }
 
+        // Validate medal distribution input
         $validator = Validator::make($request->all(), [
             'gold' => 'required|string',
             'silver' => 'required|string',
@@ -513,6 +525,7 @@ class ContestantController extends Controller
             ], 404);
         }
 
+        // Define medal positions and their quantities
         $positions = [
             'Oro' => $request->gold,
             'Plata' => $request->silver,
@@ -520,6 +533,7 @@ class ContestantController extends Controller
             'Mención honorífica' => $request->honorable_mention,
         ];
 
+        // Get competitors ordered by score for medal assignment
         $competitors = DB::table('evaluations AS e')
             ->join('registrations AS r', 'e.registration_id', '=', 'r.id')
             ->join('contestants AS c', 'r.contestant_id', '=', 'c.id')
@@ -537,6 +551,7 @@ class ContestantController extends Controller
         $numberMedals = $request->gold + $request->silver + $request->bronze + $request->honorable_mention;
         $totalCompetitors = $competitors->count();
 
+        // Validate that medal count doesn't exceed competitor count
         if ($numberMedals > $totalCompetitors) {
             return response()->json([
                 'message' => 'La cantidad de medallas no puede ser mayor que el número de competidores premiados',
@@ -548,6 +563,7 @@ class ContestantController extends Controller
         DB::beginTransaction();
 
         try {
+            // Assign medals based on ranking order
             foreach ($positions as $medal => $count) {
                 for ($i = 0; $i < $count; $i++) {
                     if (!isset($competitors[$index])) break;
@@ -561,6 +577,7 @@ class ContestantController extends Controller
                 }
             }
 
+            // Clear medal positions for remaining competitors
             for ($j = $index; $j < $competitors->count(); $j++) {
                 DB::table('evaluations')
                     ->where('id', $competitors[$j]->evaluation_id)
@@ -582,6 +599,7 @@ class ContestantController extends Controller
         ], 200);
     }
 
+    // Get list of competitors for certificate generation
     public function getListCompetitorsCertificate(string $olympiadId, string $areaId)
     {
         $olympiadAreaId = DB::table('olympiad_areas')
@@ -614,6 +632,7 @@ class ContestantController extends Controller
     }
 
     foreach ($levelIds as $levelId) {
+        // Check if this level is endorsed (Terminada status)
         $endorsed = DB::table('olympiad_area_phase_level_grades as oapl')
             ->join('level_grades as lg', 'oapl.level_grade_id', '=', 'lg.id')
             ->where('oapl.olympiad_area_phase_id', $lastPhase->id)
@@ -638,7 +657,7 @@ class ContestantController extends Controller
             ->where('r.name', 'responsable_academico')
             ->select(DB::raw("CONCAT(u.first_name, ' ', u.last_name) AS full_name"))
             ->value('full_name');
-        
+
         $rows = DB::table('evaluations AS e')
             ->join('registrations AS r', 'e.registration_id', '=', 'r.id')
             ->join('contestants AS c', 'r.contestant_id', '=', 'c.id')
@@ -663,7 +682,7 @@ class ContestantController extends Controller
             )
             ->orderBy('c.last_name')
             ->get();
-        
+
         $result = $rows->map(function ($r) use ($responsibleName) {
             return [
                     'name' => $r->Nombre,
@@ -682,6 +701,7 @@ class ContestantController extends Controller
         return response()->json($result, 200);
     }
 
+    // Get medal count distribution for a specific level
     public function getMedals(string $olympiadId, string $areaId, string $levelId)
     {
         $lastPhaseId = DB::table('olympiad_area_phases AS oap')
@@ -703,6 +723,7 @@ class ContestantController extends Controller
             ], 404);
         }
 
+        // Get medal distribution from database
         $medals = DB::table('evaluations AS e')
             ->join('registrations AS r', 'e.registration_id', '=', 'r.id')
             ->join('olympiad_areas AS oa', 'r.olympiad_area_id', '=', 'oa.id')
@@ -727,6 +748,7 @@ class ContestantController extends Controller
             ], 200);
         }
 
+        // Process medal counts into structured response
         $result = [
             'number_gold' => 0,
             'number_silver' => 0,
@@ -734,6 +756,7 @@ class ContestantController extends Controller
             'number_honorable_mention' => 0,
         ];
 
+        // Map database results to response structure
         foreach ($medals as $medal) {
             if ($medal->classification_place === 'Oro') {
                 $result['number_gold'] = $medal->cantidad;
