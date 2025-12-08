@@ -307,17 +307,6 @@ class ContestantController extends Controller
             ], 404);
         }
 
-        // $responsibleName = DB::table('user_area_olympiads as uao')
-        //     ->join('user_roles as ur', 'uao.user_role_id', '=', 'ur.id')
-        //     ->join('roles as r', 'ur.role_id', '=', 'r.id')
-        //     ->join('users as u', 'ur.user_id', '=', 'u.id')
-        //     ->where('uao.area_id', $area_id)
-        //     ->where('uao.olympiad_id', $olympiad_id)
-        //     ->where('r.name', 'responsable_academico')
-        //     ->select(DB::raw("CONCAT(u.first_name, ' ', u.last_name) AS full_name"))
-        //     ->value('full_name');
-
-        // Get winners from the last phase ordered by score
         $listWinners = DB::table('evaluations AS e')
             ->join('registrations AS r', 'e.registration_id', '=', 'r.id')
             ->join('contestants AS c', 'r.contestant_id', '=', 'c.id')
@@ -326,6 +315,7 @@ class ContestantController extends Controller
             ->join('olympiad_areas AS oa', 'r.olympiad_area_id', '=', 'oa.id')
             ->join('areas AS a', 'oa.area_id', '=', 'a.id')
             ->join('levels AS l', 'lg.level_id', '=', 'l.id')
+            ->where('e.classification_status', 'clasificado')
             ->where('e.olympiad_area_phase_id', $lastPhaseId->id)
             ->where('lg.level_id', $level_id)
             ->select(
@@ -344,11 +334,6 @@ class ContestantController extends Controller
             )
             ->orderBy('e.score', 'desc')
             ->get();
-
-        // $listWinners = $listWinners->map(function ($row) use ($responsibleName) {
-        //     $row->responsible_academic = $responsibleName; // string o null
-        //     return $row;
-        // });
 
         return response()->json($listWinners, 200);
     }

@@ -1,16 +1,14 @@
-    <?php
+<?php
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 // Controllers here:
 use App\Http\Controllers\Api\OlympiadController;
-use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\AreaController;
 use App\Http\Controllers\Api\PhaseController;
-use App\Http\Controllers\Api\CompetitorUploadController;
 use App\Http\Controllers\Api\GradeController;
 use App\Http\Controllers\Api\CsvUploadController;
 use App\Http\Controllers\CompetitorRegistrationController;
@@ -18,7 +16,6 @@ use App\Http\Controllers\Api\UserAreaController;
 use App\Http\Controllers\Api\EvaluationController;
 use App\Http\Controllers\Api\EvaluationAuditController;
 use App\Http\Controllers\Api\ContestantController;
-use App\Http\Controllers\Api\LevelController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -98,37 +95,16 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
 Route::get('/search-user/olympiad/{olympiadId}/ci/{ci}/role/{roleId}', [AuthController::class, 'searchUser']);
 
-//admin routes
-Route::middleware(['auth:sanctum', 'admin'])->group(function(){
-    // // <--- CRUD Olympiad --->
-    // Route::get('/olympiads', [OlympiadController::class, 'index']);
-    // Route::get('/olympiads/{id}', [OlympiadController::class, 'show']);
-    // Route::post('/olympiads', [OlympiadController::class, 'store']);
-    // Route::put('/olympiads/{id}', [OlympiadController::class, 'update']);
-    // Route::delete('/olympiads/{id}', [OlympiadController::class, 'destroy']);
-    //GET all users
-    Route::get('/users', [AdminController::class, 'index']);
-});
-
-// evaluator routes
-Route::middleware(['auth:sanctum', 'evaluator'])->group(function(){
-
-});
-
 // Areas and Olympics for a logged-in user
 Route::middleware(['auth:sanctum', 'evaluator_or_academic'])->group(function () {
     Route::get('/user/olympiads', [OlympiadController::class, 'getUserOlympiads']);
     Route::get('/user/areas/{olympiad_id}', [UserAreaController::class, 'getUserAreas']);
 });
 
-// academic responsible routes
-//Route::middleware(['auth:sanctum', 'academic_responsible'])->group(function(){
-    // Competitor registration routes
-    Route::post('/competitors/upload-csv', [CompetitorRegistrationController::class, 'uploadCsv']);
-    // Download a CSV template containing only headers (no data rows)
-    Route::get('/competitors/download-template', [CompetitorRegistrationController::class, 'downloadTemplateCsv']);
-    Route::get('/competitors/download-error-csv/{filename}', [CompetitorRegistrationController::class, 'downloadErrorCsv']);
-//});
+// <--- Competitor Registration via CSV --->
+Route::post('/competitors/upload-csv', [CompetitorRegistrationController::class, 'uploadCsv']);
+Route::get('/competitors/download-template', [CompetitorRegistrationController::class, 'downloadTemplateCsv']);
+Route::get('/competitors/download-error-csv/{filename}', [CompetitorRegistrationController::class, 'downloadErrorCsv']);
 
 //POST logout
 Route::middleware(['auth:sanctum'])->group(function () {
