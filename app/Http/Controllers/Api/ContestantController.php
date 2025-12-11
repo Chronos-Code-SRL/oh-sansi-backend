@@ -526,6 +526,7 @@ class ContestantController extends Controller
             ->where('oa.olympiad_id', $olympiadId)
             ->where('oa.area_id', $areaId)
             ->where('lg.level_id', $levelId)
+            ->where ('e.classification_status', 'clasificado')
             ->orderByDesc('e.score')
             ->select('e.id AS evaluation_id', 'e.score')
             ->get();

@@ -1255,6 +1255,10 @@ class OlympiadController extends Controller
                         continue;
                     }
 
+                    if ($evaluation->classification_status == 'descalificado') {
+                        continue;
+                    }
+
                     $oldStatus = $evaluation->classification_status;
                     $evaluation->classification_status = $evaluation->score >= $request->score_cut
                         ? 'clasificado'
