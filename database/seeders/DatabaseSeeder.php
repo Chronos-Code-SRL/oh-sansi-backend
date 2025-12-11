@@ -6,6 +6,8 @@ use App\Models\User;
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use App\Models\Grade;
+use App\Models\Area;
+use Illuminate\Support\Facades\DB;
 
 class DatabaseSeeder extends Seeder
 {
@@ -14,7 +16,6 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-
         $grades = [
             // Primaria
             ['name' => 'Primero de primaria'],
@@ -23,7 +24,6 @@ class DatabaseSeeder extends Seeder
             ['name' => 'Cuarto de primaria'],
             ['name' => 'Quinto de primaria'],
             ['name' => 'Sexto de primaria'],
-
             // Secundaria
             ['name' => 'Primero de secundaria'],
             ['name' => 'Segundo de secundaria'],
@@ -37,6 +37,7 @@ class DatabaseSeeder extends Seeder
             Grade::firstOrCreate($grade);
         }
 
+        // Create Areas
         $areas = [
             ['name' => 'Astronomía'],
             ['name' => 'Biología'],
@@ -49,27 +50,24 @@ class DatabaseSeeder extends Seeder
         ];
 
         foreach ($areas as $area) {
-            \App\Models\Area::firstOrCreate($area);
+            Area::firstOrCreate($area);
         }
 
-        $this->call([
-            AreaSeeder::class,
-            LevelSeeder::class,
-            GradeSeeder::class,
-            OlympiadWithAreasSeeder::class,
-            \Database\Seeders\RankedContestantsSeeder::class,
+
+        $adminUser = User::firstOrCreate([
+            'first_name' => 'Root',
+            'last_name' => 'Admin',
+            'email' => 'admin@gmail.com',
+            'password' => bcrypt('password'),
+            'ci' => '1111111',
+            'phone_number' => '71780589',
+            'genre' => 'femenino',
         ]);
 
-        $user = new User();
-        $user->first_name = 'Root';
-        $user->last_name = 'Admin';
-        $user->email = 'admin@gmail.com';
-        $user->password = bcrypt('password');
-        $user->ci = '12345678';
-        $user->phone_number = '+59 71780589';
-        $user->genre = 'femenino';
-        // $user->roles_id = 1;
-        $user->save();
+        $adminRole = DB::table('user_roles')->updateOrInsert([
+            'user_id' => $adminUser->id,
+            'role_id' => 1,
+        ]);
 
         $this->command->info('Grades, Areas and user admin created successfully.');
 
