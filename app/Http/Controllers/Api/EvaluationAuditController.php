@@ -29,7 +29,7 @@ class EvaluationAuditController extends Controller
             'event' => 'nullable|string|in:created,updated',
             'date_from' => 'nullable|date',
             'date_to' => 'nullable|date|after_or_equal:date_from',
-            'per_page' => 'nullable|integer|min:1|max:100',
+            'per_page' => 'nullable|integer|min:1|max:1000',
             'page' => 'nullable|integer|min:1'
         ]);
 
@@ -42,6 +42,13 @@ class EvaluationAuditController extends Controller
         }
 
         $query = Audit::where('auditable_type', 'App\\Models\\Evaluation');
+
+        // Exclude system-generated logs and irrelevant changes
+        $query->whereNotNull('user_id') // Exclude logs without user (bulk uploads)
+              ->where(function($q) {
+                  $q->whereRaw("JSON_EXTRACT(old_values, '$.*') IS NOT NULL")
+                    ->orWhereRaw("JSON_EXTRACT(new_values, '$.*') IS NOT NULL");
+              });
 
         // Filter by specific evaluation
         if ($request->has('evaluation_id')) {
