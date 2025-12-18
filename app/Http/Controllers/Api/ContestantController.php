@@ -376,6 +376,12 @@ class ContestantController extends Controller
             ->select('oap.id')
             ->first();
 
+        if (!$lastPhaseId) {
+            return response()->json([
+                'message' => 'No phases found for the specified olympiad and area',
+            ], 404);
+        }   
+
         $results = DB::table('evaluations AS e')
             ->join('registrations AS r', 'e.registration_id', '=', 'r.id')
             ->join('contestants AS c', 'r.contestant_id', '=', 'c.id')
