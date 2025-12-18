@@ -140,7 +140,7 @@ Route::get('/contestants/{olympiad_id}', [ContestantController::class, 'showCont
 Route::get('/contestants/olympiads/{olympiad_id}/areas/{area_id}/phases/{phase_id}/levels/{level_id}', [ContestantController::class, 'countsByAreaPhaseLevel']);
 Route::get('/contestants/olympiads/{olympiad_id}/areas/{area_id}/levels/{level_id}', [ContestantController::class, 'getAwardWinningContestants']);
 Route::get('/contestants/olympiads/{olympiad_id}/areas/{area_id}/phases/{phase_id}/levels/{level_id}/classifieds', [ContestantController::class, 'getContestantsClassifieds']);
-Route::get('/contestants/awarded/olympiads/{olympiad_id}/areas/{area_id}', [ContestantController::class, 'getAwardWinningContestantsArea']);
+Route::get('/contestants/awarded/olympiads/{olympiad_id}/areas/{area_id}/levels/{level_id}', [ContestantController::class, 'getAwardWinningContestantsArea']);
 Route::post('/contestants/awarded/olympiads/{olympiadId}/areas/{areaId}/levels/{levelId}', [ContestantController::class, 'competitorsReadjustment']);
 Route::get('/contestants/certificate/olympiads/{olympiadId}/areas/{areaId}', [ContestantController::class, 'getListCompetitorsCertificate']);
 Route::get('/medals/olympiads/{olympiadId}/areas/{areaId}/levels/{levelId}', [ContestantController::class, 'getMedals']);
