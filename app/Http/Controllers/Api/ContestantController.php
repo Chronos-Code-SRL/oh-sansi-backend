@@ -393,6 +393,7 @@ class ContestantController extends Controller
             ->where('e.olympiad_area_phase_id', $lastPhaseId->id)
             ->where('oa.olympiad_id', $olympiad_id)
             ->where('oa.area_id', $area_id)
+            ->where('lg.level_id', $level_id)
             ->select(
                 'c.first_name AS first_name',
                 'c.last_name AS last_name',
