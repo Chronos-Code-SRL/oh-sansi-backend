@@ -382,6 +382,16 @@ class ContestantController extends Controller
             ], 404);
         }   
 
+        $responsibleName = DB::table('user_area_olympiads as uao')
+            ->join('user_roles as ur', 'uao.user_role_id', '=', 'ur.id')
+            ->join('roles as r', 'ur.role_id', '=', 'r.id')
+            ->join('users as u', 'ur.user_id', '=', 'u.id')
+            ->where('uao.area_id', $area_id)
+            ->where('uao.olympiad_id', $olympiad_id)
+            ->where('r.name', 'responsable_academico')
+            ->select(DB::raw("CONCAT(u.first_name, ' ', u.last_name) AS full_name"))
+            ->value('full_name');
+
         $results = DB::table('evaluations AS e')
             ->join('registrations AS r', 'e.registration_id', '=', 'r.id')
             ->join('contestants AS c', 'r.contestant_id', '=', 'c.id')
@@ -401,10 +411,27 @@ class ContestantController extends Controller
                 'a.name AS area_name',
                 'c.department AS department',
                 'l.name AS level_name',
-                'e.classification_place AS classification_place'
+                'e.classification_place AS classification_place',
+                'e.score AS score',
+                'c.tutor_name AS tutor'
             )
             ->distinct()
             ->get();
+
+        $results = $results->map(function ($r) use ($responsibleName) {
+            return [
+                'first_name' => $r->first_name,
+                'last_name' => $r->last_name,
+                'school_name' => $r->school_name,
+                'department' => $r->department,
+                'area_name' => $r->area_name,
+                'level_name' => $r->level_name,
+                'score' => $r->score,
+                'classification_place' => $r->classification_place,
+                'tutor' => $r->tutor,
+                'area_responsible' => $responsibleName,
+            ];
+        });
 
         return response()->json([
             'contestants' => $results
