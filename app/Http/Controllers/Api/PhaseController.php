@@ -17,6 +17,7 @@ use App\Models\Evaluation;
 use App\Models\OlympiadAreaPhaseLevelGrade;
 use App\Models\LevelGrade;
 use App\Models\Level;
+use App\Models\OlympiadAreaMedal;
 
 class PhaseController extends Controller
 {
@@ -415,7 +416,7 @@ class PhaseController extends Controller
         return response()->json($data, 200);
     }
 
-    public function endorsePhase(string $olympiadId, string $areaId, string $levelId, string $phaseId)
+    public function endorsePhase(Request $request, string $olympiadId, string $areaId, string $levelId, string $phaseId)
     {
         // Verify that the olympiad_area relationship exists
         $olympiadArea = OlympiadArea::where('olympiad_id', $olympiadId)
@@ -451,6 +452,37 @@ class PhaseController extends Controller
                 'message' => 'Phase not found for this olympiad area',
                 'status' => 404
             ], 404);
+        }
+
+        // Check if this is the final phase and validate medal assignment
+        $firstLevelGrade = $levelGrades->first();
+        $firstOaplgForCheck = OlympiadAreaPhaseLevelGrade::where('olympiad_area_phase_id', $currentOlympiadAreaPhase->id)
+            ->where('level_grade_id', $firstLevelGrade->id)
+            ->first();
+
+        if ($firstOaplgForCheck && $this->isFinalPhase($firstOaplgForCheck, $firstLevelGrade)) {
+            $validation = $this->validateMedalAssignment($olympiadArea->id, $currentOlympiadAreaPhase->id, $firstLevelGrade);
+
+            // If there are errors (ties that exceed medal availability), don't allow endorsement
+            if (!empty($validation['errors'])) {
+                return response()->json([
+                    'message' => 'Cannot endorse phase due to ties exceeding medal availability',
+                    'can_endorse' => false,
+                    'errors' => $validation['errors'],
+                    'status' => 400
+                ], 400);
+            }
+
+            // If there are warnings (ties within medal availability) and force_endorse is not true
+            if (!empty($validation['warnings']) && !$request->input('force_endorse', false)) {
+                return response()->json([
+                    'message' => 'Phase has ties in medal positions. Review and confirm to proceed.',
+                    'can_endorse' => true,
+                    'warnings' => $validation['warnings'],
+                    'requires_confirmation' => true,
+                    'status' => 409
+                ], 409);
+            }
         }
 
         $processedGrades = [];
@@ -577,7 +609,7 @@ class PhaseController extends Controller
         return response()->json($responseData, 200);
     }
 
-    public function endorsePhaseAllLevels(string $olympiadId, string $areaId, string $phaseId)
+    public function endorsePhaseAllLevels(Request $request, string $olympiadId, string $areaId, string $phaseId)
     {
         // Verify that the olympiad_area relationship exists
         $olympiadArea = OlympiadArea::where('olympiad_id', $olympiadId)
@@ -634,7 +666,7 @@ class PhaseController extends Controller
 
             try {
                 // Use the existing endorsePhase method for each unique level
-                $endorseResponse = $this->endorsePhase($olympiadId, $areaId, $levelGrade->level_id, $phaseId);
+                $endorseResponse = $this->endorsePhase($request, $olympiadId, $areaId, $levelGrade->level_id, $phaseId);
 
                 if ($endorseResponse->getStatusCode() === 200) {
                     $responseData = json_decode($endorseResponse->getContent(), true);
@@ -745,13 +777,149 @@ class PhaseController extends Controller
 
         // If it's the final phase, assign medals by level
         if ($isFinalPhase) {
-            $this->assignMedals($evaluations);
+            $this->assignMedals($evaluations, $levelGrade, $scoreCut);
         }
 
         // Save all evaluations
         foreach ($evaluations as $evaluation) {
             $evaluation->save();
         }
+    }
+
+    /**
+     * Validate medal assignment for final phase
+     * Checks for ties and whether they can be accommodated within medal availability
+     */
+    private function validateMedalAssignment($olympiadAreaId, $olympiadAreaPhaseId, $levelGrade)
+    {
+        // Get medal configuration for this olympiad area
+        $medalConfig = OlympiadAreaMedal::where('olympiad_area_id', $olympiadAreaId)->first();
+
+        if (!$medalConfig) {
+            return [
+                'can_endorse' => false,
+                'errors' => [
+                    [
+                        'type' => 'missing_configuration',
+                        'message' => 'Medal configuration not found for this olympiad area. Please configure medals before endorsing the final phase.'
+                    ]
+                ],
+                'warnings' => []
+            ];
+        }
+
+        // Get the olympiad_area_phase_level_grade to find score_cut
+        $oaplg = OlympiadAreaPhaseLevelGrade::where('olympiad_area_phase_id', $olympiadAreaPhaseId)
+            ->where('level_grade_id', $levelGrade->id)
+            ->first();
+
+        if (!$oaplg) {
+            return [
+                'can_endorse' => true,
+                'errors' => [],
+                'warnings' => []
+            ];
+        }
+
+        $scoreCut = $oaplg->score_cut;
+
+        // Get all evaluations from this phase for this level
+        $allEvaluations = Evaluation::where('olympiad_area_phase_id', $olympiadAreaPhaseId)
+            ->whereNotNull('score')
+            ->with('registration.contestant')
+            ->get();
+
+        // Filter by level
+        $evaluations = $allEvaluations->filter(function ($evaluation) use ($levelGrade) {
+            return DB::table('contestant_level_grades as clg')
+                ->join('level_grades as lg', 'clg.level_grade_id', '=', 'lg.id')
+                ->where('clg.contestant_id', $evaluation->registration->contestant_id)
+                ->where('lg.level_id', $levelGrade->level_id)
+                ->where('lg.olympiad_area_id', $levelGrade->olympiad_area_id)
+                ->exists();
+        });
+
+        // Filter classified competitors with score >= score_cut
+        $classifiedEvaluations = $evaluations
+            ->where('classification_status', 'clasificado')
+            ->filter(function ($evaluation) use ($scoreCut) {
+                return $evaluation->score >= $scoreCut;
+            })
+            ->sortByDesc('score')
+            ->values();
+
+        if ($classifiedEvaluations->isEmpty()) {
+            // No classified evaluations, can endorse without issues
+            return [
+                'can_endorse' => true,
+                'errors' => [],
+                'warnings' => []
+            ];
+        }
+
+        // Group by score to detect ties
+        $scoreGroups = $classifiedEvaluations->groupBy('score')->sortKeysDesc();
+
+        $errors = [];
+        $warnings = [];
+
+        // Get unique scores in descending order
+        $uniqueScores = $scoreGroups->keys()->values();
+
+        // Validate each position
+        foreach ($uniqueScores as $position => $score) {
+            $group = $scoreGroups[$score];
+            $groupCount = $group->count();
+            $medalType = null;
+            $available = 0;
+
+            // Determine medal based on position (0-based index)
+            if ($position === 0) {
+                // First unique score = Gold
+                $medalType = 'Oro';
+                $available = $medalConfig->gold;
+            } elseif ($position === 1) {
+                // Second unique score = Silver
+                $medalType = 'Plata';
+                $available = $medalConfig->silver;
+            } elseif ($position === 2) {
+                // Third unique score = Bronze
+                $medalType = 'Bronce';
+                $available = $medalConfig->bronze;
+            } else {
+                // Fourth+ unique scores = Honorable Mention
+                $medalType = 'Mención honorífica';
+                $available = $medalConfig->honorable_mention;
+            }
+
+            // Check if the number of tied competitors exceeds available medals
+            if ($groupCount > $available) {
+                $errors[] = [
+                    'medal' => $medalType,
+                    'score' => $score,
+                    'count' => $groupCount,
+                    'available' => $available,
+                    'position' => $position + 1,
+                    'message' => "{$groupCount} competitors tied with score {$score} for {$medalType} (position " . ($position + 1) . "), but only {$available} medals available. Cannot endorse until scores are adjusted."
+                ];
+            } elseif ($groupCount > 1) {
+                // Warning if there are ties but they fit within available medals
+                $warnings[] = [
+                    'medal' => $medalType,
+                    'score' => $score,
+                    'count' => $groupCount,
+                    'available' => $available,
+                    'position' => $position + 1,
+                    'message' => "{$groupCount} competitors tied with score {$score} for {$medalType} (position " . ($position + 1) . "). All can be awarded within available slots."
+                ];
+            }
+        }
+
+        return [
+            'can_endorse' => empty($errors),
+            'errors' => $errors,
+            'warnings' => $warnings
+        ];
     }
 
     /**
@@ -780,30 +948,73 @@ class PhaseController extends Controller
     }
 
     /**
-     * Assign medals for the final phase
+     * Assign medals for the final phase based on medal configuration
      */
-    private function assignMedals($evaluations)
+    private function assignMedals($evaluations, $levelGrade, $scoreCut)
     {
-        // Sort by score descending (only classified competitors)
+        // Get medal configuration for this olympiad area
+        $medalConfig = OlympiadAreaMedal::where('olympiad_area_id', $levelGrade->olympiad_area_id)->first();
+
+        if (!$medalConfig) {
+            // If no medal configuration exists, don't assign any medals
+            Log::warning("No medal configuration found for olympiad_area_id: {$levelGrade->olympiad_area_id}");
+            return;
+        }
+
+        // Filter classified competitors with score >= score_cut, sorted by score descending
         $classifiedEvaluations = $evaluations
             ->where('classification_status', 'clasificado')
+            ->filter(function ($evaluation) use ($scoreCut) {
+                return $evaluation->score >= $scoreCut;
+            })
             ->sortByDesc('score')
             ->values();
 
-        foreach ($classifiedEvaluations as $index => $evaluation) {
-            switch ($index) {
-                case 0:
-                    $evaluation->classification_place = 'Oro';
-                    break;
-                case 1:
-                    $evaluation->classification_place = 'Plata';
-                    break;
-                case 2:
-                    $evaluation->classification_place = 'Bronce';
-                    break;
-                default:
-                    $evaluation->classification_place = 'Mención honorífica';
-                    break;
+        if ($classifiedEvaluations->isEmpty()) {
+            return;
+        }
+
+        // Group evaluations by unique scores
+        $scoreGroups = $classifiedEvaluations->groupBy('score')->sortKeysDesc();
+
+        // Get unique scores in descending order
+        $uniqueScores = $scoreGroups->keys()->values();
+
+        // Assign medals based on position of unique score
+        foreach ($uniqueScores as $position => $score) {
+            $group = $scoreGroups[$score];
+            $groupCount = $group->count();
+            $medalToAssign = null;
+            $available = 0;
+
+            // Determine medal based on position (0-based index)
+            if ($position === 0) {
+                // First unique score = Gold
+                $medalToAssign = 'Oro';
+                $available = $medalConfig->gold;
+            } elseif ($position === 1) {
+                // Second unique score = Silver
+                $medalToAssign = 'Plata';
+                $available = $medalConfig->silver;
+            } elseif ($position === 2) {
+                // Third unique score = Bronze
+                $medalToAssign = 'Bronce';
+                $available = $medalConfig->bronze;
+            } else {
+                // Fourth+ unique scores = Honorable Mention
+                $medalToAssign = 'Mención honorífica';
+                $available = $medalConfig->honorable_mention;
+            }
+
+            // Only assign if the group fits within available medals
+            if ($groupCount <= $available) {
+                foreach ($group as $evaluation) {
+                    $evaluation->classification_place = $medalToAssign;
+                }
+            } else {
+                // This shouldn't happen if validation was done correctly
+                // But log it just in case
+                Log::warning("Medal assignment mismatch: {$groupCount} competitors for {$medalToAssign} but only {$available} available");
             }
         }
     }
