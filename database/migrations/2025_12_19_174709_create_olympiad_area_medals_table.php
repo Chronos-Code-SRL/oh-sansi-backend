@@ -18,6 +18,7 @@ return new class extends Migration
             $table->integer('silver');
             $table->integer('bronze');
             $table->integer('honorable_mention');
+            $table->integer('minimum_classification_score');
             $table->timestamps();
         });
     }

@@ -10,7 +10,7 @@ use App\Models\OlympiadArea;
 
 class MedalController extends Controller
 {
-    
+
     public function store(Request $request, string $olympiad_id, string $area_id)
     {
         // validate input data
@@ -21,6 +21,7 @@ class MedalController extends Controller
                 'silver' => 'required|integer|min:0',
                 'bronze' => 'required|integer|min:0',
                 'honorable_mention' => 'required|integer|min:0',
+                'minimum_classification_score' => 'required|integer|min:0',
             ]
         );
 
@@ -40,7 +41,7 @@ class MedalController extends Controller
                     'message' => 'Olympiad Area not found',
                 ], 404);
         }
-        
+
         // create medal table
         $medals = OlympiadAreaMedal::create([
             'olympiad_area_id' => $olympiadArea->id,
@@ -48,6 +49,7 @@ class MedalController extends Controller
             'silver' => $request->silver,
             'bronze' => $request->bronze,
             'honorable_mention' => $request->honorable_mention,
+            'minimum_classification_score' => $request->minimum_classification_score,
         ]);
 
         if (!$medals) {
@@ -56,7 +58,7 @@ class MedalController extends Controller
                 'status' => 500
             ], 500);
         }
-        
+
         return response()->json([
             'message' => 'Medal table created successfully',
             'status' => 201
@@ -87,9 +89,48 @@ class MedalController extends Controller
 
     public function update(Request $request, string $id)
     {
-        //
+        // validate input data
+        $validator = Validator::make(
+            $request->all(),
+            [
+                'gold' => 'required|integer|min:0',
+                'silver' => 'required|integer|min:0',
+                'bronze' => 'required|integer|min:0',
+                'honorable_mention' => 'required|integer|min:0',
+                'minimum_classification_score' => 'required|integer|min:0',
+            ]
+        );
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Error in data validation',
+                'status' => 400
+            ], 400);
+        }
+
+        $medals = OlympiadAreaMedal::find($id);
+
+        if (!$medals) {
+            return response()->json([
+                'message' => 'Medal table not found',
+                'status' => 404
+            ], 404);
+        }
+
+        // update medals
+        $medals->gold = $request->gold;
+        $medals->silver = $request->silver;
+        $medals->bronze = $request->bronze;
+        $medals->honorable_mention = $request->honorable_mention;
+        $medals->minimum_classification_score = $request->minimum_classification_score;
+        $medals->save();
+
+        return response()->json([
+            'message' => 'Medal table updated successfully',
+            'status' => 200
+        ], 200);
     }
-    
+
     public function destroy(string $id)
     {
         //
