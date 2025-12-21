@@ -1626,9 +1626,13 @@ class PhaseController extends Controller
                         'available_in_category' => $goldLimit - $currentPosition,
                         'overflow_to' => 'Plata',
                         'evaluations' => $group->map(function ($eval) {
+                            $contestant = $eval->registration->contestant ?? null;
+                            $fullName = $contestant
+                                ? trim(($contestant->first_name ?? '') . ' ' . ($contestant->last_name ?? ''))
+                                : 'Unknown';
                             return [
                                 'evaluation_id' => $eval->id,
-                                'contestant_name' => $eval->registration->contestant->name ?? 'Unknown',
+                                'contestant_name' => $fullName ?: 'Unknown',
                                 'score' => $eval->score
                             ];
                         })->values()->toArray()
@@ -1645,9 +1649,13 @@ class PhaseController extends Controller
                         'available_in_category' => ($goldLimit + $silverLimit) - $currentPosition,
                         'overflow_to' => 'Bronce',
                         'evaluations' => $group->map(function ($eval) {
+                            $contestant = $eval->registration->contestant ?? null;
+                            $fullName = $contestant
+                                ? trim(($contestant->first_name ?? '') . ' ' . ($contestant->last_name ?? ''))
+                                : 'Unknown';
                             return [
                                 'evaluation_id' => $eval->id,
-                                'contestant_name' => $eval->registration->contestant->name ?? 'Unknown',
+                                'contestant_name' => $fullName ?: 'Unknown',
                                 'score' => $eval->score
                             ];
                         })->values()->toArray()
@@ -1664,9 +1672,13 @@ class PhaseController extends Controller
                         'available_in_category' => ($goldLimit + $silverLimit + $bronzeLimit) - $currentPosition,
                         'overflow_to' => 'Mención honorífica',
                         'evaluations' => $group->map(function ($eval) {
+                            $contestant = $eval->registration->contestant ?? null;
+                            $fullName = $contestant
+                                ? trim(($contestant->first_name ?? '') . ' ' . ($contestant->last_name ?? ''))
+                                : 'Unknown';
                             return [
                                 'evaluation_id' => $eval->id,
-                                'contestant_name' => $eval->registration->contestant->name ?? 'Unknown',
+                                'contestant_name' => $fullName ?: 'Unknown',
                                 'score' => $eval->score
                             ];
                         })->values()->toArray()
@@ -1683,9 +1695,13 @@ class PhaseController extends Controller
                         'available_in_category' => ($goldLimit + $silverLimit + $bronzeLimit + $hmLimit) - $currentPosition,
                         'overflow_to' => 'Sin medalla',
                         'evaluations' => $group->map(function ($eval) {
+                            $contestant = $eval->registration->contestant ?? null;
+                            $fullName = $contestant
+                                ? trim(($contestant->first_name ?? '') . ' ' . ($contestant->last_name ?? ''))
+                                : 'Unknown';
                             return [
                                 'evaluation_id' => $eval->id,
-                                'contestant_name' => $eval->registration->contestant->name ?? 'Unknown',
+                                'contestant_name' => $fullName ?: 'Unknown',
                                 'score' => $eval->score
                             ];
                         })->values()->toArray()
@@ -1964,9 +1980,13 @@ class PhaseController extends Controller
 
             if ($evaluation->save()) {
                 $adjustedCount++;
+                $contestant = $evaluation->registration->contestant ?? null;
+                $fullName = $contestant
+                    ? trim(($contestant->first_name ?? '') . ' ' . ($contestant->last_name ?? ''))
+                    : 'Unknown';
                 $adjustedEvaluations[] = [
                     'evaluation_id' => $evaluation->id,
-                    'contestant_name' => $evaluation->registration->contestant->name ?? 'Unknown',
+                    'contestant_name' => $fullName ?: 'Unknown',
                     'new_medal' => $evaluation->classification_place,
                     'justification' => $adjustment['justification']
                 ];
