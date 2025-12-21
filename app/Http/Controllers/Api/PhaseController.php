@@ -1207,4 +1207,784 @@ class PhaseController extends Controller
             'status' => 200
         ], 200);
     }
+
+    // ==================== NEW V2 ENDORSEMENT SYSTEM ====================
+    // Sequential medal assignment based on score ranking
+
+    /**
+     * Endorse phase using V2 logic (sequential medal assignment)
+     */
+    public function endorsePhaseV2(Request $request, string $olympiadId, string $areaId, string $levelId, string $phaseId)
+    {
+        // Verify that the olympiad_area relationship exists
+        $olympiadArea = OlympiadArea::where('olympiad_id', $olympiadId)
+            ->where('area_id', $areaId)
+            ->first();
+
+        if (!$olympiadArea) {
+            return response()->json([
+                'message' => 'Olympiad area relationship not found',
+                'status' => 404
+            ], 404);
+        }
+
+        // Verify that level_grades exist for this level and olympiad_area
+        $levelGrades = LevelGrade::where('olympiad_area_id', $olympiadArea->id)
+            ->where('level_id', $levelId)
+            ->get();
+
+        if ($levelGrades->isEmpty()) {
+            return response()->json([
+                'message' => 'Level not found for this olympiad area',
+                'status' => 404
+            ], 404);
+        }
+
+        // Verify that the phase exists for this olympiad area
+        $currentOlympiadAreaPhase = OlympiadAreaPhase::where('olympiad_area_id', $olympiadArea->id)
+            ->where('phase_id', $phaseId)
+            ->first();
+
+        if (!$currentOlympiadAreaPhase) {
+            return response()->json([
+                'message' => 'Phase not found for this olympiad area',
+                'status' => 404
+            ], 404);
+        }
+
+        // Check if this is the final phase and validate medal assignment using V2 logic
+        $firstLevelGrade = $levelGrades->first();
+        $firstOaplgForCheck = OlympiadAreaPhaseLevelGrade::where('olympiad_area_phase_id', $currentOlympiadAreaPhase->id)
+            ->where('level_grade_id', $firstLevelGrade->id)
+            ->first();
+
+        if ($firstOaplgForCheck && $this->isFinalPhase($firstOaplgForCheck, $firstLevelGrade)) {
+            $validation = $this->validateMedalAssignmentV2($olympiadArea->id, $currentOlympiadAreaPhase->id, $firstLevelGrade);
+
+            // If there are errors (ties that need manual resolution), don't allow endorsement
+            if (!empty($validation['ties_requiring_resolution'])) {
+                return response()->json([
+                    'message' => 'Cannot endorse phase due to ties that exceed medal availability. Manual adjustment required.',
+                    'can_endorse' => false,
+                    'ties_requiring_resolution' => $validation['ties_requiring_resolution'],
+                    'status' => 409
+                ], 409);
+            }
+
+            // If there are configuration errors
+            if (!empty($validation['errors'])) {
+                return response()->json([
+                    'message' => $validation['errors'][0]['message'] ?? 'Configuration error',
+                    'can_endorse' => false,
+                    'errors' => $validation['errors'],
+                    'status' => 400
+                ], 400);
+            }
+        }
+
+        // Continue with normal endorsement process (same as V1)
+        $processedGrades = [];
+        $failedGrades = [];
+
+        // Process each grade in this level
+        foreach ($levelGrades as $levelGrade) {
+            $currentOaplg = OlympiadAreaPhaseLevelGrade::where('olympiad_area_phase_id', $currentOlympiadAreaPhase->id)
+                ->where('level_grade_id', $levelGrade->id)
+                ->first();
+
+            if (!$currentOaplg) {
+                $olympiad = Olympiad::find($olympiadId);
+                if ($olympiad && ($olympiad->default_score_cut !== null || $olympiad->default_max_score !== null)) {
+                    $currentOaplg = OlympiadAreaPhaseLevelGrade::create([
+                        'olympiad_area_phase_id' => $currentOlympiadAreaPhase->id,
+                        'level_grade_id' => $levelGrade->id,
+                        'score_cut' => $olympiad->default_score_cut ?? 0,
+                        'max_score' => $olympiad->default_max_score ?? null,
+                        'status' => 'Sin empezar'
+                    ]);
+                }
+
+                if (!$currentOaplg) {
+                    $failedGrades[] = $levelGrade->grade->name ?? "Grade {$levelGrade->grade_id}";
+                    continue;
+                }
+            }
+
+            if ($currentOaplg->status === 'Terminada') {
+                continue;
+            }
+
+            $updateRequest = new Request([
+                'phase_id' => $phaseId,
+                'status' => 'Terminada'
+            ]);
+
+            $gradeResponse = $this->updatePhaseStatusV2($updateRequest, $olympiadId, $areaId, $levelId, $levelGrade->grade_id);
+
+            if ($gradeResponse->getStatusCode() === 200) {
+                $processedGrades[] = $levelGrade->grade->name ?? "Grade {$levelGrade->grade_id}";
+            } else {
+                $failedGrades[] = $levelGrade->grade->name ?? "Grade {$levelGrade->grade_id}";
+            }
+        }
+
+        if (empty($processedGrades)) {
+            return response()->json([
+                'message' => 'No grades could be endorsed for this level',
+                'failed_grades' => $failedGrades,
+                'status' => 400
+            ], 400);
+        }
+
+        $responseData = [
+            'message' => 'Phase endorsed successfully (V2)',
+            'current_phase' => [
+                'phase_id' => $phaseId,
+                'status' => 'Terminada'
+            ],
+            'olympiad_id' => $olympiadId,
+            'area_id' => $areaId,
+            'level_id' => $levelId,
+            'processed_grades' => $processedGrades,
+            'status' => 200
+        ];
+
+        if (!empty($failedGrades)) {
+            $responseData['failed_grades'] = $failedGrades;
+            $responseData['message'] = 'Phase endorsed with some failures (V2)';
+        }
+
+        $firstOaplg = OlympiadAreaPhaseLevelGrade::where('olympiad_area_phase_id', $currentOlympiadAreaPhase->id)
+            ->where('level_grade_id', $firstLevelGrade->id)
+            ->first();
+
+        if ($firstOaplg && !$this->isFinalPhase($firstOaplg, $firstLevelGrade)) {
+            $nextOaplg = $this->getNextPhase($firstOaplg, $firstLevelGrade);
+
+            if ($nextOaplg) {
+                $nextPhaseId = $nextOaplg->olympiadAreaPhase->phase_id;
+                $activatedGrades = [];
+
+                foreach ($levelGrades as $levelGrade) {
+                    $nextUpdateRequest = new Request([
+                        'phase_id' => $nextPhaseId,
+                        'status' => 'Activa'
+                    ]);
+
+                    $nextUpdateResponse = $this->updatePhaseStatusV2($nextUpdateRequest, $olympiadId, $areaId, $levelId, $levelGrade->grade_id);
+
+                    if ($nextUpdateResponse->getStatusCode() === 200) {
+                        $activatedGrades[] = $levelGrade->grade->name ?? "Grade {$levelGrade->grade_id}";
+                    }
+                }
+
+                if (!empty($activatedGrades)) {
+                    $nextOaplg->load('olympiadAreaPhase.phase');
+                    $responseData['next_phase'] = [
+                        'phase_id' => $nextPhaseId,
+                        'phase_name' => $nextOaplg->olympiadAreaPhase->phase->name,
+                        'status' => 'Activa',
+                        'activated_grades' => $activatedGrades
+                    ];
+                    $responseData['message'] = 'Phase endorsed successfully and next phase activated (V2)';
+                }
+            }
+        } else {
+            $responseData['message'] = 'Phase endorsed successfully - final phase completed for all grades (V2)';
+            $responseData['is_final_phase'] = true;
+        }
+
+        return response()->json($responseData, 200);
+    }
+
+    /**
+     * Update phase status for V2 endorsement system
+     */
+    private function updatePhaseStatusV2(Request $request, string $olympiadId, string $areaId, string $levelId, ?string $gradeId = null)
+    {
+        $olympiadArea = OlympiadArea::where('olympiad_id', $olympiadId)
+            ->where('area_id', $areaId)
+            ->first();
+
+        if (!$olympiadArea) {
+            return response()->json(['message' => 'Olympiad area relationship not found', 'status' => 404], 404);
+        }
+
+        $levelGradeQuery = LevelGrade::where('olympiad_area_id', $olympiadArea->id)
+            ->where('level_id', $levelId);
+
+        if ($gradeId !== null) {
+            $levelGradeQuery->where('grade_id', $gradeId);
+        }
+
+        $levelGrades = $levelGradeQuery->get();
+
+        if ($levelGrades->isEmpty()) {
+            return response()->json(['message' => 'Level not found', 'status' => 404], 404);
+        }
+
+        $olympiadAreaPhase = OlympiadAreaPhase::where('olympiad_area_id', $olympiadArea->id)
+            ->where('phase_id', $request->phase_id)
+            ->first();
+
+        if (!$olympiadAreaPhase) {
+            return response()->json(['message' => 'Phase not found', 'status' => 404], 404);
+        }
+
+        $updatedCount = 0;
+
+        foreach ($levelGrades as $levelGrade) {
+            $olympiadAreaPhaseLevelGrade = OlympiadAreaPhaseLevelGrade::where('olympiad_area_phase_id', $olympiadAreaPhase->id)
+                ->where('level_grade_id', $levelGrade->id)
+                ->first();
+
+            if (!$olympiadAreaPhaseLevelGrade) {
+                continue;
+            }
+
+            $olympiadAreaPhaseLevelGrade->status = $request->status;
+
+            if ($olympiadAreaPhaseLevelGrade->save()) {
+                $updatedCount++;
+
+                if ($request->status === 'Terminada') {
+                    $this->processPhaseClassificationsV2($olympiadAreaPhaseLevelGrade, $levelGrade);
+                }
+            }
+        }
+
+        if ($updatedCount === 0) {
+            return response()->json(['message' => 'Error updating phase status', 'status' => 500], 500);
+        }
+
+        return response()->json(['status' => 200], 200);
+    }
+
+    /**
+     * Process phase classifications using V2 logic (sequential medal assignment)
+     */
+    private function processPhaseClassificationsV2($olympiadAreaPhaseLevelGrade, $levelGrade)
+    {
+        $allEvaluations = Evaluation::where('olympiad_area_phase_id', $olympiadAreaPhaseLevelGrade->olympiad_area_phase_id)
+            ->whereNotNull('score')
+            ->with('registration.contestant')
+            ->get();
+
+        $evaluations = $allEvaluations->filter(function ($evaluation) use ($levelGrade) {
+            return DB::table('contestant_level_grades as clg')
+                ->join('level_grades as lg', 'clg.level_grade_id', '=', 'lg.id')
+                ->where('clg.contestant_id', $evaluation->registration->contestant_id)
+                ->where('lg.level_id', $levelGrade->level_id)
+                ->where('lg.olympiad_area_id', $levelGrade->olympiad_area_id)
+                ->exists();
+        });
+
+        $isFinalPhase = $this->isFinalPhase($olympiadAreaPhaseLevelGrade, $levelGrade);
+
+        $nextOaplg = null;
+        if (!$isFinalPhase) {
+            $nextOaplg = $this->getNextPhase($olympiadAreaPhaseLevelGrade, $levelGrade);
+        }
+
+        $scoreCut = $this->getScoreCut($olympiadAreaPhaseLevelGrade, null);
+
+        foreach ($evaluations as $evaluation) {
+            if ($evaluation->classification_status === 'descalificado') {
+                continue;
+            }
+
+            if ($scoreCut !== null) {
+                if ($evaluation->score >= $scoreCut) {
+                    $evaluation->classification_status = 'clasificado';
+
+                    if (!$isFinalPhase && $nextOaplg) {
+                        $this->createNextPhaseEvaluation($evaluation, $nextOaplg->olympiadAreaPhase);
+                    }
+                } else {
+                    $evaluation->classification_status = 'no_clasificado';
+                }
+            }
+        }
+
+        if ($isFinalPhase) {
+            $this->assignMedalsV2($evaluations, $levelGrade);
+        }
+
+        foreach ($evaluations as $evaluation) {
+            $evaluation->save();
+        }
+    }
+
+    /**
+     * Validate medal assignment using V2 logic (sequential assignment)
+     */
+    private function validateMedalAssignmentV2($olympiadAreaId, $olympiadAreaPhaseId, $levelGrade)
+    {
+        $medalConfig = OlympiadAreaMedal::where('olympiad_area_id', $olympiadAreaId)->first();
+
+        if (!$medalConfig) {
+            return [
+                'can_endorse' => false,
+                'errors' => [
+                    [
+                        'type' => 'missing_configuration',
+                        'message' => 'Medal configuration not found for this olympiad area. Please configure medals before endorsing the final phase.'
+                    ]
+                ],
+                'ties_requiring_resolution' => []
+            ];
+        }
+
+        $oaplg = OlympiadAreaPhaseLevelGrade::where('olympiad_area_phase_id', $olympiadAreaPhaseId)
+            ->where('level_grade_id', $levelGrade->id)
+            ->first();
+
+        if (!$oaplg) {
+            return [
+                'can_endorse' => true,
+                'errors' => [],
+                'ties_requiring_resolution' => []
+            ];
+        }
+
+        $allEvaluations = Evaluation::where('olympiad_area_phase_id', $olympiadAreaPhaseId)
+            ->whereNotNull('score')
+            ->with('registration.contestant')
+            ->get();
+
+        $evaluations = $allEvaluations->filter(function ($evaluation) use ($levelGrade) {
+            return DB::table('contestant_level_grades as clg')
+                ->join('level_grades as lg', 'clg.level_grade_id', '=', 'lg.id')
+                ->where('clg.contestant_id', $evaluation->registration->contestant_id)
+                ->where('lg.level_id', $levelGrade->level_id)
+                ->where('lg.olympiad_area_id', $levelGrade->olympiad_area_id)
+                ->exists();
+        });
+
+        // Use minimum_classification_score from medal config instead of score_cut
+        $minimumScore = $medalConfig->minimum_classification_score;
+
+        // Filter evaluations: classified, above minimum score, and WITHOUT manual assignment
+        $classifiedEvaluations = $evaluations
+            ->where('classification_status', 'clasificado')
+            ->filter(function ($evaluation) use ($minimumScore) {
+                // Exclude evaluations that already have a manual medal assignment
+                if (!empty($evaluation->classification_place)) {
+                    return false;
+                }
+                return $evaluation->score >= $minimumScore;
+            })
+            ->sortByDesc('score')
+            ->values();
+
+        if ($classifiedEvaluations->isEmpty()) {
+            return [
+                'can_endorse' => true,
+                'errors' => [],
+                'ties_requiring_resolution' => []
+            ];
+        }
+
+        // Count manually assigned medals to adjust available slots
+        $manuallyAssigned = $evaluations
+            ->where('classification_status', 'clasificado')
+            ->filter(function ($evaluation) {
+                return !empty($evaluation->classification_place);
+            });
+
+        $manualGoldCount = $manuallyAssigned->where('classification_place', 'Oro')->count();
+        $manualSilverCount = $manuallyAssigned->where('classification_place', 'Plata')->count();
+        $manualBronzeCount = $manuallyAssigned->where('classification_place', 'Bronce')->count();
+        $manualHMCount = $manuallyAssigned->where('classification_place', 'Mención honorífica')->count();
+
+        $tiesRequiringResolution = [];
+
+        // Track current position (only for evaluations without manual assignment)
+        $currentPosition = 0;
+        $goldLimit = max(0, $medalConfig->gold - $manualGoldCount);
+        $silverLimit = max(0, $medalConfig->silver - $manualSilverCount);
+        $bronzeLimit = max(0, $medalConfig->bronze - $manualBronzeCount);
+        $hmLimit = max(0, $medalConfig->honorable_mention - $manualHMCount);
+
+        // Group by score
+        $scoreGroups = $classifiedEvaluations->groupBy('score')->sortKeysDesc();
+
+        foreach ($scoreGroups as $score => $group) {
+            $groupCount = $group->count();
+            $endPosition = $currentPosition + $groupCount;
+
+            // Determine which medal range this group falls into
+            if ($currentPosition < $goldLimit) {
+                // This group starts in Gold range
+                if ($endPosition > $goldLimit) {
+                    // Tie extends beyond gold limit
+                    $tiesRequiringResolution[] = [
+                        'medal_type' => 'Oro',
+                        'score' => $score,
+                        'tied_count' => $groupCount,
+                        'positions' => [$currentPosition + 1, $endPosition],
+                        'available_in_category' => $goldLimit - $currentPosition,
+                        'overflow_to' => 'Plata',
+                        'evaluations' => $group->map(function ($eval) {
+                            return [
+                                'evaluation_id' => $eval->id,
+                                'contestant_name' => $eval->registration->contestant->name ?? 'Unknown',
+                                'score' => $eval->score
+                            ];
+                        })->values()->toArray()
+                    ];
+                }
+            } elseif ($currentPosition < $goldLimit + $silverLimit) {
+                // This group starts in Silver range
+                if ($endPosition > $goldLimit + $silverLimit) {
+                    $tiesRequiringResolution[] = [
+                        'medal_type' => 'Plata',
+                        'score' => $score,
+                        'tied_count' => $groupCount,
+                        'positions' => [$currentPosition + 1, $endPosition],
+                        'available_in_category' => ($goldLimit + $silverLimit) - $currentPosition,
+                        'overflow_to' => 'Bronce',
+                        'evaluations' => $group->map(function ($eval) {
+                            return [
+                                'evaluation_id' => $eval->id,
+                                'contestant_name' => $eval->registration->contestant->name ?? 'Unknown',
+                                'score' => $eval->score
+                            ];
+                        })->values()->toArray()
+                    ];
+                }
+            } elseif ($currentPosition < $goldLimit + $silverLimit + $bronzeLimit) {
+                // This group starts in Bronze range
+                if ($endPosition > $goldLimit + $silverLimit + $bronzeLimit) {
+                    $tiesRequiringResolution[] = [
+                        'medal_type' => 'Bronce',
+                        'score' => $score,
+                        'tied_count' => $groupCount,
+                        'positions' => [$currentPosition + 1, $endPosition],
+                        'available_in_category' => ($goldLimit + $silverLimit + $bronzeLimit) - $currentPosition,
+                        'overflow_to' => 'Mención honorífica',
+                        'evaluations' => $group->map(function ($eval) {
+                            return [
+                                'evaluation_id' => $eval->id,
+                                'contestant_name' => $eval->registration->contestant->name ?? 'Unknown',
+                                'score' => $eval->score
+                            ];
+                        })->values()->toArray()
+                    ];
+                }
+            } elseif ($currentPosition < $goldLimit + $silverLimit + $bronzeLimit + $hmLimit) {
+                // This group starts in HM range
+                if ($endPosition > $goldLimit + $silverLimit + $bronzeLimit + $hmLimit) {
+                    $tiesRequiringResolution[] = [
+                        'medal_type' => 'Mención honorífica',
+                        'score' => $score,
+                        'tied_count' => $groupCount,
+                        'positions' => [$currentPosition + 1, $endPosition],
+                        'available_in_category' => ($goldLimit + $silverLimit + $bronzeLimit + $hmLimit) - $currentPosition,
+                        'overflow_to' => 'Sin medalla',
+                        'evaluations' => $group->map(function ($eval) {
+                            return [
+                                'evaluation_id' => $eval->id,
+                                'contestant_name' => $eval->registration->contestant->name ?? 'Unknown',
+                                'score' => $eval->score
+                            ];
+                        })->values()->toArray()
+                    ];
+                }
+            }
+
+            $currentPosition = $endPosition;
+        }
+
+        return [
+            'can_endorse' => empty($tiesRequiringResolution),
+            'errors' => [],
+            'ties_requiring_resolution' => $tiesRequiringResolution
+        ];
+    }
+
+    /**
+     * Assign medals using V2 logic (sequential assignment by score ranking)
+     */
+    private function assignMedalsV2($evaluations, $levelGrade)
+    {
+        $medalConfig = OlympiadAreaMedal::where('olympiad_area_id', $levelGrade->olympiad_area_id)->first();
+
+        if (!$medalConfig) {
+            Log::warning("No medal configuration found for olympiad_area_id: {$levelGrade->olympiad_area_id}");
+            return;
+        }
+
+        // Use minimum_classification_score from medal config
+        $minimumScore = $medalConfig->minimum_classification_score;
+
+        // Separate evaluations into manual and automatic assignments
+        $manuallyAssigned = $evaluations
+            ->where('classification_status', 'clasificado')
+            ->filter(function ($evaluation) use ($minimumScore) {
+                return $evaluation->score >= $minimumScore && !empty($evaluation->classification_place);
+            });
+
+        $autoAssignEvaluations = $evaluations
+            ->where('classification_status', 'clasificado')
+            ->filter(function ($evaluation) use ($minimumScore) {
+                return $evaluation->score >= $minimumScore && empty($evaluation->classification_place);
+            })
+            ->sortByDesc('score')
+            ->values();
+
+        if ($autoAssignEvaluations->isEmpty()) {
+            // All medals were assigned manually, nothing to do
+            return;
+        }
+
+        // Count manually assigned medals
+        $manualGoldCount = $manuallyAssigned->where('classification_place', 'Oro')->count();
+        $manualSilverCount = $manuallyAssigned->where('classification_place', 'Plata')->count();
+        $manualBronzeCount = $manuallyAssigned->where('classification_place', 'Bronce')->count();
+        $manualHMCount = $manuallyAssigned->where('classification_place', 'Mención honorífica')->count();
+
+        // Calculate remaining slots
+        $goldLimit = max(0, $medalConfig->gold - $manualGoldCount);
+        $silverLimit = max(0, $medalConfig->silver - $manualSilverCount);
+        $bronzeLimit = max(0, $medalConfig->bronze - $manualBronzeCount);
+        $hmLimit = max(0, $medalConfig->honorable_mention - $manualHMCount);
+
+        // Assign medals sequentially based on position (only to evaluations without manual assignment)
+        foreach ($autoAssignEvaluations as $index => $evaluation) {
+            $position = $index; // 0-based index
+
+            if ($position < $goldLimit) {
+                $evaluation->classification_place = 'Oro';
+            } elseif ($position < $goldLimit + $silverLimit) {
+                $evaluation->classification_place = 'Plata';
+            } elseif ($position < $goldLimit + $silverLimit + $bronzeLimit) {
+                $evaluation->classification_place = 'Bronce';
+            } elseif ($position < $goldLimit + $silverLimit + $bronzeLimit + $hmLimit) {
+                $evaluation->classification_place = 'Mención honorífica';
+            }
+            // If beyond all limits, no medal is assigned (classification_place remains null)
+        }
+    }
+
+    /**
+     * Manually adjust medal assignments for tied competitors
+     */
+    public function manuallyAdjustMedalAssignment(Request $request, string $olympiadId, string $areaId, string $levelId, string $phaseId)
+    {
+        $validator = Validator::make($request->all(), [
+            'adjustments' => 'required|array|min:1',
+            'adjustments.*.evaluation_id' => 'required|integer|exists:evaluations,id',
+            'adjustments.*.new_medal' => 'required|string|in:Oro,Plata,Bronce,Mención honorífica',
+            'adjustments.*.justification' => 'required|string|min:10|max:500'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Error in data validation',
+                'errors' => $validator->errors(),
+                'status' => 400
+            ], 400);
+        }
+
+        // Verify olympiad area
+        $olympiadArea = OlympiadArea::where('olympiad_id', $olympiadId)
+            ->where('area_id', $areaId)
+            ->first();
+
+        if (!$olympiadArea) {
+            return response()->json([
+                'message' => 'Olympiad area relationship not found',
+                'status' => 404
+            ], 404);
+        }
+
+        // Get medal configuration
+        $medalConfig = OlympiadAreaMedal::where('olympiad_area_id', $olympiadArea->id)->first();
+
+        if (!$medalConfig) {
+            return response()->json([
+                'message' => 'Medal configuration not found for this olympiad area',
+                'status' => 404
+            ], 404);
+        }
+
+        // Get level grade
+        $levelGrade = LevelGrade::where('olympiad_area_id', $olympiadArea->id)
+            ->where('level_id', $levelId)
+            ->first();
+
+        if (!$levelGrade) {
+            return response()->json([
+                'message' => 'Level not found for this olympiad area',
+                'status' => 404
+            ], 404);
+        }
+
+        // Get olympiad area phase
+        $olympiadAreaPhase = OlympiadAreaPhase::where('olympiad_area_id', $olympiadArea->id)
+            ->where('phase_id', $phaseId)
+            ->first();
+
+        if (!$olympiadAreaPhase) {
+            return response()->json([
+                'message' => 'Phase not found for this olympiad area',
+                'status' => 404
+            ], 404);
+        }
+
+        // Get all evaluations for this phase and level to count existing medals
+        $allEvaluations = Evaluation::where('olympiad_area_phase_id', $olympiadAreaPhase->id)
+            ->whereNotNull('score')
+            ->with('registration.contestant')
+            ->get();
+
+        $evaluations = $allEvaluations->filter(function ($evaluation) use ($levelGrade) {
+            return DB::table('contestant_level_grades as clg')
+                ->join('level_grades as lg', 'clg.level_grade_id', '=', 'lg.id')
+                ->where('clg.contestant_id', $evaluation->registration->contestant_id)
+                ->where('lg.level_id', $levelGrade->level_id)
+                ->where('lg.olympiad_area_id', $levelGrade->olympiad_area_id)
+                ->exists();
+        });
+
+        // Count currently assigned medals (excluding the ones we're about to change)
+        $evaluationIdsToChange = collect($request->adjustments)->pluck('evaluation_id')->toArray();
+
+        $currentMedals = $evaluations
+            ->whereNotIn('id', $evaluationIdsToChange)
+            ->filter(function ($evaluation) {
+                return !empty($evaluation->classification_place);
+            });
+
+        $currentGoldCount = $currentMedals->where('classification_place', 'Oro')->count();
+        $currentSilverCount = $currentMedals->where('classification_place', 'Plata')->count();
+        $currentBronzeCount = $currentMedals->where('classification_place', 'Bronce')->count();
+        $currentHMCount = $currentMedals->where('classification_place', 'Mención honorífica')->count();
+
+        // Count medals in this request
+        $requestMedals = collect($request->adjustments);
+        $requestGoldCount = $requestMedals->where('new_medal', 'Oro')->count();
+        $requestSilverCount = $requestMedals->where('new_medal', 'Plata')->count();
+        $requestBronzeCount = $requestMedals->where('new_medal', 'Bronce')->count();
+        $requestHMCount = $requestMedals->where('new_medal', 'Mención honorífica')->count();
+
+        // Calculate total medals after this adjustment
+        $totalGold = $currentGoldCount + $requestGoldCount;
+        $totalSilver = $currentSilverCount + $requestSilverCount;
+        $totalBronze = $currentBronzeCount + $requestBronzeCount;
+        $totalHM = $currentHMCount + $requestHMCount;
+
+        // Validate against medal limits
+        $errors = [];
+
+        if ($totalGold > $medalConfig->gold) {
+            $errors[] = [
+                'medal' => 'Oro',
+                'current' => $currentGoldCount,
+                'requested' => $requestGoldCount,
+                'total' => $totalGold,
+                'limit' => $medalConfig->gold,
+                'message' => "Cannot assign {$requestGoldCount} Oro medal(s). Current: {$currentGoldCount}, Limit: {$medalConfig->gold}. Would exceed by " . ($totalGold - $medalConfig->gold)
+            ];
+        }
+
+        if ($totalSilver > $medalConfig->silver) {
+            $errors[] = [
+                'medal' => 'Plata',
+                'current' => $currentSilverCount,
+                'requested' => $requestSilverCount,
+                'total' => $totalSilver,
+                'limit' => $medalConfig->silver,
+                'message' => "Cannot assign {$requestSilverCount} Plata medal(s). Current: {$currentSilverCount}, Limit: {$medalConfig->silver}. Would exceed by " . ($totalSilver - $medalConfig->silver)
+            ];
+        }
+
+        if ($totalBronze > $medalConfig->bronze) {
+            $errors[] = [
+                'medal' => 'Bronce',
+                'current' => $currentBronzeCount,
+                'requested' => $requestBronzeCount,
+                'total' => $totalBronze,
+                'limit' => $medalConfig->bronze,
+                'message' => "Cannot assign {$requestBronzeCount} Bronce medal(s). Current: {$currentBronzeCount}, Limit: {$medalConfig->bronze}. Would exceed by " . ($totalBronze - $medalConfig->bronze)
+            ];
+        }
+
+        if ($totalHM > $medalConfig->honorable_mention) {
+            $errors[] = [
+                'medal' => 'Mención honorífica',
+                'current' => $currentHMCount,
+                'requested' => $requestHMCount,
+                'total' => $totalHM,
+                'limit' => $medalConfig->honorable_mention,
+                'message' => "Cannot assign {$requestHMCount} Mención honorífica medal(s). Current: {$currentHMCount}, Limit: {$medalConfig->honorable_mention}. Would exceed by " . ($totalHM - $medalConfig->honorable_mention)
+            ];
+        }
+
+        if (!empty($errors)) {
+            return response()->json([
+                'message' => 'Medal assignment would exceed configured limits',
+                'errors' => $errors,
+                'medal_limits' => [
+                    'gold' => $medalConfig->gold,
+                    'silver' => $medalConfig->silver,
+                    'bronze' => $medalConfig->bronze,
+                    'honorable_mention' => $medalConfig->honorable_mention
+                ],
+                'current_assignments' => [
+                    'gold' => $currentGoldCount,
+                    'silver' => $currentSilverCount,
+                    'bronze' => $currentBronzeCount,
+                    'honorable_mention' => $currentHMCount
+                ],
+                'status' => 400
+            ], 400);
+        }
+
+        $adjustedCount = 0;
+        $adjustedEvaluations = [];
+
+        foreach ($request->adjustments as $adjustment) {
+            $evaluation = Evaluation::find($adjustment['evaluation_id']);
+
+            if (!$evaluation) {
+                continue;
+            }
+
+            // Update classification_place and add justification to description
+            $evaluation->classification_place = $adjustment['new_medal'];
+            $justificationNote = "AJUSTE MANUAL: {$adjustment['justification']}";
+
+            if ($evaluation->description) {
+                $evaluation->description .= " | " . $justificationNote;
+            } else {
+                $evaluation->description = $justificationNote;
+            }
+
+            if ($evaluation->save()) {
+                $adjustedCount++;
+                $adjustedEvaluations[] = [
+                    'evaluation_id' => $evaluation->id,
+                    'contestant_name' => $evaluation->registration->contestant->name ?? 'Unknown',
+                    'new_medal' => $evaluation->classification_place,
+                    'justification' => $adjustment['justification']
+                ];
+            }
+        }
+
+        if ($adjustedCount === 0) {
+            return response()->json([
+                'message' => 'No evaluations were adjusted',
+                'status' => 400
+            ], 400);
+        }
+
+        return response()->json([
+            'message' => 'Medal assignments adjusted successfully',
+            'adjusted_count' => $adjustedCount,
+            'adjusted_evaluations' => $adjustedEvaluations,
+            'status' => 200
+        ], 200);
+    }
 }
