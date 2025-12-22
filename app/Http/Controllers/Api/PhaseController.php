@@ -1613,98 +1613,80 @@ class PhaseController extends Controller
             $groupCount = $group->count();
             $endPosition = $currentPosition + $groupCount;
 
-            // Determine which medal range this group falls into
-            if ($currentPosition < $goldLimit) {
-                // This group starts in Gold range
-                if ($endPosition > $goldLimit) {
-                    // Tie extends beyond gold limit
-                    $tiesRequiringResolution[] = [
-                        'medal_type' => 'Oro',
-                        'score' => $score,
-                        'tied_count' => $groupCount,
-                        'positions' => [$currentPosition + 1, $endPosition],
-                        'available_in_category' => $goldLimit - $currentPosition,
-                        'overflow_to' => 'Plata',
-                        'evaluations' => $group->map(function ($eval) {
-                            $contestant = $eval->registration->contestant ?? null;
-                            $fullName = $contestant
-                                ? trim(($contestant->first_name ?? '') . ' ' . ($contestant->last_name ?? ''))
-                                : 'Unknown';
-                            return [
-                                'evaluation_id' => $eval->id,
-                                'contestant_name' => $fullName ?: 'Unknown',
-                                'score' => $eval->score
-                            ];
-                        })->values()->toArray()
-                    ];
-                }
-            } elseif ($currentPosition < $goldLimit + $silverLimit) {
-                // This group starts in Silver range
-                if ($endPosition > $goldLimit + $silverLimit) {
+            // Build evaluation array once for this group
+            $evaluationData = $group->map(function ($eval) {
+                $contestant = $eval->registration->contestant ?? null;
+                $fullName = $contestant
+                    ? trim(($contestant->first_name ?? '') . ' ' . ($contestant->last_name ?? ''))
+                    : 'Unknown';
+                return [
+                    'evaluation_id' => $eval->id,
+                    'contestant_name' => $fullName ?: 'Unknown',
+                    'score' => $eval->score
+                ];
+            })->values()->toArray();
+
+            // Check all medal category boundaries this group crosses
+            // A tie group cannot be split, so we need to report ALL boundaries it crosses
+
+            if ($currentPosition < $goldLimit && $endPosition > $goldLimit) {
+                // Tie crosses Gold limit
+                $tiesRequiringResolution[] = [
+                    'medal_type' => 'Oro',
+                    'score' => $score,
+                    'tied_count' => $groupCount,
+                    'positions' => [$currentPosition + 1, $endPosition],
+                    'available_in_category' => $goldLimit - $currentPosition,
+                    'overflow_count' => $endPosition - $goldLimit,
+                    'overflow_to' => 'Plata',
+                    'evaluations' => $evaluationData
+                ];
+            }
+
+            if ($currentPosition < $goldLimit + $silverLimit && $endPosition > $goldLimit + $silverLimit) {
+                // Tie crosses Silver limit - only report if it starts before or at Silver range
+                if ($currentPosition < $goldLimit + $silverLimit) {
                     $tiesRequiringResolution[] = [
                         'medal_type' => 'Plata',
                         'score' => $score,
                         'tied_count' => $groupCount,
                         'positions' => [$currentPosition + 1, $endPosition],
-                        'available_in_category' => ($goldLimit + $silverLimit) - $currentPosition,
+                        'available_in_category' => max(0, ($goldLimit + $silverLimit) - max($currentPosition, $goldLimit)),
+                        'overflow_count' => $endPosition - ($goldLimit + $silverLimit),
                         'overflow_to' => 'Bronce',
-                        'evaluations' => $group->map(function ($eval) {
-                            $contestant = $eval->registration->contestant ?? null;
-                            $fullName = $contestant
-                                ? trim(($contestant->first_name ?? '') . ' ' . ($contestant->last_name ?? ''))
-                                : 'Unknown';
-                            return [
-                                'evaluation_id' => $eval->id,
-                                'contestant_name' => $fullName ?: 'Unknown',
-                                'score' => $eval->score
-                            ];
-                        })->values()->toArray()
+                        'evaluations' => $evaluationData
                     ];
                 }
-            } elseif ($currentPosition < $goldLimit + $silverLimit + $bronzeLimit) {
-                // This group starts in Bronze range
-                if ($endPosition > $goldLimit + $silverLimit + $bronzeLimit) {
+            }
+
+            if ($currentPosition < $goldLimit + $silverLimit + $bronzeLimit && $endPosition > $goldLimit + $silverLimit + $bronzeLimit) {
+                // Tie crosses Bronze limit - only report if it starts before or at Bronze range
+                if ($currentPosition < $goldLimit + $silverLimit + $bronzeLimit) {
                     $tiesRequiringResolution[] = [
                         'medal_type' => 'Bronce',
                         'score' => $score,
                         'tied_count' => $groupCount,
                         'positions' => [$currentPosition + 1, $endPosition],
-                        'available_in_category' => ($goldLimit + $silverLimit + $bronzeLimit) - $currentPosition,
+                        'available_in_category' => max(0, ($goldLimit + $silverLimit + $bronzeLimit) - max($currentPosition, $goldLimit + $silverLimit)),
+                        'overflow_count' => $endPosition - ($goldLimit + $silverLimit + $bronzeLimit),
                         'overflow_to' => 'Mención honorífica',
-                        'evaluations' => $group->map(function ($eval) {
-                            $contestant = $eval->registration->contestant ?? null;
-                            $fullName = $contestant
-                                ? trim(($contestant->first_name ?? '') . ' ' . ($contestant->last_name ?? ''))
-                                : 'Unknown';
-                            return [
-                                'evaluation_id' => $eval->id,
-                                'contestant_name' => $fullName ?: 'Unknown',
-                                'score' => $eval->score
-                            ];
-                        })->values()->toArray()
+                        'evaluations' => $evaluationData
                     ];
                 }
-            } elseif ($currentPosition < $goldLimit + $silverLimit + $bronzeLimit + $hmLimit) {
-                // This group starts in HM range
-                if ($endPosition > $goldLimit + $silverLimit + $bronzeLimit + $hmLimit) {
+            }
+
+            if ($currentPosition < $goldLimit + $silverLimit + $bronzeLimit + $hmLimit && $endPosition > $goldLimit + $silverLimit + $bronzeLimit + $hmLimit) {
+                // Tie crosses HM limit - only report if it starts before or at HM range
+                if ($currentPosition < $goldLimit + $silverLimit + $bronzeLimit + $hmLimit) {
                     $tiesRequiringResolution[] = [
                         'medal_type' => 'Mención honorífica',
                         'score' => $score,
                         'tied_count' => $groupCount,
                         'positions' => [$currentPosition + 1, $endPosition],
-                        'available_in_category' => ($goldLimit + $silverLimit + $bronzeLimit + $hmLimit) - $currentPosition,
+                        'available_in_category' => max(0, ($goldLimit + $silverLimit + $bronzeLimit + $hmLimit) - max($currentPosition, $goldLimit + $silverLimit + $bronzeLimit)),
+                        'overflow_count' => $endPosition - ($goldLimit + $silverLimit + $bronzeLimit + $hmLimit),
                         'overflow_to' => 'Sin medalla',
-                        'evaluations' => $group->map(function ($eval) {
-                            $contestant = $eval->registration->contestant ?? null;
-                            $fullName = $contestant
-                                ? trim(($contestant->first_name ?? '') . ' ' . ($contestant->last_name ?? ''))
-                                : 'Unknown';
-                            return [
-                                'evaluation_id' => $eval->id,
-                                'contestant_name' => $fullName ?: 'Unknown',
-                                'score' => $eval->score
-                            ];
-                        })->values()->toArray()
+                        'evaluations' => $evaluationData
                     ];
                 }
             }
