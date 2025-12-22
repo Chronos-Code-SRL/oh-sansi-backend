@@ -36,21 +36,24 @@ class MedalController extends Controller
         ->where('area_id', $area_id)
             ->first();
 
-            if (!$olympiadArea) {
-                return response()->json([
-                    'message' => 'Olympiad Area not found',
-                ], 404);
+        if (!$olympiadArea) {
+            return response()->json([
+                'message' => 'Olympiad Area not found',
+            ], 404);
         }
 
-        // create medal table
-        $medals = OlympiadAreaMedal::create([
-            'olympiad_area_id' => $olympiadArea->id,
-            'gold' => $request->gold,
-            'silver' => $request->silver,
-            'bronze' => $request->bronze,
-            'honorable_mention' => $request->honorable_mention,
-            'minimum_classification_score' => $request->minimum_classification_score,
-        ]);
+        $medals = OlympiadAreaMedal::updateOrCreate(
+            [
+                'olympiad_area_id' => $olympiadArea->id
+            ],[
+                'olympiad_area_id' => $olympiadArea->id,
+                'gold' => $request->gold,
+                'silver' => $request->silver,
+                'bronze' => $request->bronze,
+                'honorable_mention' => $request->honorable_mention,
+                'minimum_classification_score' => $request->minimum_classification_score,
+            ]
+        );
 
         if (!$medals) {
             return response()->json([
@@ -75,9 +78,12 @@ class MedalController extends Controller
 
         if (!$olympiadAreaId) {
             return response()->json([
-                'message' => 'Medal table not found',
-                'status' => 404
-            ], 404);
+                'golden' => 0,
+                'silver' => 0,
+                'bronze' => 0,
+                'honorable_mention' => 0,
+                'minimum_classification_score' => 0,
+            ], 200);
         }
 
         // get the medals
@@ -129,14 +135,5 @@ class MedalController extends Controller
             'message' => 'Medal table updated successfully',
             'status' => 200
         ], 200);
-    }
-
-    public function destroy(string $id)
-    {
-        //
-    }
-
-    public function index() {
-        //
     }
 }
