@@ -78,7 +78,7 @@ class MedalController extends Controller
 
         if (!$olympiadAreaId) {
             return response()->json([
-                'golden' => 0,
+                'gold' => 0,
                 'silver' => 0,
                 'bronze' => 0,
                 'honorable_mention' => 0,
@@ -90,7 +90,13 @@ class MedalController extends Controller
         $medals = OlympiadAreaMedal::where('olympiad_area_id', $olympiadAreaId->olympiad_area_id)
         ->first();
 
-        return response()->json($medals, 200);
+        return response()->json([
+            'gold' => $medals->gold,
+            'silver' => $medals->silver,
+            'bronze' => $medals->bronze,
+            'honorable_mention' => $medals->honorable_mention,
+            'minimum_classification_score' => $medals->minimum_classification_score,
+        ], 200);
     }
 
     public function update(Request $request, string $id)
