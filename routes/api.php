@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\UserAreaController;
 use App\Http\Controllers\Api\EvaluationController;
 use App\Http\Controllers\Api\EvaluationAuditController;
 use App\Http\Controllers\Api\ContestantController;
+use App\Http\Controllers\Api\MedalController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -147,3 +148,11 @@ Route::get('/medals/olympiads/{olympiadId}/areas/{areaId}/levels/{levelId}', [Co
 
 // <--- CRUD Level --->
 Route::get('/levels-olympiad', [App\Http\Controllers\Api\LevelController::class, 'getLevelsOlympiad']);
+
+// <--- CRUD Medal Tables --->
+Route::post('/medals/olympiads/{olympiad_id}/areas/{area_id}', [App\Http\Controllers\Api\MedalController::class, 'store']);
+Route::get('/medals/olympiads/{olympiad_id}/areas/{area_id}', [App\Http\Controllers\Api\MedalController::class, 'show']);
+
+// <--- V2 Endorsement System (Sequential Medal Assignment) --->
+Route::put('/olympiads/{olympiadId}/areas/{areaId}/levels/{levelId}/phases/{phaseId}/endorse-v2', [PhaseController::class, 'endorsePhaseV2']);
+Route::post('/olympiads/{olympiadId}/areas/{areaId}/levels/{levelId}/phases/{phaseId}/adjust-medals', [PhaseController::class, 'manuallyAdjustMedalAssignment']);

@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('evaluations', function (Blueprint $table) {
             $table->id();
-            $table->integer('score');
+            $table->integer('score')->nullable(); //Before: integer()
             $table->text('description');
             $table->foreignId('registration_id')->constrained()->onDelete('cascade');
             $table->foreignId('olympiad_area_phase_id')->constrained()->onDelete('cascade');
