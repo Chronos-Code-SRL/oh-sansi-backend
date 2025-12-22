@@ -62,6 +62,17 @@ class CompetitorRegistrationController extends Controller
             ], 404);
         }
 
+        // Validate that olympiad status is "En planificación"
+        if ($olympiad->status !== 'En planificación') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Files cannot be uploaded to this olympiad',
+                'errors' => ['olympiad_status' => [
+                    'Files can only be uploaded to olympiads in the "En planificación" status. Current status: ' . $olympiad->status
+                ]]
+            ], 422);
+        }
+
         $olympiadId = $request->olympiad_id;
         $files = $request->file('files');
         if (!is_array($files)) {
@@ -182,6 +193,12 @@ class CompetitorRegistrationController extends Controller
     {
         $filename = $file->getClientOriginalName();
         $content = file_get_contents($file->getPathname());
+
+        // Ensure UTF-8 encoding
+        if (!mb_check_encoding($content, 'UTF-8')) {
+            $content = mb_convert_encoding($content, 'UTF-8', mb_detect_encoding($content, 'UTF-8, ISO-8859-1, Windows-1252', true));
+        }
+
         $lines = str_getcsv($content, "\n");
 
         // Remove BOM if present
@@ -218,12 +235,20 @@ class CompetitorRegistrationController extends Controller
             // Generate error CSV with the validation error AND all original data
             $errorFile = $this->generateErrorCsv($filename, $header, $errors, $lines);
 
+            // Count only non-empty lines for total_records
+            $nonEmptyLines = 0;
+            for ($i = 1; $i < count($lines); $i++) {
+                if (!empty(trim($lines[$i]))) {
+                    $nonEmptyLines++;
+                }
+            }
+
             return [
                 'filename' => $filename,
                 'successful' => 0,
                 'competitor_errors' => 0,
                 'header_errors' => 1,
-                'total_records' => count($lines) - 1, // Excluding header row
+                'total_records' => $nonEmptyLines,
                 'error_file' => $errorFile
             ];
         }
@@ -238,10 +263,13 @@ class CompetitorRegistrationController extends Controller
         $errors = [];
         $successful = 0;
         $seenCis = [];
+        $totalRecordsProcessed = 0;
 
         // Process each row
         for ($i = 1; $i < count($lines); $i++) {
             if (empty(trim($lines[$i]))) continue;
+
+            $totalRecordsProcessed++;
 
             $row = str_getcsv($lines[$i]);
 
@@ -255,7 +283,7 @@ class CompetitorRegistrationController extends Controller
             if (count($row) !== count($header)) {
                 $errors[] = [
                     'row_number' => $i + 1,
-                    'errors' => "Row has " . count($row) . " columns but header has " . count($header) . " columns. Please check for missing commas or extra commas in the data."
+                    'errors' => "La fila tiene " . count($row) . " columnas pero la cabecera tiene " . count($header) . " columnas. Verifique si faltan o sobran comas en los datos."
                 ];
             }
 
@@ -275,7 +303,7 @@ class CompetitorRegistrationController extends Controller
             if (!empty($rowData['CI'])) {
                 $ci = $rowData['CI'];
                 if (isset($seenCis[$ci])) {
-                    $rowData['errors'] = 'CI Document duplicated within the same file';
+                    $rowData['errors'] = 'Documento de CI duplicado dentro del mismo archivo';
                     $errors[] = $rowData;
                     continue;
                 }
@@ -304,7 +332,7 @@ class CompetitorRegistrationController extends Controller
             'successful' => $successful,
             'competitor_errors' => count($errors),
             'header_errors' => 0,
-            'total_records' => count($lines) - 1, // Excluding header row
+            'total_records' => $totalRecordsProcessed,
             'error_file' => $errorFile
         ];
     }
@@ -318,42 +346,42 @@ class CompetitorRegistrationController extends Controller
 
         // Required fields validation
         $requiredFields = [
-            'CI' => 'CI Document',
-            'NOMBRE' => 'First Name',
-            'APELLIDO' => 'Last Name',
-            'GENERO' => 'Gender',
-            'DEPARTAMENTO' => 'Department',
-            'COLEGIO' => 'School',
-            'AREA' => 'Area',
-            'GRADO' => 'Grade',
-            'NUMERO TUTOR' => 'Tutor Number',
-            'NOMBRE TUTOR' => 'Tutor Name'
+            'CI' => 'Documento de CI',
+            'NOMBRE' => 'Nombre',
+            'APELLIDO' => 'Apellido',
+            'GENERO' => 'Género',
+            'DEPARTAMENTO' => 'Departamento',
+            'COLEGIO' => 'Colegio',
+            'AREA' => 'Área',
+            'GRADO' => 'Grado',
+            'NUMERO TUTOR' => 'Número de Tutor',
+            'NOMBRE TUTOR' => 'Nombre de Tutor'
         ];
 
         foreach ($requiredFields as $field => $label) {
             if (empty($data[$field])) {
-                $errors[] = "$label is required";
+                $errors[] = "$label es requerido";
             }
         }
 
         // First Name validation (2-50 characters, only letters)
         if (!empty($data['NOMBRE'])) {
             if (!preg_match('/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]{2,50}$/', $data['NOMBRE'])) {
-                $errors[] = 'First Name must be 2-50 characters and contain only letters';
+                $errors[] = 'El Nombre debe tener entre 2-50 caracteres y contener solo letras';
             }
         }
 
         // Last Name validation (2-50 characters, only letters)
         if (!empty($data['APELLIDO'])) {
             if (!preg_match('/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]{2,50}$/', $data['APELLIDO'])) {
-                $errors[] = 'Last Name must be 2-50 characters and contain only letters';
+                $errors[] = 'El Apellido debe tener entre 2-50 caracteres y contener solo letras';
             }
         }
 
         // CI Document validation (8-13 characters, unique per olympiad area)
         if (!empty($data['CI'])) {
             if (!preg_match('/^[0-9]{8,13}$/', $data['CI'])) {
-                $errors[] = 'CI Document must be 8-13 digits';
+                $errors[] = 'El Documento de CI debe tener entre 8-13 dígitos';
             } else {
                 // Check if contestant is already registered in the same olympiad areas
                 $existingContestant = Contestant::where('ci_document', $data['CI'])->first();
@@ -371,7 +399,7 @@ class CompetitorRegistrationController extends Controller
                                     ->where('olympiad_area_id', $olympiadArea->id)
                                     ->exists();
                                 if ($existingRegistration) {
-                                    $errors[] = "CI Document already registered in area '$areaName' for this olympiad";
+                                    $errors[] = "El Documento de CI ya está registrado en el área '$areaName' para esta olimpiada";
                                 }
                             }
                         }
@@ -383,42 +411,42 @@ class CompetitorRegistrationController extends Controller
         // Gender validation (F or M)
         if (!empty($data['GENERO'])) {
             if (!in_array(strtoupper($data['GENERO']), ['F', 'M'])) {
-                $errors[] = 'Gender must be F or M';
+                $errors[] = 'El Género debe ser F o M';
             }
         }
 
         // Department validation (2-50 characters, only letters)
         if (!empty($data['DEPARTAMENTO'])) {
             if (!preg_match('/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]{2,50}$/', $data['DEPARTAMENTO'])) {
-                $errors[] = 'Department must be 2-50 characters and contain only letters';
+                $errors[] = 'El Departamento debe tener entre 2-50 caracteres y contener solo letras';
             }
         }
 
         // School validation (2-100 characters, alphanumeric)
         if (!empty($data['COLEGIO'])) {
             if (!preg_match('/^[a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s]{2,100}$/', $data['COLEGIO'])) {
-                $errors[] = 'School must be 2-100 characters and contain only alphanumeric characters';
+                $errors[] = 'El Colegio debe tener entre 2-100 caracteres y contener solo caracteres alfanuméricos';
             }
         }
 
         // Phone validation (8 digits, optional)
         if (!empty($data['CELULAR'])) {
             if (!preg_match('/^[0-9]{8}$/', $data['CELULAR'])) {
-                $errors[] = 'Phone must be exactly 8 digits';
+                $errors[] = 'El Celular debe tener exactamente 8 dígitos';
             }
         }
 
         // Email validation (optional)
         if (!empty($data['E-MAIL'])) {
             if (!filter_var($data['E-MAIL'], FILTER_VALIDATE_EMAIL)) {
-                $errors[] = 'Email format is invalid';
+                $errors[] = 'El formato del Email es inválido';
             } else {
                 // Only check for duplicate email if it's not the same contestant
                 $emailExists = Contestant::where('email', $data['E-MAIL'])
                     ->where('ci_document', '!=', $data['CI'])
                     ->exists();
                 if ($emailExists) {
-                    $errors[] = 'Email already exists';
+                    $errors[] = 'El Email ya existe';
                 }
             }
         }
@@ -427,7 +455,7 @@ class CompetitorRegistrationController extends Controller
         if (!empty($olympiadId)) {
             $olympiad = Olympiad::find($olympiadId);
             if (!$olympiad) {
-                $errors[] = "Olympiad with ID '$olympiadId' does not exist";
+                $errors[] = "La Olimpiada con ID '$olympiadId' no existe";
             }
         }
 
@@ -436,20 +464,20 @@ class CompetitorRegistrationController extends Controller
             // Support comma or semicolon separators for multiple areas
             $areas = array_map('trim', preg_split('/[,;]+/', $data['AREA']));
             if (count($areas) > 3) {
-                $errors[] = 'Maximum 3 areas allowed';
+                $errors[] = 'Máximo 3 áreas permitidas';
             }
 
             foreach ($areas as $areaName) {
                 $area = Area::where('name', $areaName)->first();
                 if (!$area) {
-                    $errors[] = "Area '$areaName' does not exist in database";
+                    $errors[] = "El Área '$areaName' no existe en la base de datos";
                     continue;
                 }
                 $existsInOlympiad = OlympiadArea::where('olympiad_id', $olympiadId)
                     ->where('area_id', $area->id)
                     ->exists();
                 if (!$existsInOlympiad) {
-                    $errors[] = "Area '$areaName' is not configured for the selected Olympiad";
+                    $errors[] = "El Área '$areaName' no está configurada para la Olimpiada seleccionada";
                 }
             }
         }
@@ -457,11 +485,11 @@ class CompetitorRegistrationController extends Controller
         // Grade validation (must exist in database, only letters)
         if (!empty($data['GRADO'])) {
             if (!preg_match('/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/', $data['GRADO'])) {
-                $errors[] = 'Grade must contain only letters';
+                $errors[] = 'El Grado debe contener solo letras';
             } else {
                 $grade = Grade::where('name', trim($data['GRADO']))->first();
                 if (!$grade) {
-                    $errors[] = "Grade '" . trim($data['GRADO']) . "' does not exist in database";
+                    $errors[] = "El Grado '" . trim($data['GRADO']) . "' no existe en la base de datos";
                 }
             }
         }
@@ -470,11 +498,11 @@ class CompetitorRegistrationController extends Controller
         $levelValue = $data['NIVEL'] ?? ($data[' NIVEL'] ?? null);
         if (!empty($levelValue)) {
             if (!preg_match('/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]{2,50}$/', $levelValue)) {
-                $errors[] = 'Level must be 2-50 characters and contain only letters';
+                $errors[] = 'El Nivel debe tener entre 2-50 caracteres y contener solo letras';
             } else {
                 $level = Level::where('name', trim($levelValue))->first();
                 if (!$level) {
-                    $errors[] = "Level '" . trim($levelValue) . "' does not exist in database";
+                    $errors[] = "El Nivel '" . trim($levelValue) . "' no existe en la base de datos";
                 } else {
                     // Verify that the level is associated with the areas in this olympiad
                     $areas = array_map('trim', preg_split('/[,;]+/', $data['AREA']));
@@ -491,7 +519,7 @@ class CompetitorRegistrationController extends Controller
                                     ->exists();
 
                                 if (!$levelExists) {
-                                    $errors[] = "Level '" . trim($levelValue) . "' is not configured for area '$areaName' in this olympiad";
+                                    $errors[] = "El Nivel '" . trim($levelValue) . "' no está configurado para el área '$areaName' en esta olimpiada";
                                 }
                             }
                         }
@@ -500,20 +528,20 @@ class CompetitorRegistrationController extends Controller
             }
         }
         if (empty($levelValue)) {
-            $errors[] = 'Level is required';
+            $errors[] = 'El Nivel es requerido';
         }
 
         // Tutor Name validation (2-50 characters, only letters)
         if (!empty($data['NOMBRE TUTOR'])) {
             if (!preg_match('/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]{2,50}$/', $data['NOMBRE TUTOR'])) {
-                $errors[] = 'Tutor Name must be 2-50 characters and contain only letters';
+                $errors[] = 'El Nombre de Tutor debe tener entre 2-50 caracteres y contener solo letras';
             }
         }
 
         // Tutor Number validation (8 digits)
         if (!empty($data['NUMERO TUTOR'])) {
             if (!preg_match('/^[0-9]{8}$/', $data['NUMERO TUTOR'])) {
-                $errors[] = 'Tutor Number must be exactly 8 digits';
+                $errors[] = 'El Número de Tutor debe tener exactamente 8 dígitos';
             }
         }
 

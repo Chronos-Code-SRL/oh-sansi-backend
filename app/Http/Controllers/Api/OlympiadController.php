@@ -88,6 +88,38 @@ class OlympiadController extends Controller
             return response()->json($data, 400);
         }
 
+        // Validate that there are no overlapping olympiads
+        $overlappingOlympiad = Olympiad::where(function ($query) use ($request) {
+            $query->where(function ($q) use ($request) {
+                // Case 1: New start_date is between existing dates
+                $q->whereBetween('start_date', [$request->start_date, $request->end_date])
+                  ->orWhereBetween('end_date', [$request->start_date, $request->end_date]);
+            })->orWhere(function ($q) use ($request) {
+                // Case 2: Existing dates are between new dates (new olympiad wraps existing)
+                $q->where('start_date', '>=', $request->start_date)
+                  ->where('end_date', '<=', $request->end_date);
+            })->orWhere(function ($q) use ($request) {
+                // Case 3: New dates are between existing dates (existing wraps new)
+                $q->where('start_date', '<=', $request->start_date)
+                  ->where('end_date', '>=', $request->end_date);
+            });
+        })->first();
+
+        if ($overlappingOlympiad) {
+            $data = [
+                'message' => 'The olympiad dates overlap with an existing olympiad',
+                'error' => [
+                    'overlapping_olympiad' => [
+                        'name' => $overlappingOlympiad->name,
+                        'start_date' => $overlappingOlympiad->start_date,
+                        'end_date' => $overlappingOlympiad->end_date,
+                    ]
+                ],
+                'status' => 422
+            ];
+            return response()->json($data, 422);
+        }
+
         $olympiad = Olympiad::create([
             'name' => $request->name,
             'start_date' => $request->start_date,
