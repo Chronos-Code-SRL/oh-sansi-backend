@@ -97,6 +97,7 @@ class ContestantController extends Controller
             ->leftJoin('grades', 'level_grades.grade_id', '=', 'grades.id')
             ->leftJoin('levels', 'level_grades.level_id', '=', 'levels.id')
             ->where('olympiad_areas.olympiad_id', $olympiad_id)
+            ->orderBy('contestants.last_name', 'ASC')
             ->select(
                 'contestants.id AS contestant_id',
                 'evaluations.id AS evaluation_id',
@@ -120,24 +121,7 @@ class ContestantController extends Controller
             ], 404);
         }
 
-        $result = $contestantsOlympiad->map(function ($item) {
-            return [
-                'contestant_id' => $item->contestant_id,
-                'evaluation_id' => $item->evaluation_id,
-                'first_name' => $item->first_name,
-                'last_name' => $item->last_name,
-                'ci_document' => $item->ci_document,
-                'gender' => $item->gender,
-                'department' => $item->department,
-                'score' => $item->score,
-                'status' => (bool)$item->status,
-                'area_name' => $item->area_name,
-                'grade_name' => $item->grade_name,
-                'level_name' => $item->level_name,
-            ];
-        });
-
-        return response()->json($result, 200);
+        return response()->json($contestantsOlympiad, 200);
     }
 
     /**
@@ -376,48 +360,37 @@ class ContestantController extends Controller
     }
 
     // Get award winners for entire area (all levels must be endorsed)
-    public function getAwardWinningContestantsArea(string $olympiad_id, string $area_id)
+    public function getAwardWinningContestantsArea(string $olympiad_id, string $area_id, string $level_id)
     {
-        // Get olympiad area ID
-        $olympiadAreaId = DB::table('olympiad_areas')
-            ->where('olympiad_id', $olympiad_id)
-            ->where('area_id', $area_id)
-            ->value('id');
-
-        // Count total levels in this area
-        $cantLevelArea = DB::table('level_grades')
-            ->where('olympiad_area_id', $olympiadAreaId)
-            ->distinct('level_id')
-            ->count('level_id');
-
-        $levelIds = DB::table('level_grades')
-            ->where('olympiad_area_id', $olympiadAreaId)
-            ->distinct()
-            ->pluck('level_id');
-
-        // Check how many levels are fully endorsed
-        $cont = 0;
-
-        for ($i=0; $i < $cantLevelArea; $i++) {
-            if ($this->checkLevel($olympiad_id, $area_id, $levelIds[$i]) !== null) {
-                $cont++;
-            }
-        }
-
-        // All levels must be endorsed to proceed
-        if ($cont !== $cantLevelArea) {
-            return response()->json([
-                'message' => 'levels not fully endorsed',
-            ], 404);
-        }
-
-        // Get the last completed phase for awards
-        $lastPhase = $lastPhase = DB::table('olympiad_area_phases AS oap')
+        // Get last endorsed phase for the area and level
+        $lastPhaseId = DB::table('olympiad_area_phases AS oap')
+            ->join('olympiad_areas AS oa', 'oap.olympiad_area_id', '=', 'oa.id')
             ->join('phases AS p', 'oap.phase_id', '=', 'p.id')
-            ->where('oap.olympiad_area_id', $olympiadAreaId)
+            ->join('olympiad_area_phase_level_grades AS oapl', 'oapl.olympiad_area_phase_id', '=', 'oap.id')
+            ->join('level_grades AS lg', 'lg.id', '=', 'oapl.level_grade_id')
+            ->where('oa.olympiad_id', $olympiad_id)
+            ->where('oa.area_id', $area_id)
+            ->where('lg.level_id', $level_id)
+            ->where('oapl.status', 'Terminada')
             ->orderByDesc('p.order')
             ->select('oap.id')
             ->first();
+
+        if (!$lastPhaseId) {
+            return response()->json([
+                'message' => 'No phases found for the specified olympiad and area',
+            ], 404);
+        }   
+
+        $responsibleName = DB::table('user_area_olympiads as uao')
+            ->join('user_roles as ur', 'uao.user_role_id', '=', 'ur.id')
+            ->join('roles as r', 'ur.role_id', '=', 'r.id')
+            ->join('users as u', 'ur.user_id', '=', 'u.id')
+            ->where('uao.area_id', $area_id)
+            ->where('uao.olympiad_id', $olympiad_id)
+            ->where('r.name', 'responsable_academico')
+            ->select(DB::raw("CONCAT(u.first_name, ' ', u.last_name) AS full_name"))
+            ->value('full_name');
 
         $results = DB::table('evaluations AS e')
             ->join('registrations AS r', 'e.registration_id', '=', 'r.id')
@@ -427,9 +400,10 @@ class ContestantController extends Controller
             ->join('levels AS l', 'lg.level_id', '=', 'l.id')
             ->join('olympiad_areas AS oa', 'r.olympiad_area_id', '=', 'oa.id')
             ->join('areas AS a', 'oa.area_id', '=', 'a.id')
-            ->where('e.olympiad_area_phase_id', $lastPhase->id)
+            ->where('e.olympiad_area_phase_id', $lastPhaseId->id)
             ->where('oa.olympiad_id', $olympiad_id)
             ->where('oa.area_id', $area_id)
+            ->where('lg.level_id', $level_id)
             ->select(
                 'c.first_name AS first_name',
                 'c.last_name AS last_name',
@@ -437,10 +411,27 @@ class ContestantController extends Controller
                 'a.name AS area_name',
                 'c.department AS department',
                 'l.name AS level_name',
-                'e.classification_place AS classification_place'
+                'e.classification_place AS classification_place',
+                'e.score AS score',
+                'c.tutor_name AS tutor'
             )
             ->distinct()
             ->get();
+
+        $results = $results->map(function ($r) use ($responsibleName) {
+            return [
+                'first_name' => $r->first_name,
+                'last_name' => $r->last_name,
+                'school_name' => $r->school_name,
+                'department' => $r->department,
+                'area_name' => $r->area_name,
+                'level_name' => $r->level_name,
+                'score' => $r->score,
+                'classification_place' => $r->classification_place,
+                'tutor' => $r->tutor,
+                'area_responsible' => $responsibleName,
+            ];
+        });
 
         return response()->json([
             'contestants' => $results
