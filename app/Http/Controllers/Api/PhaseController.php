@@ -808,21 +808,6 @@ class PhaseController extends Controller
             ];
         }
 
-        // Get the olympiad_area_phase_level_grade to find score_cut
-        $oaplg = OlympiadAreaPhaseLevelGrade::where('olympiad_area_phase_id', $olympiadAreaPhaseId)
-            ->where('level_grade_id', $levelGrade->id)
-            ->first();
-
-        if (!$oaplg) {
-            return [
-                'can_endorse' => true,
-                'errors' => [],
-                'warnings' => []
-            ];
-        }
-
-        $scoreCut = $oaplg->score_cut;
-
         // Get all evaluations from this phase for this level
         $allEvaluations = Evaluation::where('olympiad_area_phase_id', $olympiadAreaPhaseId)
             ->whereNotNull('score')
@@ -839,11 +824,14 @@ class PhaseController extends Controller
                 ->exists();
         });
 
-        // Filter classified competitors with score >= score_cut
+        // Use minimum_classification_score from medal config instead of score_cut
+        $minimumScore = $medalConfig->minimum_classification_score;
+
+        // Filter classified competitors with score >= minimum_classification_score
         $classifiedEvaluations = $evaluations
             ->where('classification_status', 'clasificado')
-            ->filter(function ($evaluation) use ($scoreCut) {
-                return $evaluation->score >= $scoreCut;
+            ->filter(function ($evaluation) use ($minimumScore) {
+                return $evaluation->score >= $minimumScore;
             })
             ->sortByDesc('score')
             ->values();
@@ -961,11 +949,14 @@ class PhaseController extends Controller
             return;
         }
 
-        // Filter classified competitors with score >= score_cut, sorted by score descending
+        // Use minimum_classification_score from medal config instead of score_cut
+        $minimumScore = $medalConfig->minimum_classification_score;
+
+        // Filter classified competitors with score >= minimum_classification_score, sorted by score descending
         $classifiedEvaluations = $evaluations
             ->where('classification_status', 'clasificado')
-            ->filter(function ($evaluation) use ($scoreCut) {
-                return $evaluation->score >= $scoreCut;
+            ->filter(function ($evaluation) use ($minimumScore) {
+                return $evaluation->score >= $minimumScore;
             })
             ->sortByDesc('score')
             ->values();
