@@ -33,7 +33,7 @@ class EvaluationController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'score' => 'integer|nullable',
+            'score' => 'numeric|nullable', // Changed from 'integer|nullable' to 'numeric|nullable'
             'description' => 'string|nullable',
         ]);
 
