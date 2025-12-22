@@ -46,8 +46,10 @@ class EvaluationAuditController extends Controller
         // Exclude system-generated logs and irrelevant changes
         $query->whereNotNull('user_id') // Exclude logs without user (bulk uploads)
               ->where(function($q) {
-                  $q->whereRaw("JSON_EXTRACT(old_values, '$.*') IS NOT NULL")
-                    ->orWhereRaw("JSON_EXTRACT(new_values, '$.*') IS NOT NULL");
+                  $q->whereRaw("old_values::text != '{}'")
+                    ->orWhereRaw("new_values::text != '{}'");
+                    // $q->whereRaw("JSON_EXTRACT(old_values, '$.*') IS NOT NULL")
+                    //   ->orWhereRaw("JSON_EXTRACT(new_values, '$.*') IS NOT NULL");
               });
 
         // Filter by specific evaluation
