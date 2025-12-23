@@ -863,56 +863,92 @@ class PhaseController extends Controller
         $errors = [];
         $warnings = [];
 
-        // Get unique scores in descending order
-        $uniqueScores = $scoreGroups->keys()->values();
+        // Calculate medal ranges (cumulative person positions)
+        $medalRanges = [
+            ['type' => 'Oro', 'start' => 1, 'end' => $medalConfig->gold],
+            ['type' => 'Plata', 'start' => $medalConfig->gold + 1, 'end' => $medalConfig->gold + $medalConfig->silver],
+            ['type' => 'Bronce', 'start' => $medalConfig->gold + $medalConfig->silver + 1, 'end' => $medalConfig->gold + $medalConfig->silver + $medalConfig->bronze],
+            ['type' => 'Mención honorífica', 'start' => $medalConfig->gold + $medalConfig->silver + $medalConfig->bronze + 1, 'end' => $medalConfig->gold + $medalConfig->silver + $medalConfig->bronze + $medalConfig->honorable_mention]
+        ];
 
-        // Validate each position
-        foreach ($uniqueScores as $position => $score) {
-            $group = $scoreGroups[$score];
+        $currentPosition = 1; // Cumulative position (1-indexed)
+        $totalMedalPositions = $medalConfig->gold + $medalConfig->silver + $medalConfig->bronze + $medalConfig->honorable_mention;
+
+        // Validate each score group by cumulative person positions
+        foreach ($scoreGroups as $score => $group) {
             $groupCount = $group->count();
-            $medalType = null;
-            $available = 0;
+            $positionStart = $currentPosition;
+            $positionEnd = $currentPosition + $groupCount - 1;
 
-            // Determine medal based on position (0-based index)
-            if ($position === 0) {
-                // First unique score = Gold
-                $medalType = 'Oro';
-                $available = $medalConfig->gold;
-            } elseif ($position === 1) {
-                // Second unique score = Silver
-                $medalType = 'Plata';
-                $available = $medalConfig->silver;
-            } elseif ($position === 2) {
-                // Third unique score = Bronze
-                $medalType = 'Bronce';
-                $available = $medalConfig->bronze;
-            } else {
-                // Fourth+ unique scores = Honorable Mention
-                $medalType = 'Mención honorífica';
-                $available = $medalConfig->honorable_mention;
+            // Determine which medal ranges this group affects
+            $affectedMedals = [];
+            foreach ($medalRanges as $range) {
+                // Check if this group overlaps with this medal range
+                if ($positionStart <= $range['end'] && $positionEnd >= $range['start']) {
+                    $affectedMedals[] = [
+                        'type' => $range['type'],
+                        'start' => $range['start'],
+                        'end' => $range['end']
+                    ];
+                }
             }
 
-            // Check if the number of tied competitors exceeds available medals
-            if ($groupCount > $available) {
+            // Check if group extends beyond all medal positions
+            $extendsBeyondMedals = ($positionEnd > $totalMedalPositions);
+
+            // Validate based on how many medal categories are affected
+            if (count($affectedMedals) > 1) {
+                // ERROR: Tie crosses multiple medal category boundaries
+                $medalTypes = array_column($affectedMedals, 'type');
                 $errors[] = [
-                    'medal' => $medalType,
+                    'medal' => implode(', ', $medalTypes),
                     'score' => $score,
                     'count' => $groupCount,
-                    'available' => $available,
-                    'position' => $position + 1,
-                    'message' => "{$groupCount} competitors tied with score {$score} for {$medalType} (position " . ($position + 1) . "), but only {$available} medals available. Cannot endorse until scores are adjusted."
+                    'available' => $affectedMedals[0]['end'] - $positionStart + 1,
+                    'position' => $positionStart,
+                    'position_start' => $positionStart,
+                    'position_end' => $positionEnd,
+                    'medals_affected' => $medalTypes,
+                    'message' => "{$groupCount} competitors tied with score {$score} span positions {$positionStart}-{$positionEnd}, crossing multiple medal categories: " . implode(', ', $medalTypes) . ". Cannot endorse until tie is resolved."
                 ];
-            } elseif ($groupCount > 1) {
-                // Warning if there are ties but they fit within available medals
-                $warnings[] = [
-                    'medal' => $medalType,
+            } elseif (count($affectedMedals) === 1 && $extendsBeyondMedals) {
+                // ERROR: Tie crosses from a medal category into "no medal" territory
+                $medal = $affectedMedals[0];
+                $availableInMedal = $medal['end'] - $positionStart + 1;
+                $errors[] = [
+                    'medal' => $medal['type'],
                     'score' => $score,
                     'count' => $groupCount,
-                    'available' => $available,
-                    'position' => $position + 1,
-                    'message' => "{$groupCount} competitors tied with score {$score} for {$medalType} (position " . ($position + 1) . "). All can be awarded within available slots."
+                    'available' => $availableInMedal,
+                    'position' => $positionStart,
+                    'position_start' => $positionStart,
+                    'position_end' => $positionEnd,
+                    'medals_affected' => [$medal['type']],
+                    'message' => "{$groupCount} competitors tied with score {$score} in positions {$positionStart}-{$positionEnd}, but only {$availableInMedal} medal(s) available in {$medal['type']}. Cannot endorse until tie is resolved."
+                ];
+            } elseif (count($affectedMedals) === 1 && $groupCount > 1) {
+                // WARNING: Tie exists but all fit within one category
+                $medal = $affectedMedals[0];
+                $warnings[] = [
+                    'medal' => $medal['type'],
+                    'score' => $score,
+                    'count' => $groupCount,
+                    'available' => $medal['end'] - $medal['start'] + 1,
+                    'message' => "{$groupCount} competitors tied with score {$score} for {$medal['type']}. All can be awarded within available slots."
+                ];
+            } elseif (count($affectedMedals) === 0 && $groupCount > 1) {
+                // WARNING: Tie exists but beyond all medal positions (no medals affected)
+                $warnings[] = [
+                    'medal' => 'Sin medalla',
+                    'score' => $score,
+                    'count' => $groupCount,
+                    'available' => 0,
+                    'message' => "{$groupCount} competitors tied with score {$score} beyond medal positions."
                 ];
             }
+
+            // Advance position counter
+            $currentPosition = $positionEnd + 1;
         }
 
         return [
@@ -974,48 +1010,47 @@ class PhaseController extends Controller
             return;
         }
 
-        // Group evaluations by unique scores
+        // Group evaluations by unique scores to detect ties
         $scoreGroups = $classifiedEvaluations->groupBy('score')->sortKeysDesc();
 
-        // Get unique scores in descending order
-        $uniqueScores = $scoreGroups->keys()->values();
+        // Calculate medal ranges (cumulative person positions)
+        $medalRanges = [
+            ['type' => 'Oro', 'start' => 1, 'end' => $medalConfig->gold],
+            ['type' => 'Plata', 'start' => $medalConfig->gold + 1, 'end' => $medalConfig->gold + $medalConfig->silver],
+            ['type' => 'Bronce', 'start' => $medalConfig->gold + $medalConfig->silver + 1, 'end' => $medalConfig->gold + $medalConfig->silver + $medalConfig->bronze],
+            ['type' => 'Mención honorífica', 'start' => $medalConfig->gold + $medalConfig->silver + $medalConfig->bronze + 1, 'end' => $medalConfig->gold + $medalConfig->silver + $medalConfig->bronze + $medalConfig->honorable_mention]
+        ];
 
-        // Assign medals based on position of unique score
-        foreach ($uniqueScores as $position => $score) {
-            $group = $scoreGroups[$score];
+        $currentPosition = 1; // Cumulative position (1-indexed)
+
+        // Assign medals by cumulative person positions
+        foreach ($scoreGroups as $score => $group) {
             $groupCount = $group->count();
-            $medalToAssign = null;
-            $available = 0;
+            $positionStart = $currentPosition;
+            $positionEnd = $currentPosition + $groupCount - 1;
 
-            // Determine medal based on position (0-based index)
-            if ($position === 0) {
-                // First unique score = Gold
-                $medalToAssign = 'Oro';
-                $available = $medalConfig->gold;
-            } elseif ($position === 1) {
-                // Second unique score = Silver
-                $medalToAssign = 'Plata';
-                $available = $medalConfig->silver;
-            } elseif ($position === 2) {
-                // Third unique score = Bronze
-                $medalToAssign = 'Bronce';
-                $available = $medalConfig->bronze;
-            } else {
-                // Fourth+ unique scores = Honorable Mention
-                $medalToAssign = 'Mención honorífica';
-                $available = $medalConfig->honorable_mention;
-            }
-
-            // Only assign if the group fits within available medals
-            if ($groupCount <= $available) {
-                foreach ($group as $evaluation) {
-                    $evaluation->classification_place = $medalToAssign;
+            // Determine which medal ranges this group affects
+            $affectedMedals = [];
+            foreach ($medalRanges as $range) {
+                if ($positionStart <= $range['end'] && $positionEnd >= $range['start']) {
+                    $affectedMedals[] = $range['type'];
                 }
-            } else {
-                // This shouldn't happen if validation was done correctly
-                // But log it just in case
-                Log::warning("Medal assignment mismatch: {$groupCount} competitors for {$medalToAssign} but only {$available} available");
             }
+
+            // Only assign if the entire group fits within ONE medal category
+            if (count($affectedMedals) === 1) {
+                $targetMedal = $affectedMedals[0];
+                foreach ($group as $evaluation) {
+                    $evaluation->classification_place = $targetMedal;
+                }
+            } elseif (count($affectedMedals) > 1) {
+                // This shouldn't happen if validation passed, but log it
+                Log::warning("Medal assignment mismatch: {$groupCount} competitors tied with score {$score} at positions {$positionStart}-{$positionEnd} span multiple medal categories: " . implode(', ', $affectedMedals));
+            }
+            // If count === 0, the group is beyond all medal positions, so classification_place remains null
+
+            // Advance position counter
+            $currentPosition = $positionEnd + 1;
         }
     }
 
