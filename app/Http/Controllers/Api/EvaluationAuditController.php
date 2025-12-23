@@ -105,7 +105,7 @@ class EvaluationAuditController extends Controller
             $query->whereDate('created_at', '<=', $request->date_to);
         }
 
-        $perPage = $request->get('per_page', 15);
+        $perPage = $request->get('per_page', 1000);
         $audits = $query->with(['user:id,first_name,last_name,email'])
                        ->orderBy('created_at', 'desc')
                        ->paginate($perPage);
