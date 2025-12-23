@@ -901,7 +901,7 @@ class PhaseController extends Controller
                 // ERROR: Tie crosses multiple medal category boundaries
                 $medalTypes = array_column($affectedMedals, 'type');
                 $errors[] = [
-                    'medal' => implode(', ', $medalTypes),
+                    'medal' => $medalTypes[0],
                     'score' => $score,
                     'count' => $groupCount,
                     'available' => $affectedMedals[0]['end'] - $positionStart + 1,
